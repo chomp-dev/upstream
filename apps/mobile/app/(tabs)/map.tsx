@@ -187,11 +187,22 @@ export default function MapScreen() {
           setRefreshing(true);
         } else {
           setLoading(true);
+          setLoadingProgress(0);
+          setEstimatedCount(0);
         }
         setError(null);
         setFetchMeta(null);
 
         console.log(`[Map] Loading restaurants: radius=${radius}m, skipCache=${skipCache}`);
+        
+        // Simulate progress animation (10 API calls, ~200ms each)
+        const progressInterval = setInterval(() => {
+          setLoadingProgress((prev) => {
+            if (prev >= 90) return prev; // Cap at 90% until real data arrives
+            return prev + 10;
+          });
+          setEstimatedCount((prev) => prev + Math.floor(Math.random() * 15) + 10);
+        }, 200);
         
         const response = await searchApi.searchNearby(
           loc.coords.latitude,
@@ -200,6 +211,9 @@ export default function MapScreen() {
           200,
           skipCache
         );
+
+        clearInterval(progressInterval);
+        setLoadingProgress(100);
 
         console.log(`[Map] Got ${response.restaurants.length} restaurants, cached=${response.cached}`);
         
@@ -225,6 +239,8 @@ export default function MapScreen() {
       } finally {
         setLoading(false);
         setRefreshing(false);
+        setLoadingProgress(0);
+        setEstimatedCount(0);
       }
     },
     []
@@ -342,11 +358,19 @@ export default function MapScreen() {
           <Text variant="bodySmall" style={styles.loadingText}>
             Finding restaurants near you...
           </Text>
+          
+          {/* Real-time progress */}
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBar}>
+              <View style={[styles.progressFill, { width: `${loadingProgress}%` }]} />
+            </View>
+            <Text variant="caption" color={colors.muted} style={{ marginTop: spacing.xs }}>
+              {loadingProgress}% • ~{estimatedCount} places found so far...
+            </Text>
+          </View>
+          
           <Text variant="caption" color={colors.muted} style={{ marginTop: spacing.sm }}>
-            Making up to 10 API calls • {currentRadius >= 1000 ? `${currentRadius / 1000}km` : `${currentRadius}m`} radius
-          </Text>
-          <Text variant="caption" color={colors.muted} style={{ marginTop: spacing.xs }}>
-            This may take a few seconds...
+            {currentRadius >= 1000 ? `${currentRadius / 1000}km` : `${currentRadius}m`} radius • Up to 10 API calls
           </Text>
         </View>
       </Screen>
@@ -698,6 +722,23 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: spacing.md,
+  },
+  progressContainer: {
+    width: '80%',
+    marginTop: spacing.lg,
+    alignItems: 'center',
+  },
+  progressBar: {
+    width: '100%',
+    height: 6,
+    backgroundColor: colors.border,
+    borderRadius: radius.full,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: colors.primary,
+    borderRadius: radius.full,
   },
   errorIcon: {
     fontSize: 48,
