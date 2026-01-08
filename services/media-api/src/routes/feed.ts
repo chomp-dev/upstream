@@ -36,17 +36,71 @@ feedRouter.get('/check-status/:videoId', async (req, res) => {
   }
 });
 
+// Admin endpoint to verify all videos and mark deleted ones
+feedRouter.post('/admin/verify-all-videos', async (req, res) => {
+  try {
+    console.log('[Admin] Starting verification of all videos...');
+    
+    // Get all videos from database
+    const allVideos = await pool.query(
+      `SELECT id, cloudflare_video_id, status FROM videos ORDER BY created_at DESC`
+    );
+    
+    let checked = 0;
+    let markedAsError = 0;
+    let stillValid = 0;
+    
+    for (const video of allVideos.rows) {
+      if (video.cloudflare_video_id) {
+        try {
+          await getVideo(video.cloudflare_video_id);
+          stillValid++;
+        } catch (error: any) {
+          const is404 = error?.statusCode === 404 || 
+                        error?.message?.includes('404') || 
+                        error?.message?.includes('not found');
+          
+          if (is404 && video.status !== 'error') {
+            // Mark as error
+            await pool.query(
+              `UPDATE videos SET status = 'error', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+              [video.id]
+            );
+            markedAsError++;
+            console.log(`[Admin] Marked video ${video.cloudflare_video_id} as error (deleted from Cloudflare)`);
+          }
+        }
+        checked++;
+      }
+    }
+    
+    console.log(`[Admin] Verification complete: ${checked} checked, ${markedAsError} marked as error, ${stillValid} still valid`);
+    
+    res.json({
+      success: true,
+      totalVideos: allVideos.rows.length,
+      checked,
+      markedAsError,
+      stillValid,
+    });
+  } catch (error: any) {
+    console.error('[Admin] Error verifying videos:', error);
+    res.status(500).json({ error: error?.message || 'Failed to verify videos' });
+  }
+});
+
 // Get feed of videos and image posts
 feedRouter.get('/', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit as string) || 20;
     const offset = parseInt(req.query.offset as string) || 0;
 
-    // Fetch ALL videos - show newest first regardless of status
+    // Fetch videos - exclude error/deleted videos
     let videosResult = await pool.query(
       `SELECT id, cloudflare_video_id, playback_url, thumbnail_url, 
               status, duration, google_place_id, created_at, updated_at
        FROM videos 
+       WHERE status != 'error'
        ORDER BY created_at DESC 
        LIMIT $1 OFFSET $2`,
       [limit, offset]
@@ -54,15 +108,14 @@ feedRouter.get('/', async (req, res) => {
     
     console.log(`[Feed] Found ${videosResult.rows.length} videos. Statuses: ${videosResult.rows.map(v => `${v.id}:${v.status}`).join(', ')}`);
 
-    // Check and update status for non-ready videos
-    const pendingVideos = videosResult.rows.filter(v => v.status !== 'ready' || !v.playback_url);
-    if (pendingVideos.length > 0) {
-      console.log(`[Feed] Checking ${pendingVideos.length} pending/processing videos for status updates...`);
+    // Check and update status for non-ready videos OR ready videos without playback URLs
+    const videosToCheck = videosResult.rows.filter(v => v.status !== 'ready' || !v.playback_url);
+    if (videosToCheck.length > 0) {
+      console.log(`[Feed] Checking ${videosToCheck.length} videos for status updates...`);
     }
     
-    for (const video of videosResult.rows) {
-      // Check any video that is not ready or missing playback URL
-      if ((video.status !== 'ready' || !video.playback_url) && video.cloudflare_video_id) {
+    for (const video of videosToCheck) {
+      if (video.cloudflare_video_id) {
           try {
             console.log(`[Feed] Checking Cloudflare status for video ${video.cloudflare_video_id} (current: ${video.status})`);
             const cloudflareVideo = await getVideo(video.cloudflare_video_id);
@@ -105,8 +158,29 @@ feedRouter.get('/', async (req, res) => {
               console.log(`[Feed] ✅ Video ${video.cloudflare_video_id} updated: status=${cloudflareVideo.status}, hasPlaybackUrl=${!!newPlaybackUrl}`);
             }
           } catch (error: any) {
-            // Log error but don't fail - video might still be uploading or processing
-            console.log(`[Feed] Could not check status for video ${video.cloudflare_video_id}:`, error?.message || error);
+            // If video returns 404, mark it as deleted
+            const is404 = error?.statusCode === 404 || 
+                          error?.message?.includes('404') || 
+                          error?.message?.includes('not found');
+            
+            if (is404) {
+              console.log(`[Feed] Video ${video.cloudflare_video_id} not found on Cloudflare (deleted), marking as error`);
+              
+              // Mark video as error/deleted in database
+              await pool.query(
+                `UPDATE videos 
+                 SET status = 'error',
+                     updated_at = CURRENT_TIMESTAMP
+                 WHERE cloudflare_video_id = $1`,
+                [video.cloudflare_video_id]
+              );
+              
+              video.status = 'error';
+              console.log(`[Feed] ❌ Video ${video.cloudflare_video_id} marked as deleted/error`);
+            } else {
+              // Log other errors but don't fail - video might still be uploading or processing
+              console.log(`[Feed] Could not check status for video ${video.cloudflare_video_id}:`, error?.message || error);
+            }
           }
       }
     }

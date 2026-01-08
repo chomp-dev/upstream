@@ -19,38 +19,40 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 // react-native-maps is included in Expo SDK - works in Expo Go with Apple Maps on iOS
 import MapView, { Marker, Circle } from 'react-native-maps';
 
-// Icon mapping based on restaurant type
-const getMarkerIcon = (primaryType: string | null | undefined): string => {
-  if (!primaryType) return '•';
+// Icon mapping based on restaurant type - returns icon component
+const getMarkerIcon = (primaryType: string | null | undefined, isSelected: boolean) => {
+  const color = isSelected ? colors.primary : colors.text;
+  const size = isSelected ? 20 : 18;
+  
+  if (!primaryType) {
+    return <Ionicons name="restaurant-outline" size={size} color={color} />;
+  }
   
   const type = primaryType.toLowerCase();
   
-  if (type.includes('coffee') || type.includes('cafe')) return '☕';
-  if (type.includes('ice_cream')) return '🍦';
-  if (type.includes('bakery')) return '🥐';
-  if (type.includes('pizza')) return '🍕';
-  if (type.includes('burger') || type.includes('hamburger')) return '🍔';
-  if (type.includes('sushi') || type.includes('japanese')) return '🍣';
-  if (type.includes('chinese')) return '🥡';
-  if (type.includes('mexican') || type.includes('taco')) return '🌮';
-  if (type.includes('italian') || type.includes('pasta')) return '🍝';
-  if (type.includes('indian')) return '🍛';
-  if (type.includes('thai') || type.includes('vietnamese') || type.includes('asian')) return '🍜';
-  if (type.includes('bar')) return '🍺';
-  if (type.includes('sandwich') || type.includes('deli')) return '🥪';
-  if (type.includes('breakfast') || type.includes('brunch')) return '🍳';
-  if (type.includes('steak') || type.includes('bbq') || type.includes('barbecue')) return '🥩';
-  if (type.includes('seafood') || type.includes('fish')) return '🐟';
-  if (type.includes('chicken') || type.includes('wings')) return '🍗';
-  if (type.includes('fast_food')) return '🍟';
-  if (type.includes('juice') || type.includes('smoothie')) return '🧃';
-  if (type.includes('dessert') || type.includes('sweet')) return '🍰';
+  if (type.includes('coffee') || type.includes('cafe')) 
+    return <Ionicons name="cafe-outline" size={size} color={color} />;
+  if (type.includes('ice_cream')) 
+    return <Ionicons name="ice-cream-outline" size={size} color={color} />;
+  if (type.includes('bakery')) 
+    return <MaterialCommunityIcons name="baguette" size={size} color={color} />;
+  if (type.includes('pizza')) 
+    return <Ionicons name="pizza-outline" size={size} color={color} />;
+  if (type.includes('burger') || type.includes('hamburger')) 
+    return <MaterialCommunityIcons name="hamburger" size={size} color={color} />;
+  if (type.includes('fast_food')) 
+    return <MaterialCommunityIcons name="french-fries" size={size} color={color} />;
+  if (type.includes('bar')) 
+    return <Ionicons name="beer-outline" size={size} color={color} />;
+  if (type.includes('dessert') || type.includes('sweet')) 
+    return <MaterialCommunityIcons name="cupcake" size={size} color={color} />;
   
   // Default restaurant icon
-  return '🍽';
+  return <Ionicons name="restaurant-outline" size={size} color={color} />;
 };
 import * as Location from 'expo-location';
 import { Screen, Text, Card, Segmented, Badge, Pill } from '../../src/ui';
@@ -63,11 +65,11 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Animated marker component for smooth interactions
 const AnimatedMarkerContent = ({ 
-  icon, 
+  iconComponent, 
   isSelected, 
   onPress 
 }: { 
-  icon: string; 
+  iconComponent: React.ReactNode; 
   isSelected: boolean; 
   onPress: () => void;
 }) => {
@@ -115,7 +117,7 @@ const AnimatedMarkerContent = ({
           styles.markerBubble,
           isSelected && styles.markerBubbleSelected
         ]}>
-          <RNText style={styles.markerEmoji}>{icon}</RNText>
+          {iconComponent}
         </View>
       </Animated.View>
     </Pressable>
@@ -341,7 +343,10 @@ export default function MapScreen() {
             Finding restaurants near you...
           </Text>
           <Text variant="caption" color={colors.muted} style={{ marginTop: spacing.sm }}>
-            Fetching up to 10 Google calls (up to ~200 places)
+            Making up to 10 API calls • {currentRadius >= 1000 ? `${currentRadius / 1000}km` : `${currentRadius}m`} radius
+          </Text>
+          <Text variant="caption" color={colors.muted} style={{ marginTop: spacing.xs }}>
+            This may take a few seconds...
           </Text>
         </View>
       </Screen>
@@ -361,14 +366,20 @@ export default function MapScreen() {
           {restaurants.length} restaurants found
         </Text>
         {fetchMeta?.requestsMade != null && (
-          <Text variant="caption" color={colors.muted} style={styles.headerCount}>
-            Retrieved {fetchMeta.uniquePlaces ?? restaurants.length}
-            {fetchMeta.rawPlaces != null ? ` (${fetchMeta.rawPlaces} raw)` : ''}
-            {fetchMeta.maxRequests != null
-              ? ` — ${fetchMeta.requestsMade}/${fetchMeta.maxRequests} calls`
-              : ''}
-            {fetchMeta.truncated ? ' — capped' : ''}
-          </Text>
+          <View style={styles.fetchMetaContainer}>
+            <Text variant="caption" style={styles.fetchMetaText}>
+              🔄 Made {fetchMeta.requestsMade}/{fetchMeta.maxRequests} API calls
+            </Text>
+            <Text variant="caption" style={styles.fetchMetaText}>
+              📍 Found {fetchMeta.uniquePlaces ?? restaurants.length} unique places
+              {fetchMeta.rawPlaces != null ? ` from ${fetchMeta.rawPlaces} total` : ''}
+            </Text>
+            {fetchMeta.truncated && (
+              <Text variant="caption" style={[styles.fetchMetaText, { color: colors.coral }]}>
+                ⚠️ Results capped at {restaurants.length} (more available in this area)
+              </Text>
+            )}
+          </View>
         )}
 
         {/* View mode toggle */}
@@ -441,7 +452,7 @@ export default function MapScreen() {
               .filter((r) => r.lat != null && r.lng != null && !isNaN(r.lat) && !isNaN(r.lng))
               .map((restaurant) => {
                 const isSelected = selectedRestaurant?.id === restaurant.id;
-                const icon = getMarkerIcon(restaurant.primary_type);
+                const iconComponent = getMarkerIcon(restaurant.primary_type, isSelected);
                 
                 return (
                   <Marker
@@ -455,7 +466,7 @@ export default function MapScreen() {
                     tracksViewChanges={isSelected}
                   >
                     <AnimatedMarkerContent
-                      icon={icon}
+                      iconComponent={iconComponent}
                       isSelected={isSelected}
                       onPress={() => setSelectedRestaurant(restaurant)}
                     />
@@ -486,9 +497,7 @@ export default function MapScreen() {
               {/* Header with icon and name */}
               <View style={styles.selectedCardHeader}>
                 <View style={styles.selectedCardIcon}>
-                  <RNText style={styles.selectedCardEmoji}>
-                    {getMarkerIcon(selectedRestaurant.primary_type)}
-                  </RNText>
+                  {getMarkerIcon(selectedRestaurant.primary_type, false)}
                 </View>
                 <View style={styles.selectedCardTitleArea}>
                   <Text variant="subtitle" numberOfLines={1}>
@@ -615,6 +624,17 @@ const styles = StyleSheet.create({
   },
   headerCount: {
     marginTop: spacing.xs,
+  },
+  fetchMetaContainer: {
+    marginTop: spacing.sm,
+    padding: spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    gap: spacing.xxs,
+  },
+  fetchMetaText: {
+    fontSize: 12,
+    color: colors.muted,
   },
   viewToggle: {
     marginTop: spacing.md,
@@ -802,10 +822,6 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     backgroundColor: colors.elevated,
   },
-  markerEmoji: {
-    fontSize: 18,
-    textAlign: 'center',
-  },
   // Selected restaurant card
   selectedCardHeader: {
     flexDirection: 'row',
@@ -820,9 +836,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: spacing.md,
-  },
-  selectedCardEmoji: {
-    fontSize: 22,
   },
   selectedCardTitleArea: {
     flex: 1,

@@ -1,17 +1,22 @@
 import { Tabs } from 'expo-router';
 import { View, Text, StyleSheet, Platform } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, tabBar } from '../../src/theme';
 
 interface TabIconProps {
-  icon: string;
+  iconName: keyof typeof Ionicons.glyphMap;
   label: string;
   focused: boolean;
 }
 
-function TabIcon({ icon, label, focused }: TabIconProps) {
+function TabIcon({ iconName, label, focused }: TabIconProps) {
   return (
     <View style={styles.tabItem}>
-      <Text style={[styles.icon, focused && styles.iconFocused]}>{icon}</Text>
+      <Ionicons 
+        name={iconName} 
+        size={24} 
+        color={focused ? colors.primary : colors.muted} 
+      />
       <Text style={[styles.label, focused && styles.labelFocused]} numberOfLines={1}>
         {label}
       </Text>
@@ -22,7 +27,7 @@ function TabIcon({ icon, label, focused }: TabIconProps) {
 function CreateTabIcon({ focused }: { focused: boolean }) {
   return (
     <View style={[styles.createButton, focused && styles.createButtonFocused]}>
-      <Text style={styles.createIcon}>+</Text>
+      <Ionicons name="add" size={28} color={colors.bg} />
     </View>
   );
 }
@@ -43,7 +48,7 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ focused }) => (
-            <TabIcon icon="▶" label="Watch" focused={focused} />
+            <TabIcon iconName="play-circle-outline" label="Watch" focused={focused} />
           ),
         }}
       />
@@ -52,7 +57,7 @@ export default function TabLayout() {
         options={{
           title: 'Map',
           tabBarIcon: ({ focused }) => (
-            <TabIcon icon="◎" label="Map" focused={focused} />
+            <TabIcon iconName="location-outline" label="Map" focused={focused} />
           ),
         }}
       />
@@ -68,7 +73,7 @@ export default function TabLayout() {
         options={{
           title: 'Explore',
           tabBarIcon: ({ focused }) => (
-            <TabIcon icon="⬡" label="Explore" focused={focused} />
+            <TabIcon iconName="search-outline" label="Explore" focused={focused} />
           ),
         }}
       />
@@ -77,7 +82,7 @@ export default function TabLayout() {
         options={{
           title: 'Social',
           tabBarIcon: ({ focused }) => (
-            <TabIcon icon="◉" label="Social" focused={focused} />
+            <TabIcon iconName="person-outline" label="Profile" focused={focused} />
           ),
         }}
       />
@@ -99,14 +104,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
-  },
-  icon: {
-    fontSize: 24,
-    color: colors.muted,
-    textAlign: 'center',
-  },
-  iconFocused: {
-    color: colors.primary,
   },
   label: {
     fontSize: 11,
@@ -134,11 +131,5 @@ const styles = StyleSheet.create({
   createButtonFocused: {
     backgroundColor: colors.primaryLight,
     shadowColor: colors.primaryLight,
-  },
-  createIcon: {
-    fontSize: 32,
-    fontWeight: '300',
-    color: colors.bg,
-    lineHeight: 36,
   },
 });

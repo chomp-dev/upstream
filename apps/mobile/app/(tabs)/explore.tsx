@@ -43,8 +43,17 @@ export default function ExploreScreen() {
       }
 
       const data = await mediaApi.fetchFeed(50, 0);
-      setFeed(data.feed || []);
-      setFilteredFeed(data.feed || []);
+      
+      // Filter out error/deleted videos on client side
+      const validFeed = (data.feed || []).filter(item => {
+        if (item.type === 'video') {
+          return item.status !== 'error' && item.playback_url;
+        }
+        return true;
+      });
+      
+      setFeed(validFeed);
+      setFilteredFeed(validFeed);
     } catch (error) {
       console.error('Error loading explore feed:', error);
     } finally {

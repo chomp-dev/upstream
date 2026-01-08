@@ -86,10 +86,19 @@ export default function HomeScreen() {
     try {
       if (!isRefresh) setLoading(true);
       const data = await mediaApi.fetchFeed();
-      setFeed(data.feed || []);
+      
+      // Filter out error/deleted videos on client side as extra safety
+      const validFeed = (data.feed || []).filter(item => {
+        if (item.type === 'video') {
+          return item.status !== 'error' && item.playback_url;
+        }
+        return true;
+      });
+      
+      setFeed(validFeed);
       
       // Prefetch restaurant data for items with google_place_id
-      const placeIds = data.feed
+      const placeIds = validFeed
         .filter((item) => item.google_place_id)
         .map((item) => item.google_place_id!)
         .filter((id, idx, arr) => arr.indexOf(id) === idx); // Unique
@@ -188,14 +197,26 @@ export default function HomeScreen() {
                   />
                   {item.status !== 'ready' && (
                     <View style={styles.processingOverlay}>
-                      <ActivityIndicator size="large" color={colors.primary} />
-                      <Text variant="body" style={styles.processingText}>
-                        {item.status === 'error'
-                          ? 'Error processing video'
-                          : item.status === 'inprogress' || item.status === 'processing'
-                          ? 'Almost ready...'
-                          : 'Processing video...'}
-                      </Text>
+                      {item.status === 'error' ? (
+                        <>
+                          <Text style={styles.errorIcon}>⚠️</Text>
+                          <Text variant="body" style={styles.processingText}>
+                            Video unavailable
+                          </Text>
+                          <Text variant="bodySmall" style={[styles.processingText, { marginTop: spacing.xs }]}>
+                            This video may have been deleted
+                          </Text>
+                        </>
+                      ) : (
+                        <>
+                          <ActivityIndicator size="large" color={colors.primary} />
+                          <Text variant="body" style={styles.processingText}>
+                            {item.status === 'inprogress' || item.status === 'processing'
+                              ? 'Almost ready...'
+                              : 'Processing video...'}
+                          </Text>
+                        </>
+                      )}
                     </View>
                   )}
                 </>
@@ -290,6 +311,10 @@ const styles = StyleSheet.create({
   },
   processingText: {
     marginTop: spacing.md,
+  },
+  errorIcon: {
+    fontSize: 48,
+    marginBottom: spacing.sm,
   },
   restaurantOverlay: {
     position: 'absolute',

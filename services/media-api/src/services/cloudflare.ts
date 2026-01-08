@@ -85,6 +85,19 @@ export async function getVideo(videoId: string) {
       },
     });
 
+    // Check HTTP status before parsing JSON
+    if (response.status === 404) {
+      const error: any = new Error('Video not found (404)');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    if (!response.ok) {
+      const error: any = new Error(`Cloudflare API error: ${response.status}`);
+      error.statusCode = response.status;
+      throw error;
+    }
+
     const data = await response.json() as VideoResponse;
     
     if (!data.success) {

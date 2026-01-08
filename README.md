@@ -136,6 +136,103 @@ npx expo start
 | GET | `/api/v1/restaurants/:place_id` | Get restaurant details |
 | GET | `/health` | Health check |
 
+## Content Moderation & Deleted Videos
+
+### The Problem
+When videos are deleted from Cloudflare Stream (for moderation/content policy), they remain in the PostgreSQL database with `status='ready'`. This causes:
+- Broken videos showing in feed/explore
+- Playback errors in the mobile app
+- Noisy error logs
+
+### Current Solution
+
+**Automatic Detection (Limited):**
+- Feed endpoint automatically checks videos that are:
+  - NOT `status='ready'`, OR
+  - Missing `playback_url`
+- Videos with `status='ready'` are assumed valid and NOT re-checked
+- **Result:** Deleted videos won't be caught until manually verified
+
+**Manual Cleanup:**
+```bash
+# Run this to verify ALL videos and mark deleted ones as error
+curl -X POST http://localhost:3000/api/feed/admin/verify-all-videos
+```
+
+This endpoint:
+1. Fetches all videos from database
+2. Checks each one against Cloudflare Stream API
+3. Marks deleted videos (404 responses) as `status='error'`
+4. Returns summary: `{ checked, markedAsError, stillValid }`
+
+**Feed Filtering:**
+- Backend: Videos with `status='error'` are excluded from feed query
+- Frontend: Additional client-side filtering for safety
+- Result: Deleted videos never appear in feed or explore
+
+### Technical Details
+
+**Error Detection Logic:**
+```typescript
+// services/media-api/src/services/cloudflare.ts
+// Properly detects 404s and attaches statusCode to error
+if (response.status === 404) {
+  const error: any = new Error('Video not found (404)');
+  error.statusCode = 404;
+  throw error;
+}
+```
+
+**Feed Query:**
+```sql
+-- services/media-api/src/routes/feed.ts
+SELECT * FROM videos 
+WHERE status != 'error'  -- Exclude deleted videos
+ORDER BY created_at DESC
+```
+
+**Client-Side Safety:**
+```typescript
+// apps/mobile/app/(tabs)/index.tsx & explore.tsx
+const validFeed = feed.filter(item => 
+  item.type !== 'video' || (item.status !== 'error' && item.playback_url)
+);
+```
+
+### Recommended Production Setup
+
+**Option 1: Cron Job (Recommended)**
+Set up a scheduled task to run the admin endpoint periodically:
+
+```bash
+# Add to crontab (run every hour)
+0 * * * * curl -X POST https://your-domain.com/api/feed/admin/verify-all-videos
+
+# Or use GitHub Actions, Vercel Cron, or node-cron
+```
+
+**Option 2: Node-cron (In-App)**
+```typescript
+// services/media-api/src/index.ts
+import cron from 'node-cron';
+
+// Run every 6 hours
+cron.schedule('0 */6 * * *', async () => {
+  console.log('[Cron] Verifying all videos...');
+  // Call verify endpoint logic
+});
+```
+
+**Option 3: Cloudflare Webhooks**
+If Cloudflare Stream supports deletion webhooks, implement an endpoint to receive notifications and immediately mark videos as deleted.
+
+### Future Improvements
+- [ ] Set up automated cron job for video verification
+- [ ] Add `last_verified_at` timestamp to videos table
+- [ ] Implement video age-based re-verification (check videos older than 7 days)
+- [ ] Add Cloudflare webhook support for real-time deletion detection
+- [ ] Create admin dashboard for content moderation
+
 ## Database Schema
 
 ### Videos Table
