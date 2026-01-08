@@ -1,0 +1,2 @@
+"""Search MVP Backend Application."""
+

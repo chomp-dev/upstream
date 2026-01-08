@@ -1,0 +1,60 @@
+{
+  "expo": {
+    "name": "Chomp",
+    "slug": "chomp",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "chomp",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0D0B0A"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.chomp.app",
+      "config": {
+        "googleMapsApiKey": "AIzaSyAqq6mTFvn6DnnQkW9MUhjx59lcX5644n0"
+      },
+      "infoPlist": {
+        "NSCameraUsageDescription": "Chomp needs camera access to record videos.",
+        "NSMicrophoneUsageDescription": "Chomp needs microphone access to record audio.",
+        "NSPhotoLibraryUsageDescription": "Chomp needs photo library access to upload media.",
+        "NSLocationWhenInUseUsageDescription": "Chomp needs your location to find nearby restaurants."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0D0B0A"
+      },
+      "package": "com.chomp.app",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyAqq6mTFvn6DnnQkW9MUhjx59lcX5644n0"
+        }
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router", 
+      "expo-location"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

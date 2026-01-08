@@ -1,0 +1,33 @@
+{
+  "name": "chomp-media-api",
+  "version": "1.0.0",
+  "description": "Chomp Media API with Cloudflare Stream integration",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "type-check": "tsc --noEmit",
+    "migrate": "psql $DATABASE_URL -f migrations/001_add_google_place_id.sql"
+  },
+  "keywords": ["chomp", "media", "video", "cloudflare"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "pg": "^8.11.3",
+    "zod": "^3.22.4",
+    "node-fetch": "^2.7.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/cors": "^2.8.17",
+    "@types/node": "^20.10.5",
+    "@types/pg": "^8.10.9",
+    "@types/node-fetch": "^2.6.11",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  }
+}
