@@ -17,6 +17,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystemLegacy from 'expo-file-system/legacy';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { Screen, Text } from '../../src/ui';
 import { colors, spacing, radius } from '../../src/theme';
 import { ratingColor, priceDisplay } from '../../src/theme/styles';
@@ -259,15 +260,16 @@ export default function CreateScreen() {
                   {selectedRestaurant.name}
                 </Text>
                 <TouchableOpacity onPress={() => setSelectedRestaurant(null)}>
-                  <Text variant="body" color={colors.coral}>
-                    ✕
-                  </Text>
+                  <Ionicons name="close-circle" size={20} color={colors.coral} />
                 </TouchableOpacity>
               </View>
             ) : (
-              <Text variant="bodySmall" color={colors.muted}>
-                📍 Tap to select a nearby restaurant
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                <Ionicons name="location-outline" size={16} color={colors.muted} />
+                <Text variant="bodySmall" color={colors.muted}>
+                  Tap to select a nearby restaurant
+                </Text>
+              </View>
             )}
           </TouchableOpacity>
         </View>
@@ -279,7 +281,7 @@ export default function CreateScreen() {
             onPress={uploadVideo}
             disabled={uploading}
           >
-            <Text style={styles.uploadButtonIcon}>🎬</Text>
+            <Ionicons name="videocam" size={36} color={colors.bg} style={{ marginBottom: spacing.sm }} />
             <Text variant="subtitle" color={colors.bg}>
               Upload Video
             </Text>
@@ -293,7 +295,7 @@ export default function CreateScreen() {
             onPress={uploadImages}
             disabled={uploading}
           >
-            <Text style={styles.uploadButtonIcon}>📸</Text>
+            <Ionicons name="images-outline" size={36} color={colors.text} style={{ marginBottom: spacing.sm }} />
             <Text variant="subtitle">Upload Images</Text>
             <Text variant="caption" color={colors.muted}>
               1-10 photos
@@ -412,10 +414,6 @@ const styles = StyleSheet.create({
   },
   uploadButtonDisabled: {
     opacity: 0.5,
-  },
-  uploadButtonIcon: {
-    fontSize: 40,
-    marginBottom: spacing.sm,
   },
   modalOverlay: {
     flex: 1,

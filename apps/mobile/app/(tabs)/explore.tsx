@@ -15,6 +15,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { Screen, Text } from '../../src/ui';
 import { colors, spacing, radius } from '../../src/theme';
 import { mediaApi } from '../../src/lib/api';
@@ -164,7 +165,7 @@ export default function ExploreScreen() {
           Explore
         </Text>
         <View style={styles.searchContainer}>
-          <Text style={styles.searchIcon}>🔍</Text>
+          <Ionicons name="search-outline" size={18} color={colors.muted} style={{ marginRight: spacing.sm }} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search (coming soon)"
@@ -174,7 +175,7 @@ export default function ExploreScreen() {
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Text style={styles.clearButton}>✕</Text>
+              <Ionicons name="close-circle" size={20} color={colors.muted} />
             </TouchableOpacity>
           )}
         </View>
@@ -230,10 +231,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
-  },
-  searchIcon: {
-    fontSize: 16,
-    marginRight: spacing.sm,
   },
   searchInput: {
     flex: 1,

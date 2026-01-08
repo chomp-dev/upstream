@@ -153,6 +153,8 @@ export default function MapScreen() {
     truncated?: boolean | null;
   } | null>(null);
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [estimatedCount, setEstimatedCount] = useState(0);
   const mapRef = useRef<MapView>(null);
 
   const currentRadius = RADIUS_OPTIONS[radiusIndex].value;
@@ -574,7 +576,7 @@ export default function MapScreen() {
                   style={styles.actionButton}
                   onPress={() => handleOpenMaps(selectedRestaurant)}
                 >
-                  <RNText style={styles.actionButtonIcon}>🗺️</RNText>
+                  <Ionicons name="navigate-outline" size={18} color={colors.text} style={{ marginRight: 6 }} />
                   <RNText style={styles.actionButtonText}>Directions</RNText>
                 </TouchableOpacity>
                 
@@ -594,7 +596,7 @@ export default function MapScreen() {
                     });
                   }}
                 >
-                  <RNText style={styles.actionButtonIcon}>📍</RNText>
+                  <Ionicons name="storefront-outline" size={18} color={colors.bg} style={{ marginRight: 6 }} />
                   <RNText style={[styles.actionButtonText, styles.actionButtonTextPrimary]}>View Page</RNText>
                 </TouchableOpacity>
               </View>
@@ -923,9 +925,6 @@ const styles = StyleSheet.create({
   },
   actionButtonPrimary: {
     backgroundColor: colors.primary,
-  },
-  actionButtonIcon: {
-    fontSize: 16,
   },
   actionButtonText: {
     fontSize: 14,

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { View, StyleSheet, Dimensions, Image, Platform, TouchableOpacity, ActivityIndicator, Text } from 'react-native';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 
 const { width, height } = Dimensions.get('window');
 
@@ -151,7 +152,7 @@ export function VideoPlayer({
             {/* Like button */}
             <TouchableOpacity style={styles.actionButton} activeOpacity={0.7}>
               <View style={styles.iconCircle}>
-                <Text style={styles.actionIcon}>♥</Text>
+                <Ionicons name="heart-outline" size={22} color="#fff" />
               </View>
               <Text style={styles.actionCount}>24K</Text>
             </TouchableOpacity>
@@ -159,7 +160,7 @@ export function VideoPlayer({
             {/* Comment button */}
             <TouchableOpacity style={styles.actionButton} activeOpacity={0.7}>
               <View style={styles.iconCircle}>
-                <Text style={styles.actionIcon}>💬</Text>
+                <Ionicons name="chatbubble-outline" size={20} color="#fff" />
               </View>
               <Text style={styles.actionCount}>832</Text>
             </TouchableOpacity>
@@ -167,14 +168,14 @@ export function VideoPlayer({
             {/* Bookmark button */}
             <TouchableOpacity style={styles.actionButton} activeOpacity={0.7}>
               <View style={styles.iconCircle}>
-                <Text style={styles.actionIcon}>⭐</Text>
+                <Ionicons name="bookmark-outline" size={20} color="#fff" />
               </View>
             </TouchableOpacity>
 
             {/* Share button */}
             <TouchableOpacity style={styles.actionButton} activeOpacity={0.7}>
               <View style={styles.iconCircle}>
-                <Text style={styles.actionIcon}>⤴</Text>
+                <Ionicons name="arrow-redo-outline" size={20} color="#fff" />
               </View>
             </TouchableOpacity>
           </View>
@@ -200,7 +201,7 @@ export function VideoPlayer({
             {/* Audio info */}
             <View style={styles.audioInfo}>
               <View style={styles.audioIcon}>
-                <Text style={styles.audioEmoji}>♪</Text>
+                <Ionicons name="musical-notes" size={14} color="#fff" />
               </View>
               <Text style={styles.audioText} numberOfLines={1}>
                 Original Audio
@@ -307,10 +308,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backdropFilter: 'blur(10px)',
   },
-  actionIcon: {
-    fontSize: 22,
-    color: '#fff',
-  },
   actionCount: {
     color: '#fff',
     fontSize: 11,
@@ -368,11 +365,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  audioEmoji: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
   },
   audioText: {
     color: '#fff',

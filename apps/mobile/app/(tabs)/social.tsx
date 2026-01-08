@@ -4,6 +4,7 @@
 
 import { useState } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Screen, Text, Segmented, Card } from '../../src/ui';
 import { colors, spacing, radius } from '../../src/theme';
 
@@ -48,7 +49,7 @@ function ProfileSection() {
       {/* Profile header */}
       <View style={styles.profileHeader}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>👤</Text>
+          <Ionicons name="person" size={48} color={colors.primary} />
         </View>
         <Text variant="title" style={styles.username}>
           @chomper
@@ -84,9 +85,10 @@ function ProfileSection() {
 
       {/* Favorites */}
       <Card style={styles.card}>
-        <Text variant="label" style={styles.cardTitle}>
-          🏆 Top Spots
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md }}>
+          <Ionicons name="trophy-outline" size={18} color={colors.lime} />
+          <Text variant="label">Top Spots</Text>
+        </View>
         <View style={styles.topSpots}>
           <View style={styles.topSpotItem}>
             <Text variant="body">1.</Text>
@@ -120,9 +122,10 @@ function ProfileSection() {
 
       {/* Recent activity placeholder */}
       <Card style={styles.card}>
-        <Text variant="label" style={styles.cardTitle}>
-          📊 Recent Activity
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md }}>
+          <Ionicons name="stats-chart-outline" size={18} color={colors.blue} />
+          <Text variant="label">Recent Activity</Text>
+        </View>
         <Text variant="bodySmall" color={colors.muted}>
           Your activity stats will appear here
         </Text>
@@ -161,7 +164,7 @@ function FriendsSection() {
       ))}
 
       <Card style={[styles.card, styles.addFriendsCard]}>
-        <Text style={styles.addFriendsIcon}>👥</Text>
+        <Ionicons name="people-outline" size={40} color={colors.muted} style={{ marginBottom: spacing.sm }} />
         <Text variant="body" center>
           Find Friends
         </Text>
@@ -177,7 +180,7 @@ function InboxSection() {
   return (
     <View style={styles.section}>
       <View style={styles.emptyInbox}>
-        <Text style={styles.inboxIcon}>📬</Text>
+        <Ionicons name="mail-open-outline" size={64} color={colors.muted} style={{ marginBottom: spacing.md }} />
         <Text variant="subtitle" center>
           No messages yet
         </Text>
@@ -192,7 +195,9 @@ function InboxSection() {
       </Text>
       
       <Card style={styles.notificationCard}>
-        <Text style={styles.notificationIcon}>❤️</Text>
+        <View style={styles.notificationIconCircle}>
+          <Ionicons name="heart" size={18} color={colors.coral} />
+        </View>
         <View style={styles.notificationContent}>
           <Text variant="bodySmall">
             <Text bold>@alexeats</Text> liked your post
@@ -204,7 +209,9 @@ function InboxSection() {
       </Card>
 
       <Card style={styles.notificationCard}>
-        <Text style={styles.notificationIcon}>💬</Text>
+        <View style={styles.notificationIconCircle}>
+          <Ionicons name="chatbubble" size={16} color={colors.blue} />
+        </View>
         <View style={styles.notificationContent}>
           <Text variant="bodySmall">
             <Text bold>@samcooks</Text> commented on your video
@@ -216,7 +223,9 @@ function InboxSection() {
       </Card>
 
       <Card style={styles.notificationCard}>
-        <Text style={styles.notificationIcon}>👋</Text>
+        <View style={styles.notificationIconCircle}>
+          <Ionicons name="person-add" size={16} color={colors.purple} />
+        </View>
         <View style={styles.notificationContent}>
           <Text variant="bodySmall">
             <Text bold>@jordanfoodie</Text> started following you
@@ -270,9 +279,6 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
     marginBottom: spacing.md,
   },
-  avatarText: {
-    fontSize: 48,
-  },
   username: {
     marginBottom: spacing.xs,
   },
@@ -293,9 +299,6 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.md,
   },
   card: {
-    marginBottom: spacing.md,
-  },
-  cardTitle: {
     marginBottom: spacing.md,
   },
   topSpots: {
@@ -334,25 +337,22 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     borderStyle: 'dashed',
   },
-  addFriendsIcon: {
-    fontSize: 40,
-    marginBottom: spacing.sm,
-  },
   emptyInbox: {
     alignItems: 'center',
     paddingVertical: spacing.xxl,
-  },
-  inboxIcon: {
-    fontSize: 64,
-    marginBottom: spacing.md,
   },
   notificationCard: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: spacing.sm,
   },
-  notificationIcon: {
-    fontSize: 24,
+  notificationIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: spacing.md,
   },
   notificationContent: {

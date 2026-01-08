@@ -5,6 +5,7 @@
 
 import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { Screen, Text, Badge } from '../../src/ui';
 import { colors, spacing, radius } from '../../src/theme';
 import { ratingColor, priceDisplay } from '../../src/theme/styles';
@@ -28,7 +29,7 @@ export default function RestaurantDetailScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backIcon}>←</Text>
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text variant="subtitle" numberOfLines={1} style={styles.headerTitle}>
           {name || 'Restaurant'}
@@ -95,22 +96,22 @@ export default function RestaurantDetailScreen() {
           
           <View style={styles.actionsGrid}>
             <TouchableOpacity style={styles.actionCard}>
-              <Text style={styles.actionEmoji}>📸</Text>
+              <Ionicons name="camera-outline" size={24} color={colors.primary} />
               <Text variant="bodySmall">Add Post</Text>
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.actionCard}>
-              <Text style={styles.actionEmoji}>🗺️</Text>
+              <Ionicons name="navigate-outline" size={24} color={colors.primary} />
               <Text variant="bodySmall">Directions</Text>
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.actionCard}>
-              <Text style={styles.actionEmoji}>📞</Text>
+              <Ionicons name="call-outline" size={24} color={colors.primary} />
               <Text variant="bodySmall">Call</Text>
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.actionCard}>
-              <Text style={styles.actionEmoji}>🌐</Text>
+              <Ionicons name="globe-outline" size={24} color={colors.primary} />
               <Text variant="bodySmall">Website</Text>
             </TouchableOpacity>
           </View>
@@ -118,8 +119,9 @@ export default function RestaurantDetailScreen() {
 
         {/* Coming Soon Notice */}
         <View style={styles.comingSoon}>
+          <Ionicons name="construct-outline" size={16} color={colors.muted} style={{ marginBottom: 4 }} />
           <Text variant="caption" color={colors.muted} center>
-            🚧 Full restaurant page coming soon
+            Full restaurant page coming soon
           </Text>
         </View>
       </ScrollView>
@@ -142,10 +144,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: -spacing.sm,
-  },
-  backIcon: {
-    fontSize: 24,
-    color: colors.text,
   },
   headerTitle: {
     flex: 1,
