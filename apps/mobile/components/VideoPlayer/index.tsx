@@ -85,6 +85,10 @@ export function VideoPlayer({
                 allowsFullscreen={false}
                 // @ts-ignore: playsInline is required for iOS Web inline playback
                 playsInline
+                // @ts-ignore: muted is required for iOS Web autoplay
+                muted={true}
+                // @ts-ignore: autoPlay is required for iOS Web autoplay
+                autoPlay={true}
             />
 
             {/* Loading Indicator for initial buffer */}
