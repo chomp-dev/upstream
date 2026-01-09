@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { View, StyleSheet, Image, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
 import { useContentDimensions } from '../../src/hooks/useContentDimensions';
@@ -11,6 +12,9 @@ interface VideoPlayerProps {
     thumbnailUrl?: string;
     isActive: boolean;
 }
+
+// Helper to detect iOS Mobile Web
+const isIOSMobileWeb = Platform.OS === 'web' && /iPhone|iPad|iPod/i.test(navigator.userAgent);
 
 export function VideoPlayer({
     playbackUrl,
@@ -90,9 +94,14 @@ export function VideoPlayer({
             />
 
             {/* Loading Indicator for initial buffer */}
+            {/* Loading Indicator or Play Button Fallback */}
             {isActive && !isPlaying && (
                 <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.3)' }]}>
-                    <ActivityIndicator size="large" color="#fff" />
+                    {isIOSMobileWeb ? (
+                        <Ionicons name="play-circle-outline" size={64} color="#fff" />
+                    ) : (
+                        <ActivityIndicator size="large" color="#fff" />
+                    )}
                 </View>
             )}
 
