@@ -28,19 +28,19 @@ export default function CreateScreen() {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState('');
-  
+
   // Restaurant attachment
   const [showRestaurantPicker, setShowRestaurantPicker] = useState(false);
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
   const [nearbyRestaurants, setNearbyRestaurants] = useState<Restaurant[]>([]);
   const [loadingRestaurants, setLoadingRestaurants] = useState(false);
-  
+
   const router = useRouter();
 
   const loadNearbyRestaurants = useCallback(async () => {
     try {
       setLoadingRestaurants(true);
-      
+
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permission needed', 'Location access is required to find nearby restaurants');
@@ -174,7 +174,7 @@ export default function CreateScreen() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsMultipleSelection: true,
-        quality: 1,
+        quality: 0.8, // Compress slightly for faster uploads
       });
 
       if (result.canceled || !result.assets) return;
@@ -185,21 +185,52 @@ export default function CreateScreen() {
       }
 
       setUploading(true);
-      setUploadStatus('Uploading images...');
+      setUploadProgress(0);
 
       const imageUris = result.assets.map((asset) => asset.uri);
-      await mediaApi.uploadImages(imageUris, selectedRestaurant?.google_place_id);
+      const totalImages = imageUris.length;
 
+      // Upload images one by one with progress tracking
+      const imageIds: string[] = [];
+      for (let i = 0; i < imageUris.length; i++) {
+        const uri = imageUris[i];
+        setUploadStatus(`Uploading image ${i + 1} of ${totalImages}...`);
+        setUploadProgress((i / totalImages) * 0.9); // 90% for uploads
+
+        try {
+          // Get upload URL from our backend
+          const { imageId, uploadURL } = await mediaApi.getImageUploadUrl();
+
+          // Upload directly to Cloudflare
+          await mediaApi.uploadImageToCloudflare(uploadURL, uri);
+
+          imageIds.push(imageId);
+        } catch (err) {
+          console.error(`Failed to upload image ${i + 1}:`, err);
+          throw new Error(`Failed to upload image ${i + 1}`);
+        }
+      }
+
+      setUploadStatus('Creating post...');
+      setUploadProgress(0.95);
+
+      // Create the image post with Cloudflare image IDs
+      await mediaApi.uploadImages(imageIds, selectedRestaurant?.google_place_id);
+
+      setUploadProgress(1.0);
+      setUploadStatus('Upload complete!');
       setUploading(false);
       setSelectedRestaurant(null);
 
       Alert.alert('Success', 'Images uploaded!', [
         { text: 'View Feed', onPress: () => router.replace('/') },
       ]);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Upload error:', error);
-      Alert.alert('Error', 'Failed to upload images');
+      Alert.alert('Error', error?.message || 'Failed to upload images');
       setUploading(false);
+      setUploadProgress(0);
+      setUploadStatus('');
     }
   };
 

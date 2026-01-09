@@ -7,7 +7,6 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   StyleSheet,
-  Dimensions,
   FlatList,
   ActivityIndicator,
   TouchableOpacity,
@@ -22,8 +21,8 @@ import { ImagePostViewer } from '../../components/ImagePostViewer';
 import { mediaApi, searchApi } from '../../src/lib/api';
 import type { FeedItem, Restaurant } from '../../src/lib/api/types';
 
-const { width, height } = Dimensions.get('window');
-const SCREEN_HEIGHT = height;
+
+import { useContentDimensions } from '../../src/hooks/useContentDimensions';
 
 export default function HomeScreen() {
   const [feed, setFeed] = useState<FeedItem[]>([]);
@@ -34,6 +33,7 @@ export default function HomeScreen() {
   const isFocused = useIsFocused(); // Pause video when tab loses focus
   const params = useLocalSearchParams<{ scrollToIndex?: string; itemId?: string }>();
   const lastScrolledRef = useRef<string | null>(null);
+  const { width, height: SCREEN_HEIGHT } = useContentDimensions();
 
   useEffect(() => {
     loadFeed();
@@ -43,15 +43,15 @@ export default function HomeScreen() {
   useEffect(() => {
     if (params.scrollToIndex && params.itemId && feed.length > 0) {
       const scrollKey = `${params.scrollToIndex}-${params.itemId}`;
-      
+
       // Only scroll if this is a new navigation (not the same item)
       if (lastScrolledRef.current !== scrollKey) {
         const targetIndex = parseInt(params.scrollToIndex, 10);
-        
+
         // First try to find by itemId in current feed
         const itemIndex = feed.findIndex(item => item.id.toString() === params.itemId);
         const finalIndex = itemIndex >= 0 ? itemIndex : targetIndex;
-        
+
         if (finalIndex >= 0 && finalIndex < feed.length) {
           // Small delay to ensure list is ready
           setTimeout(() => {
@@ -61,7 +61,7 @@ export default function HomeScreen() {
             });
             setCurrentIndex(finalIndex);
           }, 100);
-          
+
           lastScrolledRef.current = scrollKey;
         }
       }
@@ -86,7 +86,7 @@ export default function HomeScreen() {
     try {
       if (!isRefresh) setLoading(true);
       const data = await mediaApi.fetchFeed();
-      
+
       // Filter out error/deleted videos on client side as extra safety
       const validFeed = (data.feed || []).filter(item => {
         if (item.type === 'video') {
@@ -94,15 +94,15 @@ export default function HomeScreen() {
         }
         return true;
       });
-      
+
       setFeed(validFeed);
-      
+
       // Prefetch restaurant data for items with google_place_id
       const placeIds = validFeed
         .filter((item) => item.google_place_id)
         .map((item) => item.google_place_id!)
         .filter((id, idx, arr) => arr.indexOf(id) === idx); // Unique
-      
+
       if (placeIds.length > 0) {
         fetchRestaurants(placeIds);
       }
@@ -119,9 +119,9 @@ export default function HomeScreen() {
       const restaurant = await searchApi.getRestaurant(placeId);
       return { placeId, restaurant };
     });
-    
+
     const results = await Promise.all(promises);
-    
+
     setRestaurantCache((prevCache) => {
       const newCache = { ...prevCache };
       for (const { placeId, restaurant } of results) {
@@ -186,7 +186,7 @@ export default function HomeScreen() {
             : null;
 
           return (
-            <View style={styles.itemContainer}>
+            <View style={{ width, height: SCREEN_HEIGHT }}>
               {item.type === 'video' ? (
                 <>
                   <VideoPlayer
@@ -295,10 +295,7 @@ const styles = StyleSheet.create({
     fontSize: 64,
     marginBottom: spacing.lg,
   },
-  itemContainer: {
-    width,
-    height: SCREEN_HEIGHT,
-  },
+  itemContainer: {},
   processingOverlay: {
     position: 'absolute',
     top: 0,

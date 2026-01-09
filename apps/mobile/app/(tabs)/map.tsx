@@ -12,117 +12,21 @@ import {
   Platform,
   Linking,
   TouchableOpacity,
-  Pressable,
   Dimensions,
   Text as RNText,
-  Animated,
 } from 'react-native';
-import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-// react-native-maps is included in Expo SDK - works in Expo Go with Apple Maps on iOS
-import MapView, { Marker, Circle } from 'react-native-maps';
-
-// Icon mapping based on restaurant type - returns icon component
-const getMarkerIcon = (primaryType: string | null | undefined, isSelected: boolean) => {
-  const color = isSelected ? colors.primary : colors.text;
-  const size = isSelected ? 20 : 18;
-  
-  if (!primaryType) {
-    return <Ionicons name="restaurant-outline" size={size} color={color} />;
-  }
-  
-  const type = primaryType.toLowerCase();
-  
-  if (type.includes('coffee') || type.includes('cafe')) 
-    return <Ionicons name="cafe-outline" size={size} color={color} />;
-  if (type.includes('ice_cream')) 
-    return <Ionicons name="ice-cream-outline" size={size} color={color} />;
-  if (type.includes('bakery')) 
-    return <MaterialCommunityIcons name="baguette" size={size} color={color} />;
-  if (type.includes('pizza')) 
-    return <Ionicons name="pizza-outline" size={size} color={color} />;
-  if (type.includes('burger') || type.includes('hamburger')) 
-    return <MaterialCommunityIcons name="hamburger" size={size} color={color} />;
-  if (type.includes('fast_food')) 
-    return <MaterialCommunityIcons name="french-fries" size={size} color={color} />;
-  if (type.includes('bar')) 
-    return <Ionicons name="beer-outline" size={size} color={color} />;
-  if (type.includes('dessert') || type.includes('sweet')) 
-    return <MaterialCommunityIcons name="cupcake" size={size} color={color} />;
-  
-  // Default restaurant icon
-  return <Ionicons name="restaurant-outline" size={size} color={color} />;
-};
 import * as Location from 'expo-location';
+
 import { Screen, Text, Card, Segmented, Badge, Pill } from '../../src/ui';
 import { colors, spacing, radius } from '../../src/theme';
 import { ratingColor, priceDisplay } from '../../src/theme/styles';
 import { searchApi, mediaApi } from '../../src/lib/api';
 import type { Restaurant, MediaSummaryResponse } from '../../src/lib/api/types';
+import MapImpl from '../../components/Map';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-// Animated marker component for smooth interactions
-const AnimatedMarkerContent = ({ 
-  iconComponent, 
-  isSelected, 
-  onPress 
-}: { 
-  iconComponent: React.ReactNode; 
-  isSelected: boolean; 
-  onPress: () => void;
-}) => {
-  const scale = React.useRef(new Animated.Value(1)).current;
-  
-  const handlePressIn = () => {
-    Animated.spring(scale, {
-      toValue: 0.85,
-      useNativeDriver: true,
-      speed: 50,
-      bounciness: 4,
-    }).start();
-  };
-  
-  const handlePressOut = () => {
-    Animated.spring(scale, {
-      toValue: 1,
-      useNativeDriver: true,
-      speed: 20,
-      bounciness: 8,
-    }).start();
-  };
-  
-  const handlePress = async () => {
-    try {
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch {}
-    onPress();
-  };
-  
-  return (
-    <Pressable
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      onPress={handlePress}
-      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-    >
-      <Animated.View 
-        style={[
-          styles.markerWrapper,
-          { transform: [{ scale }] }
-        ]}
-      >
-        <View style={[
-          styles.markerBubble,
-          isSelected && styles.markerBubbleSelected
-        ]}>
-          {iconComponent}
-        </View>
-      </Animated.View>
-    </Pressable>
-  );
-};
 
 // Radius options in meters
 const RADIUS_OPTIONS = [
@@ -155,7 +59,6 @@ export default function MapScreen() {
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [estimatedCount, setEstimatedCount] = useState(0);
-  const mapRef = useRef<MapView>(null);
 
   const currentRadius = RADIUS_OPTIONS[radiusIndex].value;
 
@@ -196,7 +99,7 @@ export default function MapScreen() {
         setFetchMeta(null);
 
         console.log(`[Map] Loading restaurants: radius=${radius}m, skipCache=${skipCache}`);
-        
+
         // Simulate progress animation (10 API calls, ~200ms each)
         const progressInterval = setInterval(() => {
           setLoadingProgress((prev) => {
@@ -205,7 +108,7 @@ export default function MapScreen() {
           });
           setEstimatedCount((prev) => prev + Math.floor(Math.random() * 15) + 10);
         }, 200);
-        
+
         const response = await searchApi.searchNearby(
           loc.coords.latitude,
           loc.coords.longitude,
@@ -218,7 +121,7 @@ export default function MapScreen() {
         setLoadingProgress(100);
 
         console.log(`[Map] Got ${response.restaurants.length} restaurants, cached=${response.cached}`);
-        
+
         setRestaurants(response.restaurants);
         setCached(response.cached);
         setFetchMeta({
@@ -248,14 +151,26 @@ export default function MapScreen() {
     []
   );
 
+  // Initial load - runs once on mount
   useEffect(() => {
+    let mounted = true;
     (async () => {
       const loc = await loadLocation();
-      if (loc) {
+      if (loc && mounted) {
         await loadRestaurants(loc, currentRadius);
       }
     })();
-  }, [loadLocation, loadRestaurants, currentRadius]);
+    return () => { mounted = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only once on mount
+
+  // Handle radius changes after initial load
+  useEffect(() => {
+    if (location) {
+      loadRestaurants(location, currentRadius);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentRadius]); // Only re-run when radius changes
 
   const handleRefresh = useCallback(async () => {
     const loc = await loadLocation();
@@ -360,7 +275,7 @@ export default function MapScreen() {
           <Text variant="bodySmall" style={styles.loadingText}>
             Finding restaurants near you...
           </Text>
-          
+
           {/* Real-time progress */}
           <View style={styles.progressContainer}>
             <View style={styles.progressBar}>
@@ -370,7 +285,7 @@ export default function MapScreen() {
               {loadingProgress}% • ~{estimatedCount} places found so far...
             </Text>
           </View>
-          
+
           <Text variant="caption" color={colors.muted} style={{ marginTop: spacing.sm }}>
             {currentRadius >= 1000 ? `${currentRadius / 1000}km` : `${currentRadius}m`} radius • Up to 10 API calls
           </Text>
@@ -434,175 +349,22 @@ export default function MapScreen() {
       </View>
 
       {/* Content */}
-      {viewMode === 'map' && Platform.OS === 'web' ? (
-        <View style={styles.centered}>
-          <Text style={styles.mapPlaceholderIcon}>🗺️</Text>
-          <Text variant="body" center>
-            Map view available on iOS/Android only
-          </Text>
-          <Text variant="bodySmall" color={colors.muted} center>
-            Switch to List view to see restaurants
-          </Text>
-        </View>
-      ) : viewMode === 'map' && location ? (
-        <View style={styles.mapContainer}>
-          <MapView
-            ref={mapRef}
-            style={styles.map}
-            initialRegion={{
-              latitude: location.coords.latitude,
-              longitude: location.coords.longitude,
-              latitudeDelta: currentRadius / 50000,
-              longitudeDelta: currentRadius / 50000,
-            }}
-            showsUserLocation
-            showsMyLocationButton
-            customMapStyle={darkMapStyle}
-            // Disable Apple Maps native clustering
-            clusteringEnabled={false}
-            onPress={() => setSelectedRestaurant(null)}
-          >
-            {/* Radius circle visualization */}
-            <Circle
-              center={{
-                latitude: location.coords.latitude,
-                longitude: location.coords.longitude,
-              }}
-              radius={currentRadius}
-              strokeColor={colors.primary}
-              strokeWidth={2}
-              fillColor="rgba(232, 93, 76, 0.1)"
-            />
-
-            {restaurants
-              .filter((r) => r.lat != null && r.lng != null && !isNaN(r.lat) && !isNaN(r.lng))
-              .map((restaurant) => {
-                const isSelected = selectedRestaurant?.id === restaurant.id;
-                const iconComponent = getMarkerIcon(restaurant.primary_type, isSelected);
-                
-                return (
-                  <Marker
-                    key={restaurant.id}
-                    identifier={restaurant.id}
-                    coordinate={{
-                      latitude: restaurant.lat,
-                      longitude: restaurant.lng,
-                    }}
-                    anchor={{ x: 0.5, y: 0.5 }}
-                    tracksViewChanges={isSelected}
-                  >
-                    <AnimatedMarkerContent
-                      iconComponent={iconComponent}
-                      isSelected={isSelected}
-                      onPress={() => setSelectedRestaurant(restaurant)}
-                    />
-                  </Marker>
-                );
-              })}
-          </MapView>
-
-          {/* Refresh button */}
-          <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
-            {refreshing ? (
-              <ActivityIndicator size="small" color={colors.text} />
-            ) : (
-              <RNText style={styles.refreshIcon}>↻</RNText>
-            )}
-          </TouchableOpacity>
-
-          {/* Bottom card for selected restaurant */}
-          {selectedRestaurant && (
-            <View style={styles.selectedCard}>
-              <TouchableOpacity 
-                style={styles.closeButton}
-                onPress={() => setSelectedRestaurant(null)}
-              >
-                <RNText style={styles.closeButtonText}>✕</RNText>
-              </TouchableOpacity>
-              
-              {/* Header with icon and name */}
-              <View style={styles.selectedCardHeader}>
-                <View style={styles.selectedCardIcon}>
-                  {getMarkerIcon(selectedRestaurant.primary_type, false)}
-                </View>
-                <View style={styles.selectedCardTitleArea}>
-                  <Text variant="subtitle" numberOfLines={1}>
-                    {selectedRestaurant.name}
-                  </Text>
-                  {selectedRestaurant.primary_type && (
-                    <Text variant="caption" color={colors.muted}>
-                      {selectedRestaurant.primary_type.replace(/_/g, ' ')}
-                    </Text>
-                  )}
-                </View>
-              </View>
-
-              {/* Rating and meta row */}
-              <View style={styles.selectedCardMeta}>
-                {selectedRestaurant.rating && (
-                  <View style={styles.ratingPill}>
-                    <RNText style={styles.ratingPillStar}>★</RNText>
-                    <RNText style={[styles.ratingPillText, { color: ratingColor(selectedRestaurant.rating) }]}>
-                      {selectedRestaurant.rating.toFixed(1)}
-                    </RNText>
-                    {selectedRestaurant.user_rating_count && (
-                      <RNText style={styles.ratingPillCount}>
-                        ({selectedRestaurant.user_rating_count.toLocaleString()})
-                      </RNText>
-                    )}
-                  </View>
-                )}
-                {selectedRestaurant.price_level !== null && (
-                  <Badge label={priceDisplay(selectedRestaurant.price_level)} variant="price" />
-                )}
-                {mediaSummary[selectedRestaurant.google_place_id] && (
-                  <Badge 
-                    label={`${mediaSummary[selectedRestaurant.google_place_id].video_count + mediaSummary[selectedRestaurant.google_place_id].image_count} posts`} 
-                    variant="default" 
-                  />
-                )}
-              </View>
-
-              {/* Address */}
-              {selectedRestaurant.formatted_address && (
-                <Text variant="bodySmall" numberOfLines={2} color={colors.muted} style={styles.selectedCardAddress}>
-                  {selectedRestaurant.formatted_address}
-                </Text>
-              )}
-
-              {/* Action buttons */}
-              <View style={styles.actionButtons}>
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={() => handleOpenMaps(selectedRestaurant)}
-                >
-                  <Ionicons name="navigate-outline" size={18} color={colors.text} style={{ marginRight: 6 }} />
-                  <RNText style={styles.actionButtonText}>Directions</RNText>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.actionButtonPrimary]}
-                  onPress={() => {
-                    router.push({
-                      pathname: '/restaurant/[id]',
-                      params: {
-                        id: selectedRestaurant.google_place_id,
-                        name: selectedRestaurant.name || '',
-                        rating: selectedRestaurant.rating?.toString() || '',
-                        price_level: selectedRestaurant.price_level?.toString() || '',
-                        address: selectedRestaurant.formatted_address || '',
-                        type: selectedRestaurant.primary_type || '',
-                      },
-                    });
-                  }}
-                >
-                  <Ionicons name="storefront-outline" size={18} color={colors.bg} style={{ marginRight: 6 }} />
-                  <RNText style={[styles.actionButtonText, styles.actionButtonTextPrimary]}>View Page</RNText>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-        </View>
+      {viewMode === 'map' ? (
+        location ? (
+          <MapImpl
+            restaurants={restaurants}
+            location={location}
+            currentRadius={currentRadius}
+            selectedRestaurant={selectedRestaurant}
+            onSelectRestaurant={setSelectedRestaurant}
+            onRefresh={handleRefresh}
+            refreshing={refreshing}
+          />
+        ) : (
+          <View style={styles.centered}>
+            <ActivityIndicator size="large" />
+          </View>
+        )
       ) : (
         <FlatList
           data={restaurants}
@@ -734,13 +496,13 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 6,
     backgroundColor: colors.border,
-    borderRadius: radius.full,
+    borderRadius: radius.pill,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
     backgroundColor: colors.primary,
-    borderRadius: radius.full,
+    borderRadius: radius.pill,
   },
   errorIcon: {
     fontSize: 48,
@@ -748,10 +510,6 @@ const styles = StyleSheet.create({
   },
   retryButton: {
     marginTop: spacing.lg,
-  },
-  mapPlaceholderIcon: {
-    fontSize: 64,
-    marginBottom: spacing.lg,
   },
   emptyContainer: {
     alignItems: 'center',
@@ -761,238 +519,4 @@ const styles = StyleSheet.create({
     fontSize: 64,
     marginBottom: spacing.lg,
   },
-  mapContainer: {
-    flex: 1,
-    position: 'relative',
-  },
-  map: {
-    flex: 1,
-    width: '100%',
-  },
-  selectedCard: {
-    position: 'absolute',
-    bottom: 20,
-    left: spacing.lg,
-    right: spacing.lg,
-    backgroundColor: colors.card,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  selectedCardContent: {
-    gap: spacing.sm,
-  },
-  selectedCardMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    flexWrap: 'wrap',
-  },
-  closeButton: {
-    position: 'absolute',
-    top: spacing.sm,
-    right: spacing.sm,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1,
-  },
-  closeButtonText: {
-    fontSize: 14,
-    color: colors.muted,
-  },
-  directionsButton: {
-    marginTop: spacing.sm,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    alignItems: 'center',
-  },
-  refreshButton: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.card,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  refreshIcon: {
-    fontSize: 22,
-    color: colors.text,
-  },
-  // Fixed-size wrapper prevents marker jumping
-  markerWrapper: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  // Simple bubble marker
-  markerBubble: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.card,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: colors.border,
-  },
-  markerBubbleSelected: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    borderColor: colors.primary,
-    borderWidth: 3,
-    backgroundColor: colors.elevated,
-  },
-  // Selected restaurant card
-  selectedCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  selectedCardIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: colors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.md,
-  },
-  selectedCardTitleArea: {
-    flex: 1,
-  },
-  selectedCardAddress: {
-    marginBottom: spacing.md,
-  },
-  ratingPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xxs,
-    borderRadius: radius.sm,
-  },
-  ratingPillStar: {
-    fontSize: 12,
-    color: colors.amber,
-    marginRight: 2,
-  },
-  ratingPillText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  ratingPillCount: {
-    fontSize: 11,
-    color: colors.muted,
-    marginLeft: 4,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surface,
-    paddingVertical: spacing.md,
-    borderRadius: radius.md,
-    gap: spacing.xs,
-  },
-  actionButtonPrimary: {
-    backgroundColor: colors.primary,
-  },
-  actionButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: colors.text,
-  },
-  actionButtonTextPrimary: {
-    color: colors.cream,
-  },
 });
-
-// Warm dark map style - matches food app theme
-const darkMapStyle = [
-  {
-    elementType: 'geometry',
-    stylers: [{ color: '#1A1614' }],
-  },
-  {
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#B8AFA6' }],
-  },
-  {
-    elementType: 'labels.text.stroke',
-    stylers: [{ color: '#0D0B0A' }],
-  },
-  {
-    featureType: 'administrative',
-    elementType: 'geometry',
-    stylers: [{ color: '#2C2520' }],
-  },
-  {
-    featureType: 'poi',
-    elementType: 'geometry',
-    stylers: [{ color: '#231E1B' }],
-  },
-  {
-    featureType: 'poi',
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#7A716A' }],
-  },
-  {
-    featureType: 'poi.park',
-    elementType: 'geometry',
-    stylers: [{ color: '#1E2A1E' }],
-  },
-  {
-    featureType: 'road',
-    elementType: 'geometry',
-    stylers: [{ color: '#2C2520' }],
-  },
-  {
-    featureType: 'road',
-    elementType: 'geometry.stroke',
-    stylers: [{ color: '#231E1B' }],
-  },
-  {
-    featureType: 'road.highway',
-    elementType: 'geometry',
-    stylers: [{ color: '#3D3530' }],
-  },
-  {
-    featureType: 'transit',
-    elementType: 'geometry',
-    stylers: [{ color: '#231E1B' }],
-  },
-  {
-    featureType: 'water',
-    elementType: 'geometry',
-    stylers: [{ color: '#141820' }],
-  },
-];

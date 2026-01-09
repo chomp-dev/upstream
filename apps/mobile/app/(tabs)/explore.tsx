@@ -21,11 +21,10 @@ import { colors, spacing, radius } from '../../src/theme';
 import { mediaApi } from '../../src/lib/api';
 import type { FeedItem } from '../../src/lib/api/types';
 
-const { width } = Dimensions.get('window');
+import { useContentDimensions } from '../../src/hooks/useContentDimensions';
+
 const GRID_GAP = 2;
 const NUM_COLUMNS = 2;
-const ITEM_WIDTH = (width - GRID_GAP * (NUM_COLUMNS + 1)) / NUM_COLUMNS;
-const ITEM_HEIGHT = ITEM_WIDTH * 1.4;
 
 export default function ExploreScreen() {
   const [feed, setFeed] = useState<FeedItem[]>([]);
@@ -34,6 +33,10 @@ export default function ExploreScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const router = useRouter();
+  const { width } = useContentDimensions();
+
+  const ITEM_WIDTH = (width - GRID_GAP * (NUM_COLUMNS + 1)) / NUM_COLUMNS;
+  const ITEM_HEIGHT = ITEM_WIDTH * 1.4;
 
   const loadFeed = useCallback(async (isRefresh = false) => {
     try {
@@ -44,7 +47,7 @@ export default function ExploreScreen() {
       }
 
       const data = await mediaApi.fetchFeed(50, 0);
-      
+
       // Filter out error/deleted videos on client side
       const validFeed = (data.feed || []).filter(item => {
         if (item.type === 'video') {
@@ -52,7 +55,7 @@ export default function ExploreScreen() {
         }
         return true;
       });
-      
+
       setFeed(validFeed);
       setFilteredFeed(validFeed);
     } catch (error) {
@@ -104,7 +107,7 @@ export default function ExploreScreen() {
 
     return (
       <TouchableOpacity
-        style={styles.gridItem}
+        style={[styles.gridItem, { width: ITEM_WIDTH, height: ITEM_HEIGHT }]}
         onPress={() => handleItemPress(item, index)}
         activeOpacity={0.8}
       >
@@ -252,8 +255,6 @@ const styles = StyleSheet.create({
     marginBottom: GRID_GAP,
   },
   gridItem: {
-    width: ITEM_WIDTH,
-    height: ITEM_HEIGHT,
     backgroundColor: colors.surface,
     borderRadius: radius.md,
     overflow: 'hidden',

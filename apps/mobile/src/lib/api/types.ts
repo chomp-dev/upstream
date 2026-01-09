@@ -42,6 +42,12 @@ export interface UploadImagesResponse {
   };
 }
 
+export interface ImageUploadUrlResponse {
+  imageId: string;
+  uploadURL: string;
+  deliveryUrl: string;
+}
+
 export interface MediaSummaryResponse {
   [placeId: string]: {
     video_count: number;
