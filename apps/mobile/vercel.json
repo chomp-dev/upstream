@@ -5,6 +5,10 @@
             "destination": "/assets/$1"
         },
         {
+            "source": "/demo/_expo/(.*)",
+            "destination": "/_expo/$1"
+        },
+        {
             "source": "/demo",
             "destination": "/index.html"
         },
