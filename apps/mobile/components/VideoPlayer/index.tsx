@@ -82,6 +82,7 @@ export function VideoPlayer({
                 style={[styles.video, { width, height }]}
                 contentFit="cover"
                 nativeControls={false}
+                allowsFullscreen={false}
             />
 
             {/* Loading Indicator for initial buffer */}
