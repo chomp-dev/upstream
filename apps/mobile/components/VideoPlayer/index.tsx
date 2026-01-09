@@ -83,6 +83,8 @@ export function VideoPlayer({
                 contentFit="cover"
                 nativeControls={false}
                 allowsFullscreen={false}
+                // @ts-ignore: playsInline is required for iOS Web inline playback
+                playsInline
             />
 
             {/* Loading Indicator for initial buffer */}
