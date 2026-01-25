@@ -83,7 +83,8 @@ class NearbySearchRequest(BaseModel):
     location: LocationInput
     radius: int = Field(default=1500, ge=100, le=50000, description="Search radius in meters")
     # 10 Google calls max * 20 results per call = 200 (deduped by place ID).
-    max_results: int = Field(default=200, ge=1, le=200, description="Maximum results to return")
+    # 15 Google calls max * 20 results per call = 300 (deduped by place ID).
+    max_results: int = Field(default=300, ge=1, le=300, description="Maximum results to return")
     included_types: Optional[list[str]] = Field(
         default=None,
         description="Place types to include (e.g., restaurant, cafe, bar). If None, uses all food types."
