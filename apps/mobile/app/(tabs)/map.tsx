@@ -100,20 +100,23 @@ export default function MapScreen() {
 
         console.log(`[Map] Loading restaurants: radius=${radius}m, skipCache=${skipCache}`);
 
-        // Simulate progress animation (10 API calls, ~200ms each)
+        // Simulate progress animation (15 API calls, ~200ms each)
         const progressInterval = setInterval(() => {
           setLoadingProgress((prev) => {
             if (prev >= 90) return prev; // Cap at 90% until real data arrives
             return prev + 10;
           });
-          setEstimatedCount((prev) => prev + Math.floor(Math.random() * 15) + 10);
+          setEstimatedCount((prev) => {
+            const next = prev + Math.floor(Math.random() * 15) + 10;
+            return next > 300 ? 300 : next; // Cap at maxResults (300)
+          });
         }, 200);
 
         const response = await searchApi.searchNearby(
           loc.coords.latitude,
           loc.coords.longitude,
           radius,
-          200,
+          300, // maxResults updated to 300
           skipCache
         );
 
@@ -287,7 +290,7 @@ export default function MapScreen() {
           </View>
 
           <Text variant="caption" color={colors.muted} style={{ marginTop: spacing.sm }}>
-            {currentRadius >= 1000 ? `${currentRadius / 1000}km` : `${currentRadius}m`} radius • Up to 10 API calls
+            {currentRadius >= 1000 ? `${currentRadius / 1000}km` : `${currentRadius}m`} radius • Up to 15 API calls
           </Text>
         </View>
       </Screen>

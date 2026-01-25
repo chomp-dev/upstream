@@ -252,7 +252,7 @@ async def search_nearby_get(
     lat: float = Query(..., ge=-90, le=90, description="Latitude"),
     lng: float = Query(..., ge=-180, le=180, description="Longitude"),
     radius: int = Query(default=1500, ge=100, le=50000, description="Radius in meters"),
-    max_results: int = Query(default=200, ge=1, le=200, description="Max results"),
+    max_results: int = Query(default=300, ge=1, le=300, description="Max results"),
     session: AsyncSession = Depends(get_db_session),
 ):
     """

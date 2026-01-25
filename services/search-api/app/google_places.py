@@ -87,7 +87,7 @@ class GooglePlacesClient:
         lng: float,
         radius: int = 1500,
         included_types: list[str] | None = None,
-        max_results: int = 200,
+        max_results: int = 300,
         field_mask: str = NEARBY_FIELD_MASK,
     ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         """
@@ -104,7 +104,10 @@ class GooglePlacesClient:
         
         Returns:
             List of place dictionaries from Google Places API
+            Metadata dict
         """
+        import asyncio
+
         # Default food-related types grouped for multiple requests
         # Each group targets different cuisine/establishment types
         DEFAULT_TYPE_GROUPS = [
@@ -118,6 +121,12 @@ class GooglePlacesClient:
             ["fast_food_restaurant", "sandwich_shop", "meal_takeaway"],
             ["cafe", "coffee_shop", "bakery"],
             ["ice_cream_shop", "bar", "juice_shop"],
+            # Added for better coverage (up to 300 results)
+            ["vegan_restaurant", "vegetarian_restaurant"],
+            ["middle_eastern_restaurant", "french_restaurant"],
+            ["seafood_restaurant"],
+            ["barbecue_restaurant", "ramen_restaurant"],
+            ["breakfast_restaurant", "brunch_restaurant"],
         ]
         
         client = await self._get_client()
@@ -128,16 +137,11 @@ class GooglePlacesClient:
         if included_types and len(included_types) > 0:
             type_groups = [included_types[:10]]  # Limit types per request
         else:
-            type_groups = DEFAULT_TYPE_GROUPS
+            type_groups = DEFAULT_TYPE_GROUPS[:15]  # Limit to 15 requests max
         
-        # Make requests for each type group (up to 10 groups for comprehensive coverage)
-        requests_made = 0
-        max_requests = 10  # Allow up to 10 API calls for better coverage
+        logger.info(f"Starting {len(type_groups)} parallel Google Places requests for ({lat}, {lng})")
         
-        for types in type_groups:
-            if len(all_places) >= max_results or requests_made >= max_requests:
-                break
-                
+        async def fetch_group(types: list[str]) -> list[dict]:
             request_body = {
                 "locationRestriction": {
                     "circle": {
@@ -160,34 +164,32 @@ class GooglePlacesClient:
                     headers={"X-Goog-FieldMask": field_mask},
                 )
                 response.raise_for_status()
-                
                 data = response.json()
-                places = data.get("places", [])
-                raw_places_count += len(places)
-                
-                # Deduplicate by place ID
-                for place in places:
-                    place_id = place.get("id")
-                    if place_id and place_id not in all_places:
-                        all_places[place_id] = place
-                
-                requests_made += 1
-                logger.info(f"Google Places request {requests_made}: {len(places)} results for types {types[:3]}...")
-                
-            except httpx.HTTPStatusError as e:
-                logger.error(f"Google Places API error: {e.response.status_code} - {e.response.text}")
-                # Continue with other type groups on error
-                continue
+                return data.get("places", [])
             except Exception as e:
-                logger.error(f"Google Places request failed: {e}")
-                continue
+                logger.error(f"Google Places request failed for types {types[:3]}: {e}")
+                return []
+
+        # Execute all requests in parallel
+        results = await asyncio.gather(*[fetch_group(g) for g in type_groups])
         
-        result = list(all_places.values())[:max_results]
-        truncated = (requests_made >= max_requests) or (len(all_places) >= max_results)
-        logger.info(f"Google Places total: {len(result)} unique results for ({lat}, {lng})")
-        return result, {
-            "requests_made": requests_made,
-            "max_requests": max_requests,
+        # Process results
+        for places in results:
+            raw_places_count += len(places)
+            for place in places:
+                place_id = place.get("id")
+                if place_id and place_id not in all_places:
+                    all_places[place_id] = place
+        
+        result_list = list(all_places.values())
+        truncated = len(result_list) > max_results
+        final_result = result_list[:max_results]
+        
+        logger.info(f"Google Places finished: {len(final_result)} unique results from {raw_places_count} raw items")
+        
+        return final_result, {
+            "requests_made": len(type_groups),
+            "max_requests": len(type_groups),
             "raw_places": raw_places_count,
             "unique_places": len(all_places),
             "truncated": truncated,
