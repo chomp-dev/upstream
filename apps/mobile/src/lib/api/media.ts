@@ -167,18 +167,44 @@ export async function getMediaSummary(
 ): Promise<MediaSummaryResponse> {
   if (placeIds.length === 0) return {};
 
-  const response = await fetch(`${MEDIA_API_BASE}/api/restaurants/media-summary`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ place_ids: placeIds }),
-  });
+  // Chunk status to avoid 400 Payload Too Large/Request Entity Too Large on some servers
+  const CHUNK_SIZE = 50;
+  const chunks = [];
 
-  if (!response.ok) {
-    console.warn('Media summary fetch failed:', response.status);
-    return {};
+  for (let i = 0; i < placeIds.length; i += CHUNK_SIZE) {
+    chunks.push(placeIds.slice(i, i + CHUNK_SIZE));
   }
 
-  return response.json();
+  try {
+    const results = await Promise.all(
+      chunks.map(async (chunk) => {
+        try {
+          const response = await fetch(`${MEDIA_API_BASE}/api/restaurants/media-summary`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ place_ids: chunk }),
+          });
+
+          if (!response.ok) {
+            console.warn('Media summary fetch failed for chunk:', response.status);
+            return {};
+          }
+
+          return await response.json();
+        } catch (e) {
+          console.warn('Media summary chunk error:', e);
+          return {};
+        }
+      })
+    );
+
+    // Merge results
+    return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
+
+  } catch (err) {
+    console.error('getMediaSummary error:', err);
+    return {};
+  }
 }
 
 /**
