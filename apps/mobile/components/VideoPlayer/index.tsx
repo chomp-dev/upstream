@@ -14,7 +14,8 @@ interface VideoPlayerProps {
 }
 
 // Helper to detect iOS Mobile Web
-const isIOSMobileWeb = Platform.OS === 'web' && /iPhone|iPad|iPod/i.test(navigator.userAgent);
+// Helper to detect iOS Mobile Web
+const isIOSMobileWeb = Platform.OS === 'web' && typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent);
 
 export function VideoPlayer({
     playbackUrl,

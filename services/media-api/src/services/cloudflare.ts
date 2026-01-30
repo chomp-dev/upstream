@@ -2,6 +2,10 @@ import dotenv from 'dotenv';
 import fetch from 'node-fetch';
 
 dotenv.config();
+console.log('[DEBUG] CWD:', process.cwd());
+console.log('[DEBUG] ACCOUNT_ID:', process.env.CLOUDFLARE_ACCOUNT_ID ? 'Exists' : 'Missing');
+console.log('[DEBUG] API_TOKEN:', process.env.CLOUDFLARE_API_TOKEN ? 'Exists' : 'Missing');
+
 
 const CLOUDFLARE_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
 const CLOUDFLARE_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;
@@ -51,10 +55,10 @@ export async function createDirectUploadUrl() {
     });
 
     const data = await response.json() as DirectUploadResponse;
-    
+
     console.log('[Cloudflare] API Response status:', response.status);
     console.log('[Cloudflare] API Response data:', JSON.stringify(data, null, 2));
-    
+
     if (!data.success) {
       console.error('Cloudflare API error:', data);
       throw new Error('Failed to create upload URL');
@@ -64,9 +68,9 @@ export async function createDirectUploadUrl() {
       console.error('Invalid Cloudflare response:', data);
       throw new Error('Invalid upload URL response from Cloudflare');
     }
-    
+
     console.log('[Cloudflare] Created upload URL for video ID:', data.result.uid);
-    
+
     return {
       id: data.result.uid,  // Use 'uid' from API response
       uploadURL: data.result.uploadURL,
@@ -99,7 +103,7 @@ export async function getVideo(videoId: string) {
     }
 
     const data = await response.json() as VideoResponse;
-    
+
     if (!data.success) {
       throw new Error('Failed to fetch video');
     }
