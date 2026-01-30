@@ -1,6 +1,6 @@
 /**
  * Home (Watch) Tab - TikTok-style vertical feed
- * Reuses existing VideoPlayer and ImagePostViewer components
+ * Supports location-based nearby feed and demo reels toggle
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -10,19 +10,26 @@ import {
   FlatList,
   ActivityIndicator,
   TouchableOpacity,
+  Dimensions,
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { useLocalSearchParams } from 'expo-router';
-import { Screen, Text, Badge } from '../../src/ui';
-import { colors, spacing } from '../../src/theme';
+import * as Location from 'expo-location';
+import { Screen, Text, Badge, Pill } from '../../src/ui';
+import { colors, spacing, radius } from '../../src/theme';
 import { ratingColor, priceDisplay } from '../../src/theme/styles';
 import { VideoPlayer } from '../../components/VideoPlayer';
 import { ImagePostViewer } from '../../components/ImagePostViewer';
 import { mediaApi, searchApi } from '../../src/lib/api';
 import type { FeedItem, Restaurant } from '../../src/lib/api/types';
 
-
 import { useContentDimensions } from '../../src/hooks/useContentDimensions';
+
+// Feed mode types
+type FeedMode = 'loading' | 'nearby' | 'demo';
+
+// Default search radius for nearby restaurants (2 miles)
+const NEARBY_RADIUS = 3200;
 
 export default function HomeScreen() {
   const [feed, setFeed] = useState<FeedItem[]>([]);
@@ -30,30 +37,194 @@ export default function HomeScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [restaurantCache, setRestaurantCache] = useState<Record<string, Restaurant>>({});
   const flatListRef = useRef<FlatList>(null);
-  const isFocused = useIsFocused(); // Pause video when tab loses focus
+  const isFocused = useIsFocused();
   const params = useLocalSearchParams<{ scrollToIndex?: string; itemId?: string }>();
   const lastScrolledRef = useRef<string | null>(null);
   const { width, height: SCREEN_HEIGHT } = useContentDimensions();
 
-  useEffect(() => {
-    loadFeed();
+  // Location-based feed state
+  const [feedMode, setFeedMode] = useState<FeedMode>('loading');
+  const [nearbyPlaceIds, setNearbyPlaceIds] = useState<string[]>([]);
+  const [locationAvailable, setLocationAvailable] = useState<boolean>(false);
+  const [nearbyRestaurantCount, setNearbyRestaurantCount] = useState(0);
+
+  // ============================================================================
+  // Location & Nearby Feed Logic
+  // ============================================================================
+
+  const loadNearbyFeed = useCallback(async () => {
+    try {
+      setLoading(true);
+
+      // Request location permission
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        console.log('[Feed] Location permission denied, falling back to demo');
+        setLocationAvailable(false);
+        await loadDemoFeed();
+        return;
+      }
+
+      // Get current location
+      const loc = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      setLocationAvailable(true);
+
+      console.log(`[Feed] Got location: ${loc.coords.latitude}, ${loc.coords.longitude}`);
+
+      // Search for nearby restaurants
+      const nearbyResponse = await searchApi.searchNearby(
+        loc.coords.latitude,
+        loc.coords.longitude,
+        NEARBY_RADIUS,
+        200
+      );
+
+      const placeIds = nearbyResponse.restaurants.map(r => r.google_place_id);
+      setNearbyPlaceIds(placeIds);
+      setNearbyRestaurantCount(nearbyResponse.restaurants.length);
+
+      console.log(`[Feed] Found ${placeIds.length} nearby restaurants`);
+
+      if (placeIds.length === 0) {
+        console.log('[Feed] No nearby restaurants, staying in nearby mode with empty state');
+        setFeed([]);
+        setFeedMode('nearby');
+        setLoading(false);
+        return;
+      }
+
+      // Fetch nearby feed
+      const nearbyFeedResponse = await mediaApi.fetchNearbyFeed(placeIds);
+
+      // Filter out invalid videos
+      const validFeed = (nearbyFeedResponse.feed || []).filter(item => {
+        if (item.type === 'video') {
+          return item.status !== 'error' && item.playback_url;
+        }
+        return true;
+      });
+
+      console.log(`[Feed] Nearby feed has ${validFeed.length} items`);
+
+      if (validFeed.length === 0) {
+        console.log('[Feed] No local content, staying in nearby mode with empty state');
+        setFeed([]);
+        setFeedMode('nearby');
+        setLoading(false);
+        return;
+      }
+
+      setFeed(validFeed);
+      setFeedMode('nearby');
+
+      // Prefetch restaurant data
+      const feedPlaceIds = validFeed
+        .filter(item => item.google_place_id)
+        .map(item => item.google_place_id!)
+        .filter((id, idx, arr) => arr.indexOf(id) === idx);
+
+      if (feedPlaceIds.length > 0) {
+        fetchRestaurants(feedPlaceIds);
+      }
+    } catch (error: any) {
+      console.error('[Feed] Location/nearby error:', error.message);
+      // On error, stay in nearby mode but show empty - user can choose to switch
+      setFeed([]);
+      setFeedMode('nearby');
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  const loadDemoFeed = useCallback(async () => {
+    try {
+      if (feedMode !== 'demo') {
+        setLoading(true);
+      }
+
+      const data = await mediaApi.fetchFeed();
+
+      // Filter out error/deleted videos
+      const validFeed = (data.feed || []).filter(item => {
+        if (item.type === 'video') {
+          return item.status !== 'error' && item.playback_url;
+        }
+        return true;
+      });
+
+      setFeed(validFeed);
+      setFeedMode('demo');
+
+      // Prefetch restaurant data
+      const placeIds = validFeed
+        .filter(item => item.google_place_id)
+        .map(item => item.google_place_id!)
+        .filter((id, idx, arr) => arr.indexOf(id) === idx);
+
+      if (placeIds.length > 0) {
+        fetchRestaurants(placeIds);
+      }
+    } catch (error: any) {
+      console.error('[Feed] Demo feed error:', error.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [feedMode]);
+
+  const switchToNearby = useCallback(async () => {
+    if (!locationAvailable || nearbyPlaceIds.length === 0) {
+      // Try loading nearby again
+      await loadNearbyFeed();
+    } else {
+      // We already have place IDs, just fetch the feed
+      setLoading(true);
+      try {
+        const nearbyFeedResponse = await mediaApi.fetchNearbyFeed(nearbyPlaceIds);
+        const validFeed = (nearbyFeedResponse.feed || []).filter(item => {
+          if (item.type === 'video') {
+            return item.status !== 'error' && item.playback_url;
+          }
+          return true;
+        });
+
+        if (validFeed.length > 0) {
+          setFeed(validFeed);
+          setFeedMode('nearby');
+        } else {
+          // Still no content, show message
+          setFeedMode('nearby');
+          setFeed([]);
+        }
+      } catch (error) {
+        console.error('[Feed] Switch to nearby error:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+  }, [locationAvailable, nearbyPlaceIds, loadNearbyFeed]);
+
+  const switchToDemo = useCallback(async () => {
+    await loadDemoFeed();
+  }, [loadDemoFeed]);
+
+  // Initial load
+  useEffect(() => {
+    loadNearbyFeed();
+  }, [loadNearbyFeed]);
 
   // Handle navigation from Explore - scroll to specific item
   useEffect(() => {
     if (params.scrollToIndex && params.itemId && feed.length > 0) {
       const scrollKey = `${params.scrollToIndex}-${params.itemId}`;
 
-      // Only scroll if this is a new navigation (not the same item)
       if (lastScrolledRef.current !== scrollKey) {
         const targetIndex = parseInt(params.scrollToIndex, 10);
-
-        // First try to find by itemId in current feed
         const itemIndex = feed.findIndex(item => item.id.toString() === params.itemId);
         const finalIndex = itemIndex >= 0 ? itemIndex : targetIndex;
 
         if (finalIndex >= 0 && finalIndex < feed.length) {
-          // Small delay to ensure list is ready
           setTimeout(() => {
             flatListRef.current?.scrollToIndex({
               index: finalIndex,
@@ -68,53 +239,25 @@ export default function HomeScreen() {
     }
   }, [params.scrollToIndex, params.itemId, feed]);
 
-  // Smart polling - faster when videos are processing
+  // Smart polling
   useEffect(() => {
     const hasPendingVideos = feed.some(
-      (item) => item.type === 'video' && item.status !== 'ready'
+      item => item.type === 'video' && item.status !== 'ready'
     );
     const interval = hasPendingVideos ? 2000 : 15000;
 
     const pollInterval = setInterval(() => {
-      loadFeed(true);
+      if (feedMode === 'nearby' && nearbyPlaceIds.length > 0) {
+        loadNearbyFeed();
+      } else if (feedMode === 'demo') {
+        loadDemoFeed();
+      }
     }, interval);
 
     return () => clearInterval(pollInterval);
-  }, [feed]);
-
-  const loadFeed = useCallback(async (isRefresh = false) => {
-    try {
-      if (!isRefresh) setLoading(true);
-      const data = await mediaApi.fetchFeed();
-
-      // Filter out error/deleted videos on client side as extra safety
-      const validFeed = (data.feed || []).filter(item => {
-        if (item.type === 'video') {
-          return item.status !== 'error' && item.playback_url;
-        }
-        return true;
-      });
-
-      setFeed(validFeed);
-
-      // Prefetch restaurant data for items with google_place_id
-      const placeIds = validFeed
-        .filter((item) => item.google_place_id)
-        .map((item) => item.google_place_id!)
-        .filter((id, idx, arr) => arr.indexOf(id) === idx); // Unique
-
-      if (placeIds.length > 0) {
-        fetchRestaurants(placeIds);
-      }
-    } catch (error: any) {
-      console.error('[Feed] Error:', error.message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  }, [feed, feedMode, nearbyPlaceIds, loadNearbyFeed, loadDemoFeed]);
 
   const fetchRestaurants = useCallback(async (placeIds: string[]) => {
-    // Fetch restaurants in parallel
     const promises = placeIds.map(async (placeId) => {
       const restaurant = await searchApi.getRestaurant(placeId);
       return { placeId, restaurant };
@@ -122,7 +265,7 @@ export default function HomeScreen() {
 
     const results = await Promise.all(promises);
 
-    setRestaurantCache((prevCache) => {
+    setRestaurantCache(prevCache => {
       const newCache = { ...prevCache };
       for (const { placeId, restaurant } of results) {
         if (restaurant && !newCache[placeId]) {
@@ -143,30 +286,49 @@ export default function HomeScreen() {
     itemVisiblePercentThreshold: 50,
   }).current;
 
-  if (loading) {
+  // ============================================================================
+  // Render States
+  // ============================================================================
+
+  if (loading && feed.length === 0) {
     return (
       <Screen safe={false}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text variant="bodySmall" style={styles.loadingText}>
-            Loading feed...
+            {feedMode === 'loading' ? 'Finding nearby content...' : 'Loading feed...'}
           </Text>
         </View>
       </Screen>
     );
   }
 
+  // Empty state - show toggle to demo
   if (feed.length === 0) {
     return (
       <Screen safe={false}>
         <View style={styles.loadingContainer}>
-          <Text style={styles.emptyIcon}>🎬</Text>
+          <Text style={styles.emptyIcon}>
+            {feedMode === 'nearby' ? '📍' : '🎬'}
+          </Text>
           <Text variant="title" center style={{ marginBottom: spacing.sm }}>
-            No posts yet
+            {feedMode === 'nearby' ? 'No local content yet' : 'No posts yet'}
           </Text>
-          <Text variant="bodySmall" center color={colors.muted}>
-            Be the first to upload!
+          <Text variant="bodySmall" center color={colors.muted} style={{ marginBottom: spacing.lg }}>
+            {feedMode === 'nearby'
+              ? `Found ${nearbyRestaurantCount} restaurants nearby, but no videos yet`
+              : 'Be the first to upload!'}
           </Text>
+
+          {feedMode === 'nearby' ? (
+            <TouchableOpacity style={styles.switchButton} onPress={switchToDemo}>
+              <Text variant="body" color={colors.bg}>🎬 Watch Demo Reels</Text>
+            </TouchableOpacity>
+          ) : locationAvailable && nearbyPlaceIds.length > 0 ? (
+            <TouchableOpacity style={styles.switchButton} onPress={switchToNearby}>
+              <Text variant="body" color={colors.bg}>📍 Try Nearby Feed</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       </Screen>
     );
@@ -174,12 +336,31 @@ export default function HomeScreen() {
 
   return (
     <Screen safe={false}>
+      {/* Feed Mode Header Badge */}
+      <View style={styles.modeHeader}>
+        <Badge
+          label={feedMode === 'nearby' ? '📍 Nearby' : '🎬 Demo Reels'}
+          variant={feedMode === 'nearby' ? 'rating' : 'default'}
+        />
+
+        {/* Toggle button */}
+        {feedMode === 'nearby' ? (
+          <TouchableOpacity style={styles.toggleButton} onPress={switchToDemo}>
+            <Text variant="caption" color={colors.muted}>Switch to Demo</Text>
+          </TouchableOpacity>
+        ) : locationAvailable && (
+          <TouchableOpacity style={styles.toggleButton} onPress={switchToNearby}>
+            <Text variant="caption" color={colors.muted}>Try Nearby</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
       <FlatList
         ref={flatListRef}
         data={feed}
         keyExtractor={(item) => `${item.type}-${item.id}`}
         refreshing={loading}
-        onRefresh={() => loadFeed(false)}
+        onRefresh={() => feedMode === 'nearby' ? loadNearbyFeed() : loadDemoFeed()}
         renderItem={({ item, index }) => {
           const restaurant = item.google_place_id
             ? restaurantCache[item.google_place_id]
@@ -268,7 +449,6 @@ export default function HomeScreen() {
           index,
         })}
         onScrollToIndexFailed={(info) => {
-          // Retry after a short delay if scroll fails
           setTimeout(() => {
             flatListRef.current?.scrollToIndex({
               index: info.index,
@@ -295,7 +475,6 @@ const styles = StyleSheet.create({
     fontSize: 64,
     marginBottom: spacing.lg,
   },
-  itemContainer: {},
   processingOverlay: {
     position: 'absolute',
     top: 0,
@@ -312,6 +491,30 @@ const styles = StyleSheet.create({
   errorIcon: {
     fontSize: 48,
     marginBottom: spacing.sm,
+  },
+  modeHeader: {
+    position: 'absolute',
+    top: 60,
+    left: spacing.lg,
+    right: spacing.lg,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    zIndex: 100,
+  },
+  toggleButton: {
+    backgroundColor: colors.overlay,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  switchButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: radius.pill,
   },
   restaurantOverlay: {
     position: 'absolute',

@@ -21,6 +21,9 @@ export interface FeedItem {
 export interface FeedResponse {
   feed: FeedItem[];
   hasMore: boolean;
+  feedMode?: 'nearby' | 'demo';
+  nearbyPlaceIds?: string[];
+  totalNearbyRestaurants?: number;
 }
 
 export interface UploadVideoResponse {

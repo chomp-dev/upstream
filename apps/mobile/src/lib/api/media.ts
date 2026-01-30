@@ -31,6 +31,36 @@ export async function fetchFeed(
 }
 
 /**
+ * Fetch the feed of videos and image posts for nearby restaurants
+ * @param placeIds - Array of google_place_ids for nearby restaurants
+ */
+export async function fetchNearbyFeed(
+  placeIds: string[],
+  limit: number = 20,
+  offset: number = 0
+): Promise<FeedResponse> {
+  if (placeIds.length === 0) {
+    return {
+      feed: [],
+      hasMore: false,
+      feedMode: 'nearby',
+      nearbyPlaceIds: [],
+      totalNearbyRestaurants: 0,
+    };
+  }
+
+  const response = await fetch(
+    `${MEDIA_API_BASE}/api/feed/nearby?place_ids=${placeIds.join(',')}&limit=${limit}&offset=${offset}`
+  );
+
+  if (!response.ok) {
+    throw new Error(`Nearby feed fetch failed: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
  * Request a video upload URL from Cloudflare Stream
  */
 export async function requestVideoUpload(

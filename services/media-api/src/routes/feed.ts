@@ -89,6 +89,103 @@ feedRouter.post('/admin/verify-all-videos', async (req, res) => {
   }
 });
 
+// ============================================================================
+// Location-Based Feed - Videos from nearby restaurants
+// ============================================================================
+
+/**
+ * Get feed of videos and image posts for nearby restaurants
+ * GET /api/feed/nearby?place_ids=id1,id2,id3&limit=20&offset=0
+ * 
+ * Returns only content linked to the specified google_place_ids.
+ * Used by mobile app to show location-relevant content.
+ */
+feedRouter.get('/nearby', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 20;
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    // Parse place_ids from query string (comma-separated or repeated params)
+    let placeIds: string[] = [];
+    const placeIdsParam = req.query.place_ids;
+
+    if (typeof placeIdsParam === 'string') {
+      placeIds = placeIdsParam.split(',').map(id => id.trim()).filter(Boolean);
+    } else if (Array.isArray(placeIdsParam)) {
+      placeIds = placeIdsParam.map(id => String(id).trim()).filter(Boolean);
+    }
+
+    console.log(`[Feed/Nearby] Request with ${placeIds.length} place_ids, limit=${limit}, offset=${offset}`);
+
+    // If no place_ids provided, return empty feed
+    if (placeIds.length === 0) {
+      return res.json({
+        feed: [],
+        hasMore: false,
+        feedMode: 'nearby',
+        nearbyPlaceIds: [],
+        totalNearbyRestaurants: 0,
+      });
+    }
+
+    // Fetch videos linked to nearby restaurants - exclude error/deleted videos
+    const videosResult = await pool.query(
+      `SELECT id, cloudflare_video_id, playback_url, thumbnail_url, 
+              status, duration, google_place_id, created_at, updated_at
+       FROM videos 
+       WHERE status != 'error' 
+         AND google_place_id = ANY($1)
+       ORDER BY created_at DESC 
+       LIMIT $2 OFFSET $3`,
+      [placeIds, limit, offset]
+    );
+
+    console.log(`[Feed/Nearby] Found ${videosResult.rows.length} videos for nearby restaurants`);
+
+    // Fetch image posts linked to nearby restaurants
+    const imagesResult = await pool.query(
+      `SELECT id, images, google_place_id, created_at
+       FROM image_posts 
+       WHERE google_place_id = ANY($1)
+       ORDER BY created_at DESC 
+       LIMIT $2 OFFSET $3`,
+      [placeIds, limit, offset]
+    );
+
+    console.log(`[Feed/Nearby] Found ${imagesResult.rows.length} image posts for nearby restaurants`);
+
+    // Combine and interleave, sorted by created_at
+    const feed = [
+      ...videosResult.rows.map(v => ({ type: 'video', ...v })),
+      ...imagesResult.rows.map(i => ({
+        type: 'image_post',
+        ...i,
+        images: Array.isArray(i.images) ? i.images.filter((url: string) => !!url) : []
+      })),
+    ].sort((a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+
+    // Get unique place_ids that actually have content
+    const matchedPlaceIds = [...new Set(feed.map(item => item.google_place_id).filter(Boolean))];
+
+    res.json({
+      feed,
+      hasMore: feed.length === limit,
+      feedMode: 'nearby',
+      nearbyPlaceIds: matchedPlaceIds,
+      totalNearbyRestaurants: placeIds.length,
+    });
+  } catch (error) {
+    console.error('[Feed/Nearby] Error:', error);
+    res.status(500).json({ error: 'Failed to fetch nearby feed' });
+  }
+});
+
+// ============================================================================
+// Demo Feed - All videos (original behavior)
+// ============================================================================
+
 // Get feed of videos and image posts
 feedRouter.get('/', async (req, res) => {
   try {
