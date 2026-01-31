@@ -25,6 +25,7 @@ from .models import (
     NearbySearchRequest,
     NearbySearchResponse,
     RestaurantResponse,
+    TextSearchRequest,
 )
 from .settings import get_settings
 
@@ -265,6 +266,44 @@ async def search_nearby_get(
         max_results=max_results,
     )
     return await search_nearby_restaurants(request, session)
+
+
+@app.post("/api/v1/search", response_model=NearbySearchResponse, tags=["Search"])
+async def search_by_text(
+    request: TextSearchRequest,
+    session: AsyncSession = Depends(get_db_session),
+):
+    """
+    Search for restaurants by text query.
+    """
+    client = get_places_client()
+    lat = request.location.lat if request.location else None
+    lng = request.location.lng if request.location else None
+    
+    try:
+        places = await client.search_text(
+            query=request.query,
+            lat=lat,
+            lng=lng,
+            radius=request.radius,
+            max_results=request.max_results,
+        )
+        
+        if not places:
+            return NearbySearchResponse(restaurants=[], count=0)
+            
+        # Parse and upsert
+        restaurants_data = [parse_google_place(p) for p in places]
+        restaurants = await upsert_restaurants(session, restaurants_data)
+        
+        return NearbySearchResponse(
+            restaurants=[RestaurantResponse.model_validate(r) for r in restaurants],
+            count=len(restaurants),
+            cached=False
+        )
+    except Exception as e:
+         logger.error(f"Text search error: {e}")
+         raise HTTPException(status_code=500, detail="Search failed")
 
 
 # =============================================================================

@@ -91,6 +91,14 @@ class NearbySearchRequest(BaseModel):
     )
 
 
+class TextSearchRequest(BaseModel):
+    """Request body for text-based restaurant search."""
+    query: str = Field(..., min_length=1, description="Text query (e.g., 'Sushi', 'McDonalds')")
+    location: Optional[LocationInput] = Field(default=None, description="Bias search to this location")
+    radius: Optional[int] = Field(default=5000, description="Bias radius in meters")
+    max_results: int = Field(default=20, ge=1, le=50, description="Max results")
+
+
 class RestaurantResponse(BaseModel):
     """Restaurant data returned to clients."""
     

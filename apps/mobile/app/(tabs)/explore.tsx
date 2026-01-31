@@ -30,6 +30,10 @@ const NUM_COLUMNS = 2;
 export default function ExploreScreen() {
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [filteredFeed, setFilteredFeed] = useState<FeedItem[]>([]);
+  // Search state
+  const [searchResults, setSearchResults] = useState<any[]>([]); // simplified type for now
+  const [isSearching, setIsSearching] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -39,6 +43,7 @@ export default function ExploreScreen() {
   const ITEM_WIDTH = (width - GRID_GAP * (NUM_COLUMNS + 1)) / NUM_COLUMNS;
   const ITEM_HEIGHT = ITEM_WIDTH * 1.4;
 
+  // ... loadFeed (unchanged) ...
   const loadFeed = useCallback(async (isRefresh = false) => {
     try {
       if (isRefresh) {
@@ -71,20 +76,25 @@ export default function ExploreScreen() {
     loadFeed();
   }, [loadFeed]);
 
-  // Simple client-side filter (placeholder for future search)
-  useEffect(() => {
-    if (searchQuery.trim() === '') {
-      setFilteredFeed(feed);
+  // Handle Search
+  const performSearch = useCallback(async (text: string) => {
+    setSearchQuery(text);
+    if (text.trim().length > 2) {
+      setIsSearching(true);
+      try {
+        // Import searchApi locally if needed or ensure it's imported at top
+        const { searchApi } = require('../../src/lib/api');
+        // Retrieve generic location if possible
+        const response = await searchApi.searchRestaurants(text);
+        setSearchResults(response.restaurants);
+      } catch (e) {
+        console.error('Explore search failed', e);
+      }
     } else {
-      // For now, just filter by type or status (placeholder)
-      const query = searchQuery.toLowerCase();
-      const filtered = feed.filter((item) => {
-        // In future: filter by restaurant name, caption, etc.
-        return item.type.includes(query);
-      });
-      setFilteredFeed(filtered);
+      setIsSearching(false);
+      setSearchResults([]);
     }
-  }, [searchQuery, feed]);
+  }, []);
 
   const getItemThumbnail = (item: FeedItem): string | undefined => {
     if (item.type === 'video') {
@@ -97,14 +107,32 @@ export default function ExploreScreen() {
   const handleItemPress = (item: FeedItem, index: number) => {
     // Navigate to home feed with item index to scroll to
     // We pass the full item data so Home can display it even if it's not in the local feed
+    const dataId = `video-${Date.now()}`
+    navigationStore.set(dataId, item);
+
     router.push({
       pathname: '/',
       params: {
         scrollToIndex: index.toString(),
         itemId: item.id.toString(),
-        videoData: JSON.stringify(item)
+        videoDataId: dataId
       },
     });
+  };
+
+  // Handle Restaurant Press (from search)
+  const handleRestaurantPress = (restaurant: any) => {
+    // For now, just open maps? Or maybe filter feed? 
+    // Let's open maps to be consistent with Map screen behavior for now.
+    const { Platform, Linking } = require('react-native');
+    if (restaurant.lat && restaurant.lng) {
+      const url = Platform.select({
+        ios: `maps:0,0?q=${restaurant.lat},${restaurant.lng}`,
+        android: `geo:0,0?q=${restaurant.lat},${restaurant.lng}(${restaurant.name})`,
+        default: `https://maps.google.com/?q=${restaurant.lat},${restaurant.lng}`,
+      });
+      if (url) Linking.openURL(url);
+    }
   };
 
   const renderItem = ({ item, index }: { item: FeedItem; index: number }) => {
@@ -153,7 +181,22 @@ export default function ExploreScreen() {
     );
   };
 
-  if (loading) {
+  const renderRestaurantItem = ({ item }: { item: any }) => (
+    <TouchableOpacity
+      style={styles.searchResultItem}
+      onPress={() => handleRestaurantPress(item)}
+    >
+      <View style={styles.resultInfo}>
+        <Text variant="body" numberOfLines={1}>{item.name}</Text>
+        <Text variant="caption" color={colors.muted} numberOfLines={1}>
+          {item.formatted_address}
+        </Text>
+      </View>
+      <Ionicons name="chevron-forward" size={20} color={colors.muted} />
+    </TouchableOpacity>
+  );
+
+  if (loading && !isSearching) {
     return (
       <Screen edges={['top']}>
         <View style={styles.centered}>
@@ -177,48 +220,62 @@ export default function ExploreScreen() {
           <Ionicons name="search-outline" size={18} color={colors.muted} style={{ marginRight: spacing.sm }} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search (coming soon)"
+            placeholder="Search restaurants..."
             placeholderTextColor={colors.muted}
             value={searchQuery}
-            onChangeText={setSearchQuery}
+            onChangeText={performSearch}
           />
           {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <TouchableOpacity onPress={() => performSearch('')}>
               <Ionicons name="close-circle" size={20} color={colors.muted} />
             </TouchableOpacity>
           )}
         </View>
       </View>
 
-      {/* Grid */}
-      <FlatList
-        data={filteredFeed}
-        keyExtractor={(item) => `${item.type}-${item.id}`}
-        renderItem={renderItem}
-        numColumns={NUM_COLUMNS}
-        contentContainerStyle={styles.gridContainer}
-        columnWrapperStyle={styles.row}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => loadFeed(true)}
-            tintColor={colors.primary}
-            colors={[colors.primary]}
-          />
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>🔍</Text>
-            <Text variant="subtitle" center>
-              No posts found
-            </Text>
-            <Text variant="bodySmall" color={colors.muted} center>
-              Be the first to share!
-            </Text>
-          </View>
-        }
-      />
+      {/* Grid or Search List */}
+      {isSearching ? (
+        <FlatList
+          data={searchResults}
+          keyExtractor={(item) => item.id}
+          renderItem={renderRestaurantItem}
+          contentContainerStyle={styles.searchListContainer}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text variant="body" color={colors.muted}>No restaurants found</Text>
+            </View>
+          }
+        />
+      ) : (
+        <FlatList
+          data={filteredFeed}
+          keyExtractor={(item) => `${item.type}-${item.id}`}
+          renderItem={renderItem}
+          numColumns={NUM_COLUMNS}
+          contentContainerStyle={styles.gridContainer}
+          columnWrapperStyle={styles.row}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => loadFeed(true)}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyIcon}>🔍</Text>
+              <Text variant="subtitle" center>
+                No posts found
+              </Text>
+              <Text variant="bodySmall" color={colors.muted} center>
+                Be the first to share!
+              </Text>
+            </View>
+          }
+        />
+      )}
     </Screen>
   );
 }
@@ -326,5 +383,23 @@ const styles = StyleSheet.create({
   emptyIcon: {
     fontSize: 64,
     marginBottom: spacing.lg,
+  },
+  searchListContainer: {
+    padding: spacing.lg,
+    paddingBottom: 120,
+  },
+  searchResultItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  resultInfo: {
+    flex: 1,
+    marginRight: spacing.sm,
   },
 });

@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   Dimensions,
   Text as RNText,
+  TextInput,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -60,7 +61,53 @@ export default function MapScreen() {
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [estimatedCount, setEstimatedCount] = useState(0);
 
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [estimatedCount, setEstimatedCount] = useState(0);
+
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+
   const currentRadius = RADIUS_OPTIONS[radiusIndex].value;
+
+  const performSearch = useCallback(async (query: string) => {
+    if (query.trim().length <= 2) {
+      if (query.trim().length === 0 && location) {
+        // Reset to nearby if cleared
+        loadRestaurants(location, currentRadius);
+      }
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      setIsSearching(true);
+
+      const loc = location || await loadLocation();
+      const lat = loc?.coords.latitude;
+      const lng = loc?.coords.longitude;
+
+      const response = await searchApi.searchRestaurants(query, lat, lng, currentRadius);
+
+      setRestaurants(response.restaurants);
+      setCached(response.cached);
+      setFetchMeta(null); // Clear meta since this is a custom search
+
+      // Fetch media summary
+      const placeIds = response.restaurants.map((r) => r.google_place_id);
+      if (placeIds.length > 0) {
+        const summary = await mediaApi.getMediaSummary(placeIds);
+        setMediaSummary(summary);
+      }
+    } catch (err) {
+      console.error('Search error:', err);
+      setError('Search failed. Please try again.');
+    } finally {
+      setLoading(false);
+      setIsSearching(false);
+    }
+  }, [location, loadLocation, loadRestaurants, currentRadius]);
 
   const loadLocation = useCallback(async () => {
     try {
@@ -303,7 +350,29 @@ export default function MapScreen() {
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <Text variant="title">Nearby</Text>
-          {cached && <Badge label="⚡ Cached" variant="cached" />}
+          {cached && !isSearching && <Badge label="⚡ Cached" variant="cached" />}
+        </View>
+
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <Ionicons name="search" size={20} color={colors.muted} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search places..."
+            placeholderTextColor={colors.muted}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            onSubmitEditing={() => performSearch(searchQuery)}
+            returnKeyType="search"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => {
+              setSearchQuery('');
+              performSearch('');
+            }}>
+              <Ionicons name="close-circle" size={18} color={colors.muted} />
+            </TouchableOpacity>
+          )}
         </View>
 
         <Text variant="caption" color={colors.muted} style={styles.headerCount}>
@@ -415,6 +484,24 @@ const styles = StyleSheet.create({
   },
   headerCount: {
     marginTop: spacing.xs,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    marginTop: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: colors.text,
+    padding: 0,
   },
   fetchMetaContainer: {
     marginTop: spacing.sm,

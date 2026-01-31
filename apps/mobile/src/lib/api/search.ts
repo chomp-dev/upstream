@@ -63,10 +63,10 @@ export async function searchNearby(
   skipCache: boolean = false
 ): Promise<NearbySearchResponse> {
   // If skipCache, add timestamp to bust any client-side caching
-  const url = skipCache 
+  const url = skipCache
     ? `${SEARCH_API_BASE}/api/v1/nearby?_t=${Date.now()}`
     : `${SEARCH_API_BASE}/api/v1/nearby`;
-    
+
   // Don't send included_types - let backend use its DEFAULT_TYPE_GROUPS
   // which makes multiple API requests to get more results
   const request: NearbySearchRequest = {
@@ -75,21 +75,21 @@ export async function searchNearby(
     max_results: maxResults,
     // included_types omitted intentionally - backend will use multiple type groups
   };
-  
+
   const response = await fetch(url, {
     method: 'POST',
-    headers: { 
+    headers: {
       'Content-Type': 'application/json',
       // Tell server to skip cache if requested
       ...(skipCache ? { 'X-Skip-Cache': 'true' } : {}),
     },
     body: JSON.stringify(request),
   });
-  
+
   if (!response.ok) {
     throw new Error(`Nearby search failed: ${response.status}`);
   }
-  
+
   return response.json();
 }
 
@@ -113,20 +113,53 @@ export async function clearSearchCache(): Promise<boolean> {
 export async function getRestaurant(placeId: string): Promise<Restaurant | null> {
   try {
     const response = await fetch(`${SEARCH_API_BASE}/api/v1/restaurants/${placeId}`);
-    
+
     if (response.status === 404) {
       return null;
     }
-    
+
     if (!response.ok) {
       throw new Error(`Restaurant fetch failed: ${response.status}`);
     }
-    
+
     return response.json();
   } catch (error) {
     console.warn('Failed to fetch restaurant:', error);
     return null;
   }
+}
+
+/**
+ * Search for restaurants by text query
+ */
+export async function searchRestaurants(
+  query: string,
+  lat?: number,
+  lng?: number,
+  radius: number = 5000
+): Promise<NearbySearchResponse> {
+  const url = `${SEARCH_API_BASE}/api/v1/search`;
+
+  const request = {
+    query,
+    location: lat && lng ? { lat, lng } : undefined,
+    radius,
+    max_results: 20
+  };
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Search failed: ${response.status}`);
+  }
+
+  return response.json();
 }
 
 /**

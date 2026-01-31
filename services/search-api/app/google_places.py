@@ -195,6 +195,50 @@ class GooglePlacesClient:
             "truncated": truncated,
         }
 
+    async def search_text(
+        self,
+        query: str,
+        lat: float | None = None,
+        lng: float | None = None,
+        radius: int | None = None,
+        max_results: int = 20,
+        field_mask: str = NEARBY_FIELD_MASK,
+    ) -> list[dict[str, Any]]:
+        """
+        Search for places by text query.
+        """
+        client = await self._get_client()
+        
+        request_body: dict[str, Any] = {
+            "textQuery": query,
+            "maxResultCount": max_results,
+            # Filter to only food-related places to avoid irrelevant results
+            "includedType": "restaurant", 
+        }
+        
+        # Add location bias if provided
+        if lat is not None and lng is not None:
+             # Use locationBias for text search, not restriction, so we can find things slightly further away
+            request_body["locationBias"] = {
+                "circle": {
+                    "center": {"latitude": lat, "longitude": lng},
+                    "radius": radius or 5000.0,
+                }
+            }
+            
+        try:
+            response = await client.post(
+                f"{self.base_url}/places:searchText",
+                json=request_body,
+                headers={"X-Goog-FieldMask": field_mask},
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data.get("places", [])
+        except Exception as e:
+            logger.error(f"Google Places text search failed for '{query}': {e}")
+            return []
+
 
 def parse_google_place(place: dict[str, Any]) -> dict[str, Any]:
     """

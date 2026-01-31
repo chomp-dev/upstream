@@ -12,6 +12,7 @@ import {
   ScrollView,
   Modal,
   FlatList,
+  TextInput,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystemLegacy from 'expo-file-system/legacy';
@@ -40,6 +41,36 @@ export default function CreateScreen() {
   const [loadingRestaurants, setLoadingRestaurants] = useState(false);
 
   const router = useRouter();
+
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Restaurant[]>([]);
+  const [searching, setSearching] = useState(false);
+
+  const handleSearch = useCallback(async (query: string) => {
+    setSearchQuery(query);
+    if (query.trim().length > 2) {
+      try {
+        setSearching(true);
+        // Use current location bias if available
+        let lat, lng;
+        try {
+          const loc = await Location.getCurrentPositionAsync();
+          lat = loc.coords.latitude;
+          lng = loc.coords.longitude;
+        } catch { }
+
+        const response = await searchApi.searchRestaurants(query, lat, lng);
+        setSearchResults(response.restaurants);
+      } catch (e) {
+        console.error('Search error:', e);
+      } finally {
+        setSearching(false);
+      }
+    } else {
+      setSearchResults([]);
+    }
+  }, []);
 
   const loadNearbyRestaurants = useCallback(async () => {
     try {
@@ -290,7 +321,7 @@ export default function CreateScreen() {
         {/* Restaurant attachment */}
         <View style={styles.section}>
           <Text variant="label" style={styles.sectionLabel}>
-            Attach Restaurant (optional)
+            Attach Restaurant <Text color={colors.coral} style={{ fontWeight: 'bold' }}>*</Text>
           </Text>
           <TouchableOpacity
             style={styles.restaurantSelector}
@@ -376,32 +407,50 @@ export default function CreateScreen() {
         presentationStyle="pageSheet"
       >
         <View style={styles.pickerContainer}>
-          <View style={styles.pickerHeader}>
-            <Text variant="title">Select Restaurant</Text>
-            <TouchableOpacity onPress={() => setShowRestaurantPicker(false)}>
-              <Text variant="body" color={colors.blue}>
-                Cancel
-              </Text>
-            </TouchableOpacity>
+          <View style={styles.pickerHeaderColumn}>
+            <View style={styles.pickerHeaderRow}>
+              <Text variant="title">Select Restaurant</Text>
+              <TouchableOpacity onPress={() => setShowRestaurantPicker(false)}>
+                <Text variant="body" color={colors.blue}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Search Bar */}
+            <View style={styles.searchBar}>
+              <Ionicons name="search" size={20} color={colors.muted} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search for a restaurant..."
+                placeholderTextColor={colors.muted}
+                value={searchQuery}
+                onChangeText={handleSearch}
+                autoCorrect={false}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => handleSearch('')}>
+                  <Ionicons name="close-circle" size={18} color={colors.muted} />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
 
-          {loadingRestaurants ? (
+          {(loadingRestaurants || searching) ? (
             <View style={styles.pickerLoading}>
               <ActivityIndicator size="large" color={colors.primary} />
               <Text variant="bodySmall" color={colors.muted} style={{ marginTop: spacing.md }}>
-                Finding nearby restaurants...
+                {searching ? 'Searching...' : 'Finding nearby restaurants...'}
               </Text>
             </View>
           ) : (
             <FlatList
-              data={nearbyRestaurants}
+              data={searchQuery.length > 2 ? searchResults : nearbyRestaurants}
               keyExtractor={(item) => item.id}
               renderItem={renderRestaurantItem}
               contentContainerStyle={styles.pickerList}
               ListEmptyComponent={
                 <View style={styles.pickerLoading}>
                   <Text variant="body" center>
-                    No restaurants found nearby
+                    {searchQuery.length > 0 ? 'No results found' : 'No restaurants found nearby'}
                   </Text>
                 </View>
               }
@@ -412,6 +461,8 @@ export default function CreateScreen() {
     </Screen>
   );
 }
+
+
 
 const styles = StyleSheet.create({
   container: {
@@ -495,13 +546,32 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.bg,
   },
-  pickerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  pickerHeaderColumn: {
     padding: spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    gap: spacing.md,
+  },
+  pickerHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: colors.text,
   },
   pickerLoading: {
     flex: 1,
