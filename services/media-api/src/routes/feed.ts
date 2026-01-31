@@ -251,15 +251,13 @@ feedRouter.get('/', async (req, res) => {
     console.log(`[Feed] Found ${videosResult.rows.length} videos. Statuses: ${videosResult.rows.map(v => `${v.id}:${v.status}`).join(', ')}`);
 
     // Check and update status for ALL videos to handle manual Cloudflare deletions
-    // This is more aggressive than before but ensures the feed doesn't show deleted videos
+    // We run this in the background (no await) to keep the feed fast
     const videosToCheck = videosResult.rows.filter(v => v.cloudflare_video_id);
 
     if (videosToCheck.length > 0) {
-      console.log(`[Feed] Validating ${videosToCheck.length} videos with Cloudflare...`);
-
-      // We process these in parallel but with a concurrency limit if needed
-      // For page size 20, Promise.all is fine
-      await Promise.all(videosToCheck.map(async (video) => {
+      // Fire-and-forget validation
+      // This means the current response might show deleted videos (stale), but they will be fixed on next refresh
+      Promise.all(videosToCheck.map(async (video) => {
         try {
           const cloudflareVideo = await getVideo(video.cloudflare_video_id);
 
@@ -289,12 +287,6 @@ feedRouter.get('/', async (req, res) => {
                 video.cloudflare_video_id,
               ]
             );
-
-            // Update the video object in place so the response is correct
-            video.status = cloudflareVideo.status;
-            video.playback_url = newPlaybackUrl;
-            video.thumbnail_url = cloudflareVideo.thumbnail || null;
-            video.duration = durationInt;
           }
         } catch (error: any) {
           // Check for 404 (Deleted)
@@ -310,14 +302,11 @@ feedRouter.get('/', async (req, res) => {
               `UPDATE videos SET status = 'error', updated_at = CURRENT_TIMESTAMP WHERE cloudflare_video_id = $1`,
               [video.cloudflare_video_id]
             );
-
-            video.status = 'error';
           } else {
-            // Log other errors but don't fail
             console.warn(`[Feed] Status check failed for ${video.cloudflare_video_id}:`, error?.message);
           }
         }
-      }));
+      })).catch(err => console.error('[Feed] Background validation error:', err));
     }
 
     // Fetch image posts
