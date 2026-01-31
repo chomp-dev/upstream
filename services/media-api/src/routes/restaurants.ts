@@ -91,9 +91,13 @@ restaurantsRouter.post('/media-summary', async (req, res) => {
     }
 
     res.json(summary);
-  } catch (error) {
-    console.error('Media summary error:', error);
-    res.status(500).json({ error: 'Failed to fetch media summary' });
+  } catch (error: any) {
+    console.error('Media summary error:', error.message, error.stack);
+    res.status(500).json({
+      error: 'Failed to fetch media summary',
+      details: error.message,
+      code: error.code
+    });
   }
 });
 
@@ -142,8 +146,12 @@ restaurantsRouter.get('/:place_id/media', async (req, res) => {
       count: media.length,
       hasMore: media.length === limit,
     });
-  } catch (error) {
-    console.error('Restaurant media error:', error);
-    res.status(500).json({ error: 'Failed to fetch restaurant media' });
+  } catch (error: any) {
+    console.error('Restaurant media error:', error.message, error.stack);
+    res.status(500).json({
+      error: 'Failed to fetch restaurant media',
+      details: error.message,
+      code: error.code
+    });
   }
 });

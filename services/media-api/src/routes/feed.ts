@@ -286,9 +286,13 @@ feedRouter.get('/nearby', async (req, res) => {
     if (imagesResult.rows.length > 0) {
       validateImagePosts(imagesResult.rows);
     }
-  } catch (error) {
-    console.error('[Feed/Nearby] Error:', error);
-    res.status(500).json({ error: 'Failed to fetch nearby feed' });
+  } catch (error: any) {
+    console.error('[Feed/Nearby] Error:', error.message, error.stack);
+    res.status(500).json({
+      error: 'Failed to fetch nearby feed',
+      details: error.message,
+      code: error.code
+    });
   }
 });
 
