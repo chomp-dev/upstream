@@ -101,6 +101,32 @@ export async function getImageUploadUrl(): Promise<ImageUploadUrlResponse> {
 }
 
 /**
+ * Check the status of a video upload
+ * Used to verify if the file actually reached Cloudflare
+ */
+export async function checkVideoUploadStatus(
+  videoId: string
+): Promise<{ status: string; uid: string }> {
+  try {
+    const response = await fetch(`${MEDIA_API_BASE}/api/upload/video/${videoId}/status`);
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        // This is actually expected if we check immediately after upload sometimes
+        throw new Error('Video not found (upload likely failed)');
+      }
+      // Don't throw for other errors, just return unknown status so we retry
+      console.warn(`[API] Check status failed: ${response.status}`);
+      return { status: 'unknown', uid: videoId };
+    }
+    return response.json();
+  } catch (error) {
+    console.warn('[API] Error checking status:', error);
+    return { status: 'unknown', uid: videoId };
+  }
+}
+
+/**
  * Upload an image file directly to Cloudflare
  * @param uploadUrl - The one-time upload URL from getImageUploadUrl()
  * @param imageUri - The local file URI to upload

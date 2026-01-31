@@ -37,6 +37,45 @@ uploadRouter.post('/video', async (req, res) => {
   }
 });
 
+// Check video status from Cloudflare
+uploadRouter.get('/video/:videoId/status', async (req, res) => {
+  try {
+    const { videoId } = req.params;
+    // @ts-ignore - getVideo is imported below
+    const { getVideo } = require('../services/cloudflare');
+    const video = await getVideo(videoId);
+
+    // Update DB if status changed
+    if (video.status && video.status !== 'pendingupload') {
+      await pool.query(
+        `UPDATE videos 
+         SET status = $1, 
+             playback_url = $2, 
+             thumbnail_url = $3,
+             duration = $4,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE cloudflare_video_id = $5`,
+        [
+          video.status,
+          video.playback?.hls || video.playback?.dash || null,
+          video.thumbnail || null,
+          video.duration || null,
+          videoId,
+        ]
+      );
+    }
+
+    res.json(video);
+  } catch (error: any) {
+    console.error('Status check error:', error);
+    // Return 404 if video not found (meaning upload never started/finished)
+    if (error.statusCode === 404 || error.message?.includes('404')) {
+      return res.status(404).json({ error: 'Video not found' });
+    }
+    res.status(500).json({ error: 'Failed to check video status' });
+  }
+});
+
 // Get direct upload URL for a single image (Cloudflare Images)
 // Client should call this for each image they want to upload
 uploadRouter.post('/image-url', async (req, res) => {

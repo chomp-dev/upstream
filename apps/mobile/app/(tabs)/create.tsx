@@ -83,7 +83,7 @@ export default function CreateScreen() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Videos,
         allowsEditing: true,
-        quality: 1,
+        quality: 0.7, // Optimize video size (User requested optimization)
         videoMaxDuration: 60,
       });
 
@@ -123,17 +123,9 @@ export default function CreateScreen() {
         },
         (progressData) => {
           const progress = progressData.totalBytesSent / progressData.totalBytesExpectedToSend;
-          const uploadedMB = (progressData.totalBytesSent / 1024 / 1024).toFixed(2);
-          const totalMB = (progressData.totalBytesExpectedToSend / 1024 / 1024).toFixed(2);
-          const elapsed = (Date.now() - uploadStartTime) / 1000;
-          const speed = elapsed > 0 ? progressData.totalBytesSent / elapsed : 0;
-          const speedMBps = (speed / 1024 / 1024).toFixed(2);
-          const remaining = progressData.totalBytesExpectedToSend - progressData.totalBytesSent;
-          const eta = speed > 0 ? Math.round(remaining / speed) : 0;
-
-          setUploadProgress(progress * 0.95);
+          setUploadProgress(progress * 0.90); // Reserve last 10% for verification
           setUploadStatus(
-            `Uploading... ${Math.round(progress * 100)}% (${uploadedMB}/${totalMB} MB, ${speedMBps} MB/s, ~${eta}s left)`
+            `Uploading... ${Math.round(progress * 100)}%`
           );
         }
       );
@@ -144,16 +136,56 @@ export default function CreateScreen() {
         throw new Error(`Upload failed with status ${uploadResult?.status}`);
       }
 
-      setUploadProgress(1.0);
-      setUploadStatus('Upload complete!');
+      setUploadStatus('Verifying upload...');
+      setUploadProgress(0.92);
+
+      // Verification Loop
+      // Poll backend to confirm video reached Cloudflare and moved past 'pendingupload'
+      let verified = false;
+      let attempts = 0;
+      const MAX_ATTEMPTS = 10; // 20 seconds total
+
+      while (attempts < MAX_ATTEMPTS && !verified) {
+        try {
+          await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s
+          attempts++;
+
+          const statusResult = await mediaApi.checkVideoUploadStatus(uploadResponse.videoId);
+          console.log(`[Upload] Verification attempt ${attempts}: ${statusResult.status}`);
+
+          if (statusResult.status && statusResult.status !== 'pendingupload' && statusResult.status !== 'unknown') {
+            verified = true; // Video reached Cloudflare (inprogress, ready, etc)
+          } else if (attempts > 5 && statusResult.status === 'pendingupload') {
+            // If it's still pendingupload after 10s, it's suspicious but we keep trying
+            setUploadStatus('Still processing...');
+          }
+        } catch (e) {
+          console.warn('[Upload] Verification checking error, continuing...', e);
+        }
+      }
+
+      if (!verified) {
+        console.warn('[Upload] Could not verify upload success via backend');
+        // We don't fail hard here because the upload call itself succeeded, 
+        // but we warn the user it might take time
+        Alert.alert(
+          'Upload Received',
+          'Your video was uploaded but is taking longer than usual to process. It will appear in your feed shortly.',
+          [{ text: 'OK', onPress: () => router.replace('/') }]
+        );
+      } else {
+        setUploadProgress(1.0);
+        setUploadStatus('Upload complete!');
+
+        Alert.alert(
+          'Success',
+          'Video uploaded! It will appear in your feed once processing is complete.',
+          [{ text: 'View Feed', onPress: () => router.replace('/') }]
+        );
+      }
+
       setUploading(false);
       setSelectedRestaurant(null);
-
-      Alert.alert(
-        'Success',
-        'Video uploaded! It will appear in your feed once processing is complete.',
-        [{ text: 'View Feed', onPress: () => router.replace('/') }]
-      );
     } catch (error: any) {
       console.error('Upload error:', error);
       Alert.alert('Error', error?.message || 'Failed to upload video');
