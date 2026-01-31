@@ -3,6 +3,7 @@
  * Communicates with the Express/TS backend (media-api)
  */
 
+import { Platform } from 'react-native';
 import { MEDIA_API_BASE } from '../env';
 import type {
   FeedResponse,
@@ -141,23 +142,29 @@ export async function uploadImageToCloudflare(
   // Create form data with the image
   const formData = new FormData();
 
-  // For React Native, we need to create a file-like object
-  const filename = imageUri.split('/').pop() || 'image.jpg';
-  const match = /\.(\w+)$/.exec(filename);
-  const type = match ? `image/${match[1]}` : 'image/jpeg';
+  // For React Native (Mobile), we use the { uri, name, type } object
+  // For Web, we must fetch the blob and append it directly
+  if (Platform.OS === 'web') {
+    const blob = await fetch(imageUri).then(r => r.blob());
+    formData.append('file', blob, 'image.jpg');
+  } else {
+    // Native (iOS/Android)
+    const filename = imageUri.split('/').pop() || 'image.jpg';
+    const match = /\.(\w+)$/.exec(filename);
+    const type = match ? `image/${match[1]}` : 'image/jpeg';
 
-  formData.append('file', {
-    uri: imageUri,
-    name: filename,
-    type,
-  } as any);
+    formData.append('file', {
+      uri: imageUri,
+      name: filename,
+      type,
+    } as any);
+  }
 
   const response = await fetch(uploadUrl, {
     method: 'POST',
     body: formData,
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
+    // Do NOT set Content-Type header for FormData in React Native
+    // It needs to generate its own boundary
   });
 
   if (!response.ok) {
