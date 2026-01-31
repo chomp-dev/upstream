@@ -69,44 +69,8 @@ export default function MapScreen() {
 
   const currentRadius = RADIUS_OPTIONS[radiusIndex].value;
 
-  const performSearch = useCallback(async (query: string) => {
-    if (query.trim().length <= 2) {
-      if (query.trim().length === 0 && location) {
-        // Reset to nearby if cleared
-        loadRestaurants(location, currentRadius);
-      }
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-      setIsSearching(true);
-
-      const loc = location || await loadLocation();
-      const lat = loc?.coords.latitude;
-      const lng = loc?.coords.longitude;
-
-      const response = await searchApi.searchRestaurants(query, lat, lng, currentRadius);
-
-      setRestaurants(response.restaurants);
-      setCached(response.cached);
-      setFetchMeta(null); // Clear meta since this is a custom search
-
-      // Fetch media summary
-      const placeIds = response.restaurants.map((r) => r.google_place_id);
-      if (placeIds.length > 0) {
-        const summary = await mediaApi.getMediaSummary(placeIds);
-        setMediaSummary(summary);
-      }
-    } catch (err) {
-      console.error('Search error:', err);
-      setError('Search failed. Please try again.');
-    } finally {
-      setLoading(false);
-      setIsSearching(false);
-    }
-  }, [location, loadLocation, loadRestaurants, currentRadius]);
+  // NOTE: loadLocation and loadRestaurants are defined first, 
+  // then performSearch is defined below them to avoid temporal dead zone
 
   const loadLocation = useCallback(async () => {
     try {
@@ -199,6 +163,45 @@ export default function MapScreen() {
     },
     []
   );
+
+  const performSearch = useCallback(async (query: string) => {
+    if (query.trim().length <= 2) {
+      if (query.trim().length === 0 && location) {
+        // Reset to nearby if cleared
+        loadRestaurants(location, currentRadius);
+      }
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      setIsSearching(true);
+
+      const loc = location || await loadLocation();
+      const lat = loc?.coords.latitude;
+      const lng = loc?.coords.longitude;
+
+      const response = await searchApi.searchRestaurants(query, lat, lng, currentRadius);
+
+      setRestaurants(response.restaurants);
+      setCached(response.cached);
+      setFetchMeta(null); // Clear meta since this is a custom search
+
+      // Fetch media summary
+      const placeIds = response.restaurants.map((r) => r.google_place_id);
+      if (placeIds.length > 0) {
+        const summary = await mediaApi.getMediaSummary(placeIds);
+        setMediaSummary(summary);
+      }
+    } catch (err) {
+      console.error('Search error:', err);
+      setError('Search failed. Please try again.');
+    } finally {
+      setLoading(false);
+      setIsSearching(false);
+    }
+  }, [location, loadLocation, loadRestaurants, currentRadius]);
 
   // Initial load - runs once on mount
   useEffect(() => {
