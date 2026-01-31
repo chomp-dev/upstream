@@ -124,3 +124,35 @@ export async function getVideo(videoId: string) {
   }
 }
 
+export async function getImage(imageId: string) {
+  try {
+    // Cloudflare Images API v1
+    const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/images/v1/${imageId}`, {
+      headers: {
+        'Authorization': `Bearer ${CLOUDFLARE_API_TOKEN}`,
+      },
+    });
+
+    if (response.status === 404) {
+      const error: any = new Error('Image not found (404)');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    if (!response.ok) {
+      const error: any = new Error(`Cloudflare Images API error: ${response.status}`);
+      error.statusCode = response.status;
+      throw error;
+    }
+
+    const data = await response.json() as any;
+    if (!data.success) {
+      throw new Error('Failed to fetch image details');
+    }
+
+    return data.result;
+  } catch (error) {
+    throw error;
+  }
+}
+

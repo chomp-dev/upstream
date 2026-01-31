@@ -146,53 +146,15 @@ export default function CreateScreen() {
       clearInterval(progressInterval);
       setUploadProgress(0.9); // 90% when upload call returns success
 
-      setUploadStatus('Verifying upload...');
-      setUploadProgress(0.92);
+      setUploadProgress(1.0);
+      setUploadStatus('Upload complete!');
 
-      // Verification Loop
-      // Poll backend to confirm video reached Cloudflare and moved past 'pendingupload'
-      let verified = false;
-      let attempts = 0;
-      const MAX_ATTEMPTS = 10; // 20 seconds total
-
-      while (attempts < MAX_ATTEMPTS && !verified) {
-        try {
-          await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s
-          attempts++;
-
-          const statusResult = await mediaApi.checkVideoUploadStatus(uploadResponse.videoId);
-          console.log(`[Upload] Verification attempt ${attempts}: ${statusResult.status}`);
-
-          if (statusResult.status && statusResult.status !== 'pendingupload' && statusResult.status !== 'unknown') {
-            verified = true; // Video reached Cloudflare (inprogress, ready, etc)
-          } else if (attempts > 5 && statusResult.status === 'pendingupload') {
-            // If it's still pendingupload after 10s, it's suspicious but we keep trying
-            setUploadStatus('Still processing...');
-          }
-        } catch (e) {
-          console.warn('[Upload] Verification checking error, continuing...', e);
-        }
-      }
-
-      if (!verified) {
-        console.warn('[Upload] Could not verify upload success via backend');
-        // We don't fail hard here because the upload call itself succeeded, 
-        // but we warn the user it might take time
-        Alert.alert(
-          'Upload Received',
-          'Your video was uploaded but is taking longer than usual to process. It will appear in your feed shortly.',
-          [{ text: 'OK', onPress: () => router.replace('/') }]
-        );
-      } else {
-        setUploadProgress(1.0);
-        setUploadStatus('Upload complete!');
-
-        Alert.alert(
-          'Success',
-          'Video uploaded! It will appear in your feed once processing is complete.',
-          [{ text: 'View Feed', onPress: () => router.replace('/') }]
-        );
-      }
+      // Immediate success - backend will handle processing async
+      Alert.alert(
+        'Success',
+        'Video uploaded! It is processing and will appear in your feed shortly.',
+        [{ text: 'View Feed', onPress: () => router.replace('/') }]
+      );
 
       setUploading(false);
       setSelectedRestaurant(null);
