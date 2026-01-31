@@ -17,7 +17,7 @@ import {
   Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystemLegacy from 'expo-file-system/legacy';
+import * as FileSystem from 'expo-file-system';
 import * as Location from 'expo-location';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -232,7 +232,7 @@ export default function CreateScreen() {
 
         // On native, verify file exists
         if (Platform.OS !== 'web') {
-          const fileInfo = await FileSystemLegacy.getInfoAsync(selectedMedia.uri);
+          const fileInfo = await FileSystem.getInfoAsync(selectedMedia.uri);
           if (!fileInfo.exists) throw new Error('File does not exist');
           fileSize = fileInfo.size || fileSize;
         }
@@ -314,8 +314,8 @@ export default function CreateScreen() {
           });
         } else {
           // Native: Use FileSystem
-          base64 = await FileSystemLegacy.readAsStringAsync(selectedMedia.uri, {
-            encoding: FileSystemLegacy.EncodingType.Base64
+          base64 = await FileSystem.readAsStringAsync(selectedMedia.uri, {
+            encoding: 'base64'
           });
         }
 
