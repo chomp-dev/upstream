@@ -25,6 +25,10 @@ import { mediaApi, searchApi } from '../../src/lib/api';
 import type { Restaurant } from '../../src/lib/api/types';
 
 export default function CreateScreen() {
+  useEffect(() => {
+    console.log('[CreateScreen] Mounted - Version: Fix-Image-Upload-V2');
+  }, []);
+
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState('');

@@ -142,11 +142,20 @@ export async function uploadImageToCloudflare(
   // Create form data with the image
   const formData = new FormData();
 
+  console.log('[Upload] Starting image upload (V2)...');
+
   // For React Native (Mobile), we use the { uri, name, type } object
   // For Web, we must fetch the blob and append it directly
   if (Platform.OS === 'web') {
-    const blob = await fetch(imageUri).then(r => r.blob());
-    formData.append('file', blob, 'image.jpg');
+    console.log('[Upload] Web detected, fetching blob from:', imageUri);
+    try {
+      const blob = await fetch(imageUri).then(r => r.blob());
+      console.log('[Upload] Blob created:', blob.size, blob.type);
+      formData.append('file', blob, 'image.jpg');
+    } catch (e) {
+      console.error('[Upload] Failed to create blob:', e);
+      throw e;
+    }
   } else {
     // Native (iOS/Android)
     const filename = imageUri.split('/').pop() || 'image.jpg';
@@ -160,11 +169,14 @@ export async function uploadImageToCloudflare(
     } as any);
   }
 
+  console.log('[Upload] Sending to Cloudflare:', uploadUrl);
+
   const response = await fetch(uploadUrl, {
     method: 'POST',
     body: formData,
-    // Do NOT set Content-Type header for FormData in React Native
-    // It needs to generate its own boundary
+    headers: {
+      'Accept': 'application/json',
+    },
   });
 
   if (!response.ok) {
