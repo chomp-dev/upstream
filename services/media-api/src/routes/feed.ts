@@ -221,6 +221,64 @@ feedRouter.get('/nearby', async (req, res) => {
       nearbyPlaceIds: matchedPlaceIds,
       totalNearbyRestaurants: placeIds.length,
     });
+
+    // Background validation (Fire-and-forget)
+    // Check and update status for ALL videos to handle manual Cloudflare deletions
+    const videosToCheck = videosResult.rows.filter(v => v.cloudflare_video_id);
+
+    if (videosToCheck.length > 0) {
+      Promise.all(videosToCheck.map(async (video) => {
+        try {
+          // We need to import getVideo at the top or assumed it's available
+          const cloudflareVideo = await getVideo(video.cloudflare_video_id);
+
+          // Update database if status changed OR if we need to sync metadata
+          const newPlaybackUrl = cloudflareVideo.playback?.hls || cloudflareVideo.playback?.dash || null;
+          const durationInt = cloudflareVideo.duration ? Math.round(cloudflareVideo.duration) : null;
+
+          if (cloudflareVideo.status !== video.status ||
+            !video.playback_url ||
+            video.duration !== durationInt) {
+
+            console.log(`[Feed/Nearby] Syncing video ${video.cloudflare_video_id}: ${video.status} -> ${cloudflareVideo.status}`);
+
+            await pool.query(
+              `UPDATE videos 
+                 SET status = $1, 
+                     playback_url = $2, 
+                     thumbnail_url = $3,
+                     duration = $4,
+                     updated_at = CURRENT_TIMESTAMP
+                 WHERE cloudflare_video_id = $5`,
+              [
+                cloudflareVideo.status,
+                newPlaybackUrl,
+                cloudflareVideo.thumbnail || null,
+                durationInt,
+                video.cloudflare_video_id,
+              ]
+            );
+          }
+        } catch (error: any) {
+          // Check for 404 (Deleted)
+          const is404 = error?.statusCode === 404 ||
+            error?.message?.includes('404') ||
+            error?.message?.includes('not found') ||
+            error?.statusCode === 400;
+
+          if (is404) {
+            console.log(`[Feed/Nearby] Video ${video.cloudflare_video_id} deleted on Cloudflare, marking as error`);
+
+            await pool.query(
+              `UPDATE videos SET status = 'error', updated_at = CURRENT_TIMESTAMP WHERE cloudflare_video_id = $1`,
+              [video.cloudflare_video_id]
+            );
+          } else {
+            console.warn(`[Feed/Nearby] Status check failed for ${video.cloudflare_video_id}:`, error?.message);
+          }
+        }
+      })).catch(err => console.error('[Feed/Nearby] Background validation error:', err));
+    }
   } catch (error) {
     console.error('[Feed/Nearby] Error:', error);
     res.status(500).json({ error: 'Failed to fetch nearby feed' });

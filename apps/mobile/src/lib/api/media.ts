@@ -127,8 +127,56 @@ export async function checkVideoUploadStatus(
   }
 }
 
-// ... image upload functions ...
 // Error reporting removed as per user request for backend-only handling
+
+/**
+ * Upload a video file directly to Cloudflare
+ * Replaces unreliable FileSystem upload
+ */
+export async function uploadVideoToCloudflare(
+  uploadUrl: string,
+  videoUri: string
+): Promise<void> {
+  const formData = new FormData();
+  console.log('[Upload] Starting video upload (V2 Fetch)...');
+
+  if (Platform.OS === 'web') {
+    console.log('[Upload] Web detected, fetching blob from:', videoUri);
+    try {
+      const blob = await fetch(videoUri).then(r => r.blob());
+      console.log('[Upload] Video Blob created:', blob.size, blob.type);
+      formData.append('file', blob, 'video.mp4');
+    } catch (e) {
+      console.error('[Upload] Failed to create video blob:', e);
+      throw e;
+    }
+  } else {
+    // Native
+    const filename = videoUri.split('/').pop() || 'video.mp4';
+    // react-native-blob-util or just standard FormData handling
+    formData.append('file', {
+      uri: videoUri,
+      name: filename,
+      type: 'video/mp4', // Explicitly set for video
+    } as any);
+  }
+
+  console.log('[Upload] Sending video to Cloudflare:', uploadUrl);
+
+  const response = await fetch(uploadUrl, {
+    method: 'POST',
+    body: formData,
+    headers: {
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    console.error('[Upload] Cloudflare video upload failed:', text);
+    throw new Error(`Failed to upload video to Cloudflare: ${response.status}`);
+  }
+}
 
 /**
  * Upload an image file directly to Cloudflare

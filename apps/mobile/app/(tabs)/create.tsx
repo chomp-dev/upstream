@@ -125,30 +125,26 @@ export default function CreateScreen() {
 
       const uploadStartTime = Date.now();
 
-      const uploadTask = FileSystemLegacy.createUploadTask(
-        uploadResponse.uploadUrl,
-        fileUri,
-        {
-          uploadType: FileSystemLegacy.FileSystemUploadType.MULTIPART,
-          fieldName: 'file',
-          mimeType: mimeType,
-          parameters: {},
-          headers: {},
-        },
-        (progressData) => {
-          const progress = progressData.totalBytesSent / progressData.totalBytesExpectedToSend;
-          setUploadProgress(progress * 0.90); // Reserve last 10% for verification
-          setUploadStatus(
-            `Uploading... ${Math.round(progress * 100)}%`
-          );
-        }
-      );
+      // Use the new robust upload method (same as images)
+      // Note: Fetch doesn't support granular progress without XHR, 
+      // so we'll simulate progress for better UX while it uploads
+      const progressInterval = setInterval(() => {
+        setUploadProgress((prev) => {
+          if (prev >= 0.8) return prev; // Cap at 80% until done
+          return prev + 0.05;
+        });
+        setUploadStatus('Uploading...');
+      }, 500);
 
-      const uploadResult = await uploadTask.uploadAsync();
-
-      if (!uploadResult || uploadResult.status < 200 || uploadResult.status >= 300) {
-        throw new Error(`Upload failed with status ${uploadResult?.status}`);
+      try {
+        await mediaApi.uploadVideoToCloudflare(uploadResponse.uploadUrl, result.assets[0].uri);
+      } catch (e: any) {
+        clearInterval(progressInterval);
+        throw e;
       }
+
+      clearInterval(progressInterval);
+      setUploadProgress(0.9); // 90% when upload call returns success
 
       setUploadStatus('Verifying upload...');
       setUploadProgress(0.92);
