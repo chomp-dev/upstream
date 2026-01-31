@@ -2,7 +2,7 @@
  * Map Tab - Nearby restaurants on map with List toggle
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   StyleSheet,
@@ -66,6 +66,17 @@ export default function MapScreen() {
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
+
+  // Client-side filtering of loaded restaurants
+  const filteredRestaurants = useMemo(() => {
+    if (!searchQuery.trim()) return restaurants;
+    const q = searchQuery.toLowerCase();
+    return restaurants.filter(r =>
+      r.name?.toLowerCase().includes(q) ||
+      r.formatted_address?.toLowerCase().includes(q) ||
+      r.primary_type?.toLowerCase().includes(q)
+    );
+  }, [restaurants, searchQuery]);
 
   const currentRadius = RADIUS_OPTIONS[radiusIndex].value;
 
@@ -378,7 +389,7 @@ export default function MapScreen() {
         </View>
 
         <Text variant="caption" color={colors.muted} style={styles.headerCount}>
-          {restaurants.length} restaurants found
+          {filteredRestaurants.length} restaurants found{searchQuery.trim() ? ` (filtering "${searchQuery}")` : ''}
         </Text>
         {fetchMeta?.requestsMade != null && (
           <View style={styles.fetchMetaContainer}>
@@ -426,7 +437,7 @@ export default function MapScreen() {
       {viewMode === 'map' ? (
         location ? (
           <MapImpl
-            restaurants={restaurants}
+            restaurants={filteredRestaurants}
             location={location}
             currentRadius={currentRadius}
             selectedRestaurant={selectedRestaurant}
@@ -441,7 +452,7 @@ export default function MapScreen() {
         )
       ) : (
         <FlatList
-          data={restaurants}
+          data={filteredRestaurants}
           keyExtractor={(item) => item.id}
           renderItem={renderRestaurantCard}
           contentContainerStyle={styles.listContent}
