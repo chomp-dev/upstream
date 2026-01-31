@@ -364,32 +364,32 @@ export default function CreateScreen() {
           Share your food discoveries
         </Text>
 
-        {/* Media Selection or Form */}
-        {!selectedMedia ? (
-          <View style={styles.section}>
-            <Text variant="label" style={styles.sectionLabel}>Select Media</Text>
-            <TouchableOpacity
-              style={styles.uploadButton}
-              onPress={pickVideo}
-              disabled={uploading}
-            >
-              <Ionicons name="videocam" size={36} color={colors.bg} style={{ marginBottom: spacing.sm }} />
-              <Text variant="subtitle" color={colors.bg}>Pick Video</Text>
-              <Text variant="caption" color={colors.bg} style={{ opacity: 0.7 }}>Up to 60 seconds</Text>
-            </TouchableOpacity>
+        {/* Media Selection Section */}
+        <View style={styles.section}>
+          <Text variant="label" style={styles.sectionLabel}>Select Media <Text color={colors.coral}>*</Text></Text>
 
-            <TouchableOpacity
-              style={[styles.uploadButton, styles.uploadButtonSecondary]}
-              onPress={pickImages}
-              disabled={uploading}
-            >
-              <Ionicons name="images-outline" size={36} color={colors.text} style={{ marginBottom: spacing.sm }} />
-              <Text variant="subtitle">Pick Image</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={styles.formContainer}>
-            {/* Preview */}
+          {!selectedMedia ? (
+            <View style={{ gap: spacing.md }}>
+              <TouchableOpacity
+                style={styles.uploadButton}
+                onPress={pickVideo}
+                disabled={uploading}
+              >
+                <Ionicons name="videocam" size={36} color={colors.bg} style={{ marginBottom: spacing.sm }} />
+                <Text variant="subtitle" color={colors.bg}>Pick Video</Text>
+                <Text variant="caption" color={colors.bg} style={{ opacity: 0.7 }}>Up to 60 seconds</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.uploadButton, styles.uploadButtonSecondary]}
+                onPress={pickImages}
+                disabled={uploading}
+              >
+                <Ionicons name="images-outline" size={36} color={colors.text} style={{ marginBottom: spacing.sm }} />
+                <Text variant="subtitle">Pick Image</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
             <View style={styles.previewContainer}>
               {selectedMedia.type === 'video' ? (
                 <View style={styles.mediaPreview}>
@@ -403,88 +403,94 @@ export default function CreateScreen() {
                 style={styles.changeMediaButton}
                 onPress={() => setSelectedMedia(null)}
               >
-                <Text variant="caption" color={colors.coral}>Change</Text>
+                <Text variant="caption" color={colors.coral}>Change Media</Text>
               </TouchableOpacity>
             </View>
+          )}
+        </View>
 
-            {/* Restaurant Picker */}
-            <View style={styles.section}>
-              <Text variant="label" style={styles.sectionLabel}>
-                Restaurant <Text color={colors.coral}>*</Text>
-              </Text>
-              <TouchableOpacity
-                style={styles.restaurantSelector}
-                onPress={() => setShowRestaurantPicker(true)}
-              >
-                {selectedRestaurant ? (
-                  <View style={styles.selectedRestaurant}>
-                    <View style={[styles.ratingDot, { backgroundColor: ratingColor(selectedRestaurant.rating) }]} />
-                    <Text variant="body" numberOfLines={1} style={{ flex: 1 }}>{selectedRestaurant.name}</Text>
-                    <TouchableOpacity onPress={() => setSelectedRestaurant(null)}>
-                      <Ionicons name="close-circle" size={20} color={colors.coral} />
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                    <Ionicons name="location-outline" size={16} color={colors.muted} />
-                    <Text variant="bodySmall" color={colors.muted}>Select Restaurant</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            </View>
-
-            {/* Metadata Inputs */}
-            <View style={styles.section}>
-              <Text variant="label" style={styles.sectionLabel}>Title <Text color={colors.coral}>*</Text></Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. Best Sushi in Town!"
-                placeholderTextColor={colors.muted}
-                value={title}
-                onChangeText={setTitle}
-                maxLength={100}
-              />
-            </View>
-
-            <View style={styles.section}>
-              <Text variant="label" style={styles.sectionLabel}>Description</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                placeholder="Tell us about your experience..."
-                placeholderTextColor={colors.muted}
-                value={description}
-                onChangeText={setDescription}
-                multiline
-                maxLength={500}
-              />
-            </View>
-
-            <View style={styles.section}>
-              <Text variant="label" style={styles.sectionLabel}>Tags</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. sushi, spicy, date-night"
-                placeholderTextColor={colors.muted}
-                value={tags}
-                onChangeText={setTags}
-              />
-              <Text variant="caption" color={colors.muted} style={{ marginTop: 4 }}>Comma separated</Text>
-            </View>
-
-            {/* Post Button */}
+        {/* Form Container - ALWAYS VISIBLE */}
+        <View style={styles.formContainer}>
+          {/* Restaurant Picker */}
+          <View style={styles.section}>
+            <Text variant="label" style={styles.sectionLabel}>
+              Restaurant <Text color={colors.coral}>*</Text>
+            </Text>
             <TouchableOpacity
-              style={[styles.uploadButton, uploading && styles.uploadButtonDisabled]}
-              onPress={handleUpload}
-              disabled={uploading}
+              style={styles.restaurantSelector}
+              onPress={() => setShowRestaurantPicker(true)}
             >
-              {uploading ? (
-                <ActivityIndicator color={colors.bg} />
+              {selectedRestaurant ? (
+                <View style={styles.selectedRestaurant}>
+                  <View style={[styles.ratingDot, { backgroundColor: ratingColor(selectedRestaurant.rating) }]} />
+                  <Text variant="body" numberOfLines={1} style={{ flex: 1 }}>{selectedRestaurant.name}</Text>
+                  <TouchableOpacity onPress={() => setSelectedRestaurant(null)}>
+                    <Ionicons name="close-circle" size={20} color={colors.coral} />
+                  </TouchableOpacity>
+                </View>
               ) : (
-                <Text variant="subtitle" color={colors.bg}>Post Review</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                  <Ionicons name="location-outline" size={16} color={colors.muted} />
+                  <Text variant="bodySmall" color={colors.muted}>Select Restaurant</Text>
+                </View>
               )}
             </TouchableOpacity>
           </View>
-        )}
+
+          {/* Metadata Inputs */}
+          <View style={styles.section}>
+            <Text variant="label" style={styles.sectionLabel}>Title <Text color={colors.coral}>*</Text></Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. Best Sushi in Town!"
+              placeholderTextColor={colors.muted}
+              value={title}
+              onChangeText={setTitle}
+              maxLength={100}
+            />
+          </View>
+
+          <View style={styles.section}>
+            <Text variant="label" style={styles.sectionLabel}>Description</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              placeholder="Tell us about your experience..."
+              placeholderTextColor={colors.muted}
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              maxLength={500}
+            />
+          </View>
+
+          <View style={styles.section}>
+            <Text variant="label" style={styles.sectionLabel}>Tags</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. sushi, spicy, date-night"
+              placeholderTextColor={colors.muted}
+              value={tags}
+              onChangeText={setTags}
+            />
+            <Text variant="caption" color={colors.muted} style={{ marginTop: 4 }}>Comma separated</Text>
+          </View>
+
+          {/* Post Button */}
+          <TouchableOpacity
+            style={[
+              styles.uploadButton,
+              (uploading || !selectedMedia || !selectedRestaurant || !title.trim()) && styles.uploadButtonDisabled
+            ]}
+            onPress={handleUpload}
+            disabled={uploading || !selectedMedia || !selectedRestaurant || !title.trim()}
+          >
+            {uploading ? (
+              <ActivityIndicator color={colors.bg} />
+            ) : (
+              <Text variant="subtitle" color={colors.bg}>Post Review</Text>
+            )}
+          </TouchableOpacity>
+        </View>
       </ScrollView>
 
       {/* Upload Progress Modal */}

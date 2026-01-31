@@ -5,6 +5,7 @@ import { uploadRouter } from './routes/upload';
 import { feedRouter } from './routes/feed';
 import { webhookRouter } from './routes/webhook';
 import { restaurantsRouter } from './routes/restaurants';
+import { searchRouter } from './routes/search';
 import { initDb } from './db';
 
 dotenv.config();
@@ -34,6 +35,8 @@ app.use('/api/upload', uploadRouter);
 app.use('/api/feed', feedRouter);
 app.use('/api/webhook', webhookRouter);
 app.use('/api/restaurants', restaurantsRouter);
+app.use('/api/search', searchRouter);
+app.use('/api/v1/search', searchRouter); // Alias for compatibility
 
 // Root route for diagnostic testing
 app.get('/', (req, res) => {
