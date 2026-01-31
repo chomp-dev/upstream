@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { pool } from '../db';
+import { pool, queryWithRetry } from '../db';
 import { getVideo } from '../services/cloudflare';
 
 export const feedRouter = Router();
@@ -174,7 +174,8 @@ feedRouter.get('/nearby', async (req, res) => {
     }
 
     // Fetch videos linked to nearby restaurants - exclude error/deleted videos
-    const videosResult = await pool.query(
+    // Fetch videos linked to nearby restaurants - exclude error/deleted videos
+    const videosResult = await queryWithRetry(
       `SELECT id, cloudflare_video_id, playback_url, thumbnail_url, 
               status, duration, google_place_id, created_at, updated_at
        FROM videos 
@@ -188,7 +189,8 @@ feedRouter.get('/nearby', async (req, res) => {
     console.log(`[Feed/Nearby] Found ${videosResult.rows.length} videos for nearby restaurants`);
 
     // Fetch image posts linked to nearby restaurants
-    const imagesResult = await pool.query(
+    // Fetch image posts linked to nearby restaurants
+    const imagesResult = await queryWithRetry(
       `SELECT id, images, google_place_id, created_at
        FROM image_posts 
        WHERE google_place_id = ANY($1)
@@ -201,8 +203,8 @@ feedRouter.get('/nearby', async (req, res) => {
 
     // Combine and interleave, sorted by created_at
     const feed = [
-      ...videosResult.rows.map(v => ({ type: 'video', ...v })),
-      ...imagesResult.rows.map(i => ({
+      ...videosResult.rows.map((v: any) => ({ type: 'video', ...v })),
+      ...imagesResult.rows.map((i: any) => ({
         type: 'image_post',
         ...i,
         images: Array.isArray(i.images) ? i.images.filter((url: string) => !!url) : []
@@ -212,7 +214,7 @@ feedRouter.get('/nearby', async (req, res) => {
     );
 
     // Get unique place_ids that actually have content
-    const matchedPlaceIds = [...new Set(feed.map(item => item.google_place_id).filter(Boolean))];
+    const matchedPlaceIds = [...new Set(feed.map((item: any) => item.google_place_id).filter(Boolean))];
 
     res.json({
       feed,
@@ -224,13 +226,14 @@ feedRouter.get('/nearby', async (req, res) => {
 
     // Background validation (Fire-and-forget)
     // Check and update status for ALL videos to handle manual Cloudflare deletions
-    const videosToCheck = videosResult.rows.filter(v => v.cloudflare_video_id);
+    const videosToCheck = videosResult.rows.filter((v: any) => v.cloudflare_video_id);
 
     if (videosToCheck.length > 0) {
-      Promise.all(videosToCheck.map(async (video) => {
+      Promise.all(videosToCheck.map(async (video: any) => {
         try {
           // We need to import getVideo at the top or assumed it's available
           const cloudflareVideo = await getVideo(video.cloudflare_video_id);
+          // ... existing code ...
 
           // Update database if status changed OR if we need to sync metadata
           const newPlaybackUrl = cloudflareVideo.playback?.hls || cloudflareVideo.playback?.dash || null;
@@ -301,7 +304,8 @@ feedRouter.get('/', async (req, res) => {
     const offset = parseInt(req.query.offset as string) || 0;
 
     // Fetch videos - exclude error/deleted videos
-    let videosResult = await pool.query(
+    // Fetch videos - exclude error/deleted videos
+    let videosResult = await queryWithRetry(
       `SELECT id, cloudflare_video_id, playback_url, thumbnail_url, 
               status, duration, google_place_id, created_at, updated_at
        FROM videos 
@@ -315,12 +319,12 @@ feedRouter.get('/', async (req, res) => {
 
     // Check and update status for ALL videos to handle manual Cloudflare deletions
     // We run this in the background (no await) to keep the feed fast
-    const videosToCheck = videosResult.rows.filter(v => v.cloudflare_video_id);
+    const videosToCheck = videosResult.rows.filter((v: any) => v.cloudflare_video_id);
 
     if (videosToCheck.length > 0) {
       // Fire-and-forget validation
       // This means the current response might show deleted videos (stale), but they will be fixed on next refresh
-      Promise.all(videosToCheck.map(async (video) => {
+      Promise.all(videosToCheck.map(async (video: any) => {
         try {
           const cloudflareVideo = await getVideo(video.cloudflare_video_id);
 
@@ -373,7 +377,8 @@ feedRouter.get('/', async (req, res) => {
     }
 
     // Fetch image posts
-    const imagesResult = await pool.query(
+    // Fetch image posts
+    const imagesResult = await queryWithRetry(
       `SELECT id, images, google_place_id, created_at
        FROM image_posts 
        ORDER BY created_at DESC 
@@ -383,8 +388,8 @@ feedRouter.get('/', async (req, res) => {
 
     // Combine and interleave (simple approach - videos first, then images)
     const feed = [
-      ...videosResult.rows.map(v => ({ type: 'video', ...v })),
-      ...imagesResult.rows.map(i => ({
+      ...videosResult.rows.map((v: any) => ({ type: 'video', ...v })),
+      ...imagesResult.rows.map((i: any) => ({
         type: 'image_post',
         ...i,
         images: Array.isArray(i.images) ? i.images.filter((url: string) => !!url) : []
@@ -395,7 +400,7 @@ feedRouter.get('/', async (req, res) => {
 
     // Debug logging
     console.log('[Feed] Serving feed with ' + feed.length + ' items');
-    const imagePosts = feed.filter(i => i.type === 'image_post');
+    const imagePosts = feed.filter((i: any) => i.type === 'image_post');
     if (imagePosts.length > 0) {
       console.log('[Feed] content check:', JSON.stringify(imagePosts[0], null, 2));
       // Validate images in background

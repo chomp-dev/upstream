@@ -116,4 +116,26 @@ export async function initDb() {
   }
 }
 
+// Helper to retry queries on connection failure
+export async function queryWithRetry(text: string, params?: any[], retries = 3): Promise<any> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await pool.query(text, params);
+    } catch (error: any) {
+      const isConnectionError =
+        error.message?.includes('Connection terminated') ||
+        error.code === 'ETIMEDOUT' ||
+        error.code === 'ECONNRESET' ||
+        error.code === '57P01'; // Admin shutdown
+
+      if (isConnectionError && i < retries - 1) {
+        console.warn(`⚠️ DB Query failed (attempt ${i + 1}/${retries}), retrying...`, error.message);
+        await new Promise(res => setTimeout(res, 1000 * (i + 1))); // Exponential backoff
+        continue;
+      }
+      throw error;
+    }
+  }
+}
+
 export { pool };

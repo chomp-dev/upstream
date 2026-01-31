@@ -93,10 +93,31 @@ async def upsert_restaurants(
         set_=update_dict,
     ).returning(Restaurant)
     
-    result = await session.execute(stmt)
-    await session.commit()
-    
-    return list(result.scalars().all())
+    # Retry logic for upsert
+    import asyncio
+    last_error = None
+    for attempt in range(3):
+        try:
+            result = await session.execute(stmt)
+            await session.commit()
+            return list(result.scalars().all())
+        except Exception as e:
+            last_error = e
+            # Check for connection errors (heuristic)
+            err_str = str(e).lower()
+            if "connection" in err_str or "timeout" in err_str or "pgcode" in err_str:
+                if attempt < 2:
+                    await asyncio.sleep(1 * (attempt + 1))
+                    try:
+                        await session.rollback()
+                    except:
+                        pass
+                    continue
+            raise e
+            
+    if last_error:
+        raise last_error
+    return []
 
 
 async def get_restaurants_by_place_ids(
@@ -108,8 +129,22 @@ async def get_restaurants_by_place_ids(
         return []
     
     stmt = select(Restaurant).where(Restaurant.google_place_id.in_(place_ids))
-    result = await session.execute(stmt)
-    return list(result.scalars().all())
+    
+    # Retry logic for select
+    import asyncio
+    for attempt in range(3):
+        try:
+            result = await session.execute(stmt)
+            return list(result.scalars().all())
+        except Exception as e:
+            # Check for connection errors
+            err_str = str(e).lower()
+            if "connection" in err_str or "timeout" in err_str or "pgcode" in err_str:
+                if attempt < 2:
+                    await asyncio.sleep(1 * (attempt + 1))
+                    continue
+            raise e
+    return []
 
 
 async def get_stale_restaurants(
