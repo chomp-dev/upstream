@@ -91,8 +91,8 @@ export function VideoPlayer({
                 allowsFullscreen={false}
                 // @ts-ignore: playsInline is required for iOS Web inline playback
                 playsInline
-                // @ts-ignore: muted is required for iOS Web autoplay
-                muted={true}
+                // @ts-ignore: muted is required for iOS Web autoplay, but we want sound elsewhere
+                muted={Platform.OS === 'web'}
             />
 
             {/* Loading Indicator for initial buffer */}

@@ -127,15 +127,17 @@ export default function CreateScreen() {
   const [description, setDescription] = useState('');
   const [tags, setTags] = useState('');
 
-  const [selectedMedia, setSelectedMedia] = useState<{
+  interface MediaItem {
     type: 'video' | 'image';
     uri: string;
     fileSize?: number;
     mimeType?: string;
-  } | null>(null);
+  }
+
+  const [selectedMedia, setSelectedMedia] = useState<MediaItem[]>([]);
 
   const resetForm = () => {
-    setSelectedMedia(null);
+    setSelectedMedia([]);
     setSelectedRestaurant(null);
     setTitle('');
     setDescription('');
@@ -170,12 +172,12 @@ export default function CreateScreen() {
         return;
       }
 
-      setSelectedMedia({
+      setSelectedMedia([{
         type: 'video',
         uri: asset.uri,
         fileSize: fileSize,
         mimeType: asset.mimeType
-      });
+      }]);
 
     } catch (error: any) {
       Alert.alert('Error', 'Failed to pick video');
@@ -192,16 +194,18 @@ export default function CreateScreen() {
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsMultipleSelection: false,
+        allowsMultipleSelection: true,
+        selectionLimit: 10,
         quality: 0.8,
       });
 
       if (result.canceled || !result.assets) return;
 
-      setSelectedMedia({
-        type: 'image',
-        uri: result.assets[0].uri,
-      });
+      const newMedia = result.assets.map(asset => ({
+        type: 'image' as const,
+        uri: asset.uri,
+      }));
+      setSelectedMedia(newMedia);
 
     } catch (error: any) {
       Alert.alert('Error', error?.message || 'Failed to pick images');
@@ -209,7 +213,7 @@ export default function CreateScreen() {
   };
 
   const handleUpload = async () => {
-    if (!selectedMedia) return;
+    if (selectedMedia.length === 0) return;
     if (!selectedRestaurant) {
       Alert.alert('Required', 'Please attach a restaurant to your post.');
       return;
@@ -225,14 +229,16 @@ export default function CreateScreen() {
       setUploadProgress(0);
 
       const tagArray = tags.split(',').map(t => t.trim()).filter(Boolean);
+      const isVideo = selectedMedia[0].type === 'video';
 
-      if (selectedMedia.type === 'video') {
-        // --- VIDEO UPLOAD ---
-        let fileSize = selectedMedia.fileSize || 0;
+      if (isVideo) {
+        // --- VIDEO UPLOAD (Single) ---
+        const media = selectedMedia[0];
+        let fileSize = media.fileSize || 0;
 
         // On native, verify file exists
         if (Platform.OS !== 'web') {
-          const fileInfo = await FileSystem.getInfoAsync(selectedMedia.uri);
+          const fileInfo = await FileSystem.getInfoAsync(media.uri);
           if (!fileInfo.exists) throw new Error('File does not exist');
           fileSize = fileInfo.size || fileSize;
         }
@@ -260,12 +266,12 @@ export default function CreateScreen() {
         const formData = new FormData();
 
         if (Platform.OS === 'web') {
-          const vidRes = await fetch(selectedMedia.uri);
+          const vidRes = await fetch(media.uri);
           const blob = await vidRes.blob();
           formData.append('file', blob, 'video.mp4');
         } else {
           formData.append('file', {
-            uri: selectedMedia.uri,
+            uri: media.uri,
             name: 'video.mp4',
             type: 'video/mp4',
           } as any);
@@ -294,46 +300,62 @@ export default function CreateScreen() {
         setUploadProgress(1);
 
       } else {
-        // --- IMAGE UPLOAD ---
-        setUploadStatus('Uploading images...');
+        // --- MULTIPLE IMAGE UPLOAD ---
+        const imageIds: string[] = [];
+        const totalImages = selectedMedia.length;
 
-        let base64: string;
+        for (let i = 0; i < totalImages; i++) {
+          const media = selectedMedia[i];
+          setUploadStatus(`Uploading image ${i + 1} of ${totalImages}...`);
+          setUploadProgress(i / totalImages);
 
-        if (Platform.OS === 'web') {
-          // Web: Fetch blob -> FileReader -> Base64
-          const imgRes = await fetch(selectedMedia.uri);
-          const blob = await imgRes.blob();
-          base64 = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-              const res = reader.result as string;
-              resolve(res.split(',')[1]); // Remove "data:image/..." prefix
+          // 1. Get Upload URL for this image
+          const urlRes = await fetch(`${mediaApi.BASE_URL}/api/upload/image-url`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          });
+
+          if (!urlRes.ok) throw new Error(`Failed to get upload URL for image ${i + 1}`);
+          const { uploadURL, imageId } = await urlRes.json();
+
+          // 2. Upload to Cloudflare (Direct XHR)
+          const formData = new FormData();
+          if (Platform.OS === 'web') {
+            const imgRes = await fetch(media.uri);
+            const blob = await imgRes.blob();
+            formData.append('file', blob, 'image.jpg');
+          } else {
+            formData.append('file', {
+              uri: media.uri,
+              name: 'image.jpg',
+              type: 'image/jpeg',
+            } as any);
+          }
+
+          // Perform XHR Upload
+          await new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', uploadURL);
+            xhr.onload = () => {
+              if (xhr.status >= 200 && xhr.status < 300) resolve(xhr.response);
+              else reject(new Error(`Image upload failed: ${xhr.status}`));
             };
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
+            xhr.onerror = () => reject(new Error('Network error during image upload'));
+            xhr.send(formData);
           });
-        } else {
-          // Native: Use FileSystem
-          base64 = await FileSystem.readAsStringAsync(selectedMedia.uri, {
-            encoding: 'base64'
-          });
+
+          imageIds.push(imageId);
         }
 
-        const uploadRes = await fetch(`${mediaApi.BASE_URL}/api/upload/image-base64`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image: base64 })
-        });
+        setUploadProgress(1);
+        setUploadStatus('Finalizing post...');
 
-        if (!uploadRes.ok) throw new Error('Image upload failed');
-        const { imageId } = await uploadRes.json();
-
-        // Create Post
+        // 3. Create Post
         const createRes = await fetch(`${mediaApi.BASE_URL}/api/upload/images`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            images: [imageId],
+            images: imageIds,
             google_place_id: selectedRestaurant.google_place_id,
             title: title.trim(),
             description: description.trim(),
@@ -398,7 +420,7 @@ export default function CreateScreen() {
         <View style={styles.section}>
           <Text variant="label" style={styles.sectionLabel}>Select Media <Text color={colors.coral}>*</Text></Text>
 
-          {!selectedMedia ? (
+          {selectedMedia.length === 0 ? (
             <View style={{ gap: spacing.md }}>
               <TouchableOpacity
                 style={styles.uploadButton}
@@ -416,24 +438,34 @@ export default function CreateScreen() {
                 disabled={uploading}
               >
                 <Ionicons name="images-outline" size={36} color={colors.text} style={{ marginBottom: spacing.sm }} />
-                <Text variant="subtitle">Pick Image</Text>
+                <Text variant="subtitle">Pick Images</Text>
+                <Text variant="caption" color={colors.muted} style={{ opacity: 0.7 }}>Up to 10 photos</Text>
               </TouchableOpacity>
             </View>
           ) : (
             <View style={styles.previewContainer}>
-              {selectedMedia.type === 'video' ? (
-                <View style={styles.mediaPreview}>
-                  <Ionicons name="videocam" size={48} color={colors.muted} />
-                  <Text variant="caption">{selectedMedia.mimeType || 'Video'}</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing.sm }}>
+                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                  {selectedMedia.map((media, index) => (
+                    <View key={index} style={styles.mediaPreview}>
+                      {media.type === 'video' ? (
+                        <View style={{ alignItems: 'center' }}>
+                          <Ionicons name="videocam" size={48} color={colors.muted} />
+                          <Text variant="caption">{media.mimeType || 'Video'}</Text>
+                        </View>
+                      ) : (
+                        <Image source={{ uri: media.uri }} style={{ width: 200, height: 200, borderRadius: radius.lg }} resizeMode="cover" />
+                      )}
+                    </View>
+                  ))}
                 </View>
-              ) : (
-                <Image source={{ uri: selectedMedia.uri }} style={styles.mediaPreview} />
-              )}
+              </ScrollView>
+
               <TouchableOpacity
                 style={styles.changeMediaButton}
-                onPress={() => setSelectedMedia(null)}
+                onPress={() => setSelectedMedia([])}
               >
-                <Text variant="caption" color={colors.coral}>Change Media</Text>
+                <Text variant="caption" color={colors.coral}>Clear Selection</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -509,10 +541,10 @@ export default function CreateScreen() {
           <TouchableOpacity
             style={[
               styles.uploadButton,
-              (uploading || !selectedMedia || !selectedRestaurant || !title.trim()) && styles.uploadButtonDisabled
+              (uploading || selectedMedia.length === 0 || !selectedRestaurant || !title.trim()) && styles.uploadButtonDisabled
             ]}
             onPress={handleUpload}
-            disabled={uploading || !selectedMedia || !selectedRestaurant || !title.trim()}
+            disabled={uploading || selectedMedia.length === 0 || !selectedRestaurant || !title.trim()}
           >
             {uploading ? (
               <ActivityIndicator color={colors.bg} />
