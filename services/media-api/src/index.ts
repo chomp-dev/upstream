@@ -14,7 +14,7 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
+  origin: process.env.NODE_ENV === 'production'
     ? (process.env.FRONTEND_URL || 'http://localhost:8081')
     : true, // Allow all origins in development for mobile testing
   credentials: true
@@ -37,8 +37,8 @@ app.use('/api/restaurants', restaurantsRouter);
 
 // Root route for diagnostic testing
 app.get('/', (req, res) => {
-  res.json({ 
-    status: 'ok', 
+  res.json({
+    status: 'ok',
     message: 'Chomp Media API is running',
     version: '1.0.0',
     timestamp: new Date().toISOString()
@@ -51,13 +51,18 @@ app.get('/health', (req, res) => {
 });
 
 // Initialize database and start server
-initDb()
-  .then(() => {
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`🚀 Media API running on http://localhost:${PORT}`);
-    });
-  })
-  .catch((error) => {
-    console.error('Failed to initialize database:', error);
-    process.exit(1);
+// Initialize database and start server
+const startServer = async () => {
+  try {
+    await initDb();
+  } catch (error) {
+    console.error('⚠️ Failed to initialize database (Server will verify connection lazily):', error);
+    // We don't exit here so the server can still start and satisfy Render's port scan
+  }
+
+  app.listen(Number(PORT), '0.0.0.0', () => {
+    console.log(`🚀 Media API running on http://localhost:${PORT}`);
   });
+};
+
+startServer();

@@ -7,6 +7,7 @@ dotenv.config();
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
+  connectionTimeoutMillis: 10000, // 10s timeout
 });
 
 export async function initDb() {
