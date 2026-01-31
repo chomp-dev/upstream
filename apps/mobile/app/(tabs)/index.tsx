@@ -38,7 +38,7 @@ export default function HomeScreen() {
   const [restaurantCache, setRestaurantCache] = useState<Record<string, Restaurant>>({});
   const flatListRef = useRef<FlatList>(null);
   const isFocused = useIsFocused();
-  const params = useLocalSearchParams<{ scrollToIndex?: string; itemId?: string; videoData?: string }>();
+  const params = useLocalSearchParams<{ scrollToIndex?: string; itemId?: string; videoDataId?: string }>();
   const lastScrolledRef = useRef<string | null>(null);
   const { width, height: SCREEN_HEIGHT } = useContentDimensions();
 
@@ -220,25 +220,30 @@ export default function HomeScreen() {
       const scrollKey = `${params.scrollToIndex}-${params.itemId}`;
 
       // Inject video if provided (allows playing out-of-area videos from Explore)
-      // We parse the full item data passed from Explore
-      if (params.videoData && loading === false) {
+      // We retrieve the full item data from our memory store
+      if (params.videoDataId && loading === false) {
         try {
-          const injectedItem = JSON.parse(params.videoData as string) as FeedItem;
-          // Check if already exists to avoid duplicates
-          const exists = feed.find(i => i.id === injectedItem.id);
+          // @ts-ignore
+          const navigationStore = require('../../src/lib/navigationStore').navigationStore;
+          const injectedItem = navigationStore.get(params.videoDataId) as FeedItem;
 
-          if (!exists) {
-            console.log('[Feed] Injecting out-of-area video from Explore:', injectedItem.id);
-            // Prepend or insert at specific index? Prepending is safest for "just show me this"
-            setFeed(prev => [injectedItem, ...prev]);
+          if (injectedItem) {
+            // Check if already exists to avoid duplicates
+            const exists = feed.find(i => i.id === injectedItem.id);
 
-            // Reset scroll target to 0 since we put it at top
-            // We need to wait for state update to reflect in FlatList
-            setTimeout(() => {
-              flatListRef.current?.scrollToIndex({ index: 0, animated: false });
-              setCurrentIndex(0);
-            }, 200);
-            return;
+            if (!exists) {
+              console.log('[Feed] Injecting out-of-area video from Explore:', injectedItem.id);
+              // Prepend or insert at specific index? Prepending is safest for "just show me this"
+              setFeed(prev => [injectedItem, ...prev]);
+
+              // Reset scroll target to 0 since we put it at top
+              // We need to wait for state update to reflect in FlatList
+              setTimeout(() => {
+                flatListRef.current?.scrollToIndex({ index: 0, animated: false });
+                setCurrentIndex(0);
+              }, 200);
+              return;
+            }
           }
         } catch (e) {
           console.error('[Feed] Failed to inject video data:', e);
@@ -263,7 +268,7 @@ export default function HomeScreen() {
         }
       }
     }
-  }, [params.scrollToIndex, params.itemId, params.videoData, feed, loading]);
+  }, [params.scrollToIndex, params.itemId, params.videoDataId, feed, loading]);
 
   // Smart polling
   useEffect(() => {

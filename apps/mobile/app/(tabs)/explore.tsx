@@ -20,6 +20,7 @@ import { Screen, Text } from '../../src/ui';
 import { colors, spacing, radius } from '../../src/theme';
 import { mediaApi } from '../../src/lib/api';
 import type { FeedItem } from '../../src/lib/api/types';
+import { navigationStore } from '../../src/lib/navigationStore';
 
 import { useContentDimensions } from '../../src/hooks/useContentDimensions';
 
