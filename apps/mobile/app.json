@@ -53,7 +53,14 @@
     },
     "plugins": [
       "expo-router",
-      "expo-location"
+      "expo-location",
+      [
+        "react-native-auth0",
+        {
+          "domain": "dev-dm0k5l2f2j2qi2g3.us.auth0.com",
+          "customScheme": "com.chomp.app"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

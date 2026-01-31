@@ -1,7 +1,9 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, StyleSheet, Platform } from 'react-native';
+import { Auth0Provider } from 'react-native-auth0';
 import { colors } from '../src/theme';
+import { AuthProvider } from '../src/context/auth';
 
 export default function RootLayout() {
   const content = (
@@ -19,17 +21,28 @@ export default function RootLayout() {
     </>
   );
 
+  const wrappedContent = (
+    <Auth0Provider
+      domain={process.env.EXPO_PUBLIC_AUTH0_DOMAIN!}
+      clientId={process.env.EXPO_PUBLIC_AUTH0_CLIENT_ID!}
+    >
+      <AuthProvider>
+        {content}
+      </AuthProvider>
+    </Auth0Provider>
+  );
+
   if (Platform.OS === 'web') {
     return (
       <View style={styles.webContainer}>
         <View style={styles.mobileWrapper}>
-          {content}
+          {wrappedContent}
         </View>
       </View>
     );
   }
 
-  return content;
+  return wrappedContent;
 }
 
 const styles = StyleSheet.create({

@@ -6,6 +6,7 @@ import { feedRouter } from './routes/feed';
 import { webhookRouter } from './routes/webhook';
 import { restaurantsRouter } from './routes/restaurants';
 import { searchRouter } from './routes/search';
+import { usersRouter } from './routes/users';
 import { initDb } from './db';
 
 dotenv.config();
@@ -55,6 +56,7 @@ app.use('/api/webhook', webhookRouter);
 app.use('/api/restaurants', restaurantsRouter);
 app.use('/api/search', searchRouter);
 app.use('/api/v1/search', searchRouter); // Alias for compatibility
+app.use('/api/users', usersRouter);
 
 // Root route for diagnostic testing
 app.get('/', (req, res) => {

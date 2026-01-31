@@ -10,8 +10,31 @@ import { colors, spacing, radius } from '../../src/theme';
 
 type SocialSection = 'profile' | 'friends' | 'inbox';
 
+import { useAuth } from '../../src/context/auth';
+import { Image } from 'expo-image';
+import { Pressable } from 'react-native';
+
 export default function SocialScreen() {
   const [activeSection, setActiveSection] = useState<SocialSection>('profile');
+  const { user, login } = useAuth();
+
+  if (!user && activeSection === 'profile') {
+    return (
+      <Screen edges={['top']} safe>
+        <View style={styles.loginContainer}>
+          <Text variant="title" center style={{ marginBottom: spacing.md }}>
+            Join the Club
+          </Text>
+          <Text variant="body" color={colors.muted} center style={{ marginBottom: spacing.xl }}>
+            Sign in to share your food adventures and connect with other creators.
+          </Text>
+          <Pressable style={styles.loginButton} onPress={login}>
+            <Text variant="subtitle" color={colors.bg}>Sign In / Sign Up</Text>
+          </Pressable>
+        </View>
+      </Screen>
+    );
+  }
 
   return (
     <Screen edges={['top']}>
@@ -30,8 +53,8 @@ export default function SocialScreen() {
         />
       </View>
 
-      <ScrollView 
-        style={styles.container} 
+      <ScrollView
+        style={styles.container}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
@@ -44,39 +67,54 @@ export default function SocialScreen() {
 }
 
 function ProfileSection() {
+  const { user, logout } = useAuth();
+
+  if (!user) return null;
+
   return (
     <View style={styles.section}>
       {/* Profile header */}
       <View style={styles.profileHeader}>
         <View style={styles.avatar}>
-          <Ionicons name="person" size={48} color={colors.primary} />
+          {user.picture ? (
+            <Image
+              source={{ uri: user.picture }}
+              style={{ width: 94, height: 94, borderRadius: 47 }}
+            />
+          ) : (
+            <Ionicons name="person" size={48} color={colors.primary} />
+          )}
         </View>
         <Text variant="title" style={styles.username}>
-          @chomper
+          {user.name || user.email}
         </Text>
         <Text variant="bodySmall" color={colors.muted}>
-          Food explorer • NYC
+          {user.email}
         </Text>
+
+        <Pressable style={styles.logoutButton} onPress={logout}>
+          <Text variant="caption" color={colors.muted}>Log Out</Text>
+        </Pressable>
       </View>
 
       {/* Stats */}
       <View style={styles.statsRow}>
         <View style={styles.stat}>
-          <Text variant="title">24</Text>
+          <Text variant="title">0</Text>
           <Text variant="caption" color={colors.muted}>
             Posts
           </Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.stat}>
-          <Text variant="title">1.2K</Text>
+          <Text variant="title">0</Text>
           <Text variant="caption" color={colors.muted}>
             Followers
           </Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.stat}>
-          <Text variant="title">342</Text>
+          <Text variant="title">0</Text>
           <Text variant="caption" color={colors.muted}>
             Following
           </Text>
@@ -90,33 +128,9 @@ function ProfileSection() {
           <Text variant="label">Top Spots</Text>
         </View>
         <View style={styles.topSpots}>
-          <View style={styles.topSpotItem}>
-            <Text variant="body">1.</Text>
-            <Text variant="bodySmall" style={{ flex: 1 }}>
-              Joe's Pizza
-            </Text>
-            <Text variant="caption" color={colors.primary}>
-              ★ 4.8
-            </Text>
-          </View>
-          <View style={styles.topSpotItem}>
-            <Text variant="body">2.</Text>
-            <Text variant="bodySmall" style={{ flex: 1 }}>
-              Ramen Lab
-            </Text>
-            <Text variant="caption" color={colors.primary}>
-              ★ 4.7
-            </Text>
-          </View>
-          <View style={styles.topSpotItem}>
-            <Text variant="body">3.</Text>
-            <Text variant="bodySmall" style={{ flex: 1 }}>
-              Levain Bakery
-            </Text>
-            <Text variant="caption" color={colors.primary}>
-              ★ 4.6
-            </Text>
-          </View>
+          <Text variant="bodySmall" color={colors.muted}>
+            No favorites yet
+          </Text>
         </View>
       </Card>
 
@@ -146,7 +160,7 @@ function FriendsSection() {
       <Text variant="label" color={colors.muted} style={styles.sectionLabel}>
         Your Friends
       </Text>
-      
+
       {friends.map((friend) => (
         <Card key={friend.id} style={styles.friendCard}>
           <View style={styles.friendAvatar}>
@@ -193,7 +207,7 @@ function InboxSection() {
       <Text variant="label" color={colors.muted} style={styles.sectionLabel}>
         Notifications
       </Text>
-      
+
       <Card style={styles.notificationCard}>
         <View style={styles.notificationIconCircle}>
           <Ionicons name="heart" size={18} color={colors.coral} />
@@ -357,5 +371,27 @@ const styles = StyleSheet.create({
   },
   notificationContent: {
     flex: 1,
+  },
+  loginContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+    paddingBottom: 100,
+  },
+  loginButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: radius.pill,
+  },
+  logoutButton: {
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
 });
