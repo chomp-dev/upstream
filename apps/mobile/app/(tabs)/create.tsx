@@ -18,7 +18,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystemLegacy from 'expo-file-system/legacy';
 import * as Location from 'expo-location';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen, Text } from '../../src/ui';
 import { colors, spacing, radius } from '../../src/theme';
@@ -42,6 +42,19 @@ export default function CreateScreen() {
   const [loadingRestaurants, setLoadingRestaurants] = useState(false);
 
   const router = useRouter();
+  const params = useLocalSearchParams();
+
+  useEffect(() => {
+    if (params.restaurant) {
+      try {
+        const restaurantData = JSON.parse(params.restaurant as string);
+        setSelectedRestaurant(restaurantData);
+        console.log('[CreateScreen] Pre-selected restaurant:', restaurantData.name);
+      } catch (e) {
+        console.error('Failed to parse restaurant param:', e);
+      }
+    }
+  }, [params.restaurant]);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -303,7 +316,7 @@ export default function CreateScreen() {
 
       Alert.alert('Success', 'Upload complete!');
       resetForm();
-      router.push('/(tabs)/');
+      router.push('/');
     } catch (error: any) {
       console.error('Upload error:', error);
       Alert.alert('Error', error.message || 'Upload failed');

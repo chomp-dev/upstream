@@ -234,8 +234,10 @@ export default function ExploreScreen() {
       </View>
 
       {/* Grid or Search List */}
+      {/* Grid or Search List */}
       {isSearching ? (
         <FlatList
+          key="search-list"
           data={searchResults}
           keyExtractor={(item) => item.id}
           renderItem={renderRestaurantItem}
@@ -248,6 +250,7 @@ export default function ExploreScreen() {
         />
       ) : (
         <FlatList
+          key="feed-grid"
           data={filteredFeed}
           keyExtractor={(item) => `${item.type}-${item.id}`}
           renderItem={renderItem}
