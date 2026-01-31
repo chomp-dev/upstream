@@ -239,7 +239,7 @@ export default function CreateScreen() {
 
         // 1. Get Upload URL
         setUploadStatus('Getting secure upload URL...');
-        const initResponse = await fetch(`${mediaApi.BASE_URL}/upload/video`, {
+        const initResponse = await fetch(`${mediaApi.BASE_URL}/api/upload/video`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -319,7 +319,7 @@ export default function CreateScreen() {
           });
         }
 
-        const uploadRes = await fetch(`${mediaApi.BASE_URL}/upload/image-base64`, {
+        const uploadRes = await fetch(`${mediaApi.BASE_URL}/api/upload/image-base64`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ image: base64 })
@@ -329,7 +329,7 @@ export default function CreateScreen() {
         const { imageId } = await uploadRes.json();
 
         // Create Post
-        const createRes = await fetch(`${mediaApi.BASE_URL}/upload/images`, {
+        const createRes = await fetch(`${mediaApi.BASE_URL}/api/upload/images`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
