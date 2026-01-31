@@ -189,7 +189,6 @@ feedRouter.get('/nearby', async (req, res) => {
     console.log(`[Feed/Nearby] Found ${videosResult.rows.length} videos for nearby restaurants`);
 
     // Fetch image posts linked to nearby restaurants
-    // Fetch image posts linked to nearby restaurants
     const imagesResult = await queryWithRetry(
       `SELECT id, images, google_place_id, created_at
        FROM image_posts 

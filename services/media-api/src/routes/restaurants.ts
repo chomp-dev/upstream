@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { pool } from '../db';
+import { pool, queryWithRetry } from '../db';
 
 export const restaurantsRouter = Router();
 
@@ -22,22 +22,22 @@ interface MediaSummaryItem {
 restaurantsRouter.post('/media-summary', async (req, res) => {
   try {
     const { place_ids }: MediaSummaryRequest = req.body;
-    
+
     if (!Array.isArray(place_ids) || place_ids.length === 0) {
-      return res.status(400).json({ 
-        error: 'Must provide an array of place_ids' 
+      return res.status(400).json({
+        error: 'Must provide an array of place_ids'
       });
     }
-    
+
     // Limit to prevent abuse
-    if (place_ids.length > 100) {
-      return res.status(400).json({ 
-        error: 'Maximum 100 place_ids allowed per request' 
+    if (place_ids.length > 500) {
+      return res.status(400).json({
+        error: 'Maximum 500 place_ids allowed per request'
       });
     }
 
     // Get video counts and latest thumbnail per place_id
-    const videoResult = await pool.query(
+    const videoResult = await queryWithRetry(
       `SELECT 
          google_place_id,
          COUNT(*) as video_count,
@@ -53,7 +53,7 @@ restaurantsRouter.post('/media-summary', async (req, res) => {
     );
 
     // Get image post counts per place_id
-    const imageResult = await pool.query(
+    const imageResult = await queryWithRetry(
       `SELECT 
          google_place_id,
          COUNT(*) as image_count
@@ -65,7 +65,7 @@ restaurantsRouter.post('/media-summary', async (req, res) => {
 
     // Build response object
     const summary: Record<string, MediaSummaryItem> = {};
-    
+
     // Initialize all requested place_ids with zeros
     for (const placeId of place_ids) {
       summary[placeId] = {
@@ -108,7 +108,7 @@ restaurantsRouter.get('/:place_id/media', async (req, res) => {
     const offset = parseInt(req.query.offset as string) || 0;
 
     // Fetch videos for this restaurant
-    const videosResult = await pool.query(
+    const videosResult = await queryWithRetry(
       `SELECT id, cloudflare_video_id, playback_url, thumbnail_url, 
               status, duration, created_at
        FROM videos 
@@ -119,7 +119,7 @@ restaurantsRouter.get('/:place_id/media', async (req, res) => {
     );
 
     // Fetch image posts for this restaurant
-    const imagesResult = await pool.query(
+    const imagesResult = await queryWithRetry(
       `SELECT id, images, created_at
        FROM image_posts 
        WHERE google_place_id = $1
@@ -130,9 +130,9 @@ restaurantsRouter.get('/:place_id/media', async (req, res) => {
 
     // Combine and sort by created_at
     const media = [
-      ...videosResult.rows.map(v => ({ type: 'video', ...v })),
-      ...imagesResult.rows.map(i => ({ type: 'image_post', ...i })),
-    ].sort((a, b) => 
+      ...videosResult.rows.map((v: any) => ({ type: 'video', ...v })),
+      ...imagesResult.rows.map((i: any) => ({ type: 'image_post', ...i })),
+    ].sort((a: any, b: any) =>
       new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
 
