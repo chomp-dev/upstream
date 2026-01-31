@@ -14,6 +14,7 @@ import {
   FlatList,
   TextInput,
   Image,
+  Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystemLegacy from 'expo-file-system/legacy';
@@ -226,10 +227,17 @@ export default function CreateScreen() {
       const tagArray = tags.split(',').map(t => t.trim()).filter(Boolean);
 
       if (selectedMedia.type === 'video') {
-        const fileInfo = await FileSystemLegacy.getInfoAsync(selectedMedia.uri);
-        if (!fileInfo.exists) throw new Error('File does not exist');
+        // --- VIDEO UPLOAD ---
+        let fileSize = selectedMedia.fileSize || 0;
 
-        // 1. Get Upload URL with metadata
+        // On native, verify file exists
+        if (Platform.OS !== 'web') {
+          const fileInfo = await FileSystemLegacy.getInfoAsync(selectedMedia.uri);
+          if (!fileInfo.exists) throw new Error('File does not exist');
+          fileSize = fileInfo.size || fileSize;
+        }
+
+        // 1. Get Upload URL
         setUploadStatus('Getting secure upload URL...');
         const initResponse = await fetch(`${mediaApi.BASE_URL}/upload/video`, {
           method: 'POST',
@@ -248,30 +256,34 @@ export default function CreateScreen() {
         // 2. Upload to Cloudflare
         setUploadStatus('Uploading video...');
 
-        const xhr = new XMLHttpRequest();
+        // Prepare file/blob
+        const formData = new FormData();
 
-        await new Promise((resolve, reject) => {
-          xhr.open('POST', uploadUrl);
-          const formData = new FormData();
+        if (Platform.OS === 'web') {
+          const vidRes = await fetch(selectedMedia.uri);
+          const blob = await vidRes.blob();
+          formData.append('file', blob, 'video.mp4');
+        } else {
           formData.append('file', {
             uri: selectedMedia.uri,
             name: 'video.mp4',
             type: 'video/mp4',
           } as any);
+        }
+
+        const xhr = new XMLHttpRequest();
+        await new Promise((resolve, reject) => {
+          xhr.open('POST', uploadUrl);
 
           xhr.upload.onprogress = (event) => {
             if (event.lengthComputable) {
-              const progress = event.loaded / event.total;
-              setUploadProgress(progress);
+              setUploadProgress(event.loaded / event.total);
             }
           };
 
           xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              resolve(xhr.response);
-            } else {
-              reject(new Error(`Upload failed: ${xhr.status}`));
-            }
+            if (xhr.status >= 200 && xhr.status < 300) resolve(xhr.response);
+            else reject(new Error(`Upload failed: ${xhr.status}`));
           };
 
           xhr.onerror = () => reject(new Error('Network error during upload'));
@@ -282,12 +294,30 @@ export default function CreateScreen() {
         setUploadProgress(1);
 
       } else {
-        // Image Upload
+        // --- IMAGE UPLOAD ---
         setUploadStatus('Uploading images...');
 
-        const base64 = await FileSystemLegacy.readAsStringAsync(selectedMedia.uri, {
-          encoding: FileSystemLegacy.EncodingType.Base64
-        });
+        let base64: string;
+
+        if (Platform.OS === 'web') {
+          // Web: Fetch blob -> FileReader -> Base64
+          const imgRes = await fetch(selectedMedia.uri);
+          const blob = await imgRes.blob();
+          base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const res = reader.result as string;
+              resolve(res.split(',')[1]); // Remove "data:image/..." prefix
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+        } else {
+          // Native: Use FileSystem
+          base64 = await FileSystemLegacy.readAsStringAsync(selectedMedia.uri, {
+            encoding: FileSystemLegacy.EncodingType.Base64
+          });
+        }
 
         const uploadRes = await fetch(`${mediaApi.BASE_URL}/upload/image-base64`, {
           method: 'POST',
