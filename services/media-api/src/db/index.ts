@@ -41,21 +41,43 @@ export async function initDb() {
       )
     `);
 
-    // Add google_place_id column if it doesn't exist (for existing tables)
+    // Add metadata columns if they don't exist
     await pool.query(`
       DO $$ 
       BEGIN 
+        -- Videos table columns
         BEGIN
           ALTER TABLE videos ADD COLUMN google_place_id TEXT;
-        EXCEPTION
-          WHEN duplicate_column THEN NULL;
-        END;
+        EXCEPTION WHEN duplicate_column THEN NULL; END;
+
+        BEGIN
+          ALTER TABLE videos ADD COLUMN title TEXT;
+        EXCEPTION WHEN duplicate_column THEN NULL; END;
+
+        BEGIN
+          ALTER TABLE videos ADD COLUMN description TEXT;
+        EXCEPTION WHEN duplicate_column THEN NULL; END;
+
+        BEGIN
+          ALTER TABLE videos ADD COLUMN tags TEXT[];
+        EXCEPTION WHEN duplicate_column THEN NULL; END;
         
+        -- Image posts table columns
         BEGIN
           ALTER TABLE image_posts ADD COLUMN google_place_id TEXT;
-        EXCEPTION
-          WHEN duplicate_column THEN NULL;
-        END;
+        EXCEPTION WHEN duplicate_column THEN NULL; END;
+
+        BEGIN
+          ALTER TABLE image_posts ADD COLUMN title TEXT;
+        EXCEPTION WHEN duplicate_column THEN NULL; END;
+
+        BEGIN
+          ALTER TABLE image_posts ADD COLUMN description TEXT;
+        EXCEPTION WHEN duplicate_column THEN NULL; END;
+
+        BEGIN
+          ALTER TABLE image_posts ADD COLUMN tags TEXT[];
+        EXCEPTION WHEN duplicate_column THEN NULL; END;
       END $$;
     `);
 
@@ -63,7 +85,7 @@ export async function initDb() {
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_videos_google_place_id ON videos (google_place_id);
     `);
-    
+
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_image_posts_google_place_id ON image_posts (google_place_id);
     `);
@@ -72,7 +94,7 @@ export async function initDb() {
     return pool;
   } catch (error: any) {
     console.error('❌ Database initialization error:', error.message);
-    
+
     if (error.code === 'ENOTFOUND') {
       console.error('\n💡 Troubleshooting tips:');
       console.error('1. Check if your Supabase project is active (not paused)');
@@ -85,7 +107,7 @@ export async function initDb() {
     } else if (error.code === '28P01') {
       console.error('\n💡 Authentication failed - check your database password in DATABASE_URL');
     }
-    
+
     throw error;
   }
 }

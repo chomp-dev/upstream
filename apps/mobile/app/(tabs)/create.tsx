@@ -13,6 +13,7 @@ import {
   Modal,
   FlatList,
   TextInput,
+  Image,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystemLegacy from 'expo-file-system/legacy';
@@ -107,98 +108,67 @@ export default function CreateScreen() {
     }
   }, [showRestaurantPicker, loadNearbyRestaurants]);
 
-  const uploadVideo = async () => {
+  // Metadata state
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [tags, setTags] = useState('');
+
+  const [selectedMedia, setSelectedMedia] = useState<{
+    type: 'video' | 'image';
+    uri: string;
+    fileSize?: number;
+    mimeType?: string;
+  } | null>(null);
+
+  const resetForm = () => {
+    setSelectedMedia(null);
+    setSelectedRestaurant(null);
+    setTitle('');
+    setDescription('');
+    setTags('');
+    setUploadProgress(0);
+    setUploadStatus('');
+  };
+
+  const pickVideo = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Please grant camera roll access');
+        Alert.alert('Permission needed', 'Please grant camera roll access to upload');
         return;
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Videos,
         allowsEditing: true,
-        quality: 0.7, // Optimize video size (User requested optimization)
+        quality: 1,
         videoMaxDuration: 60,
       });
 
-      if (result.canceled) return;
+      if (result.canceled || !result.assets) return;
 
-      // MANDATORY: Check if restaurant is selected
-      if (!selectedRestaurant) {
-        Alert.alert(
-          'Location Required',
-          'Please attach a restaurant to your video so others can find it!',
-          [{ text: 'OK', onPress: () => setShowRestaurantPicker(true) }]
-        );
+      const asset = result.assets[0];
+      const fileSize = asset.fileSize || 0;
+      const fileSizeMB = fileSize / 1024 / 1024;
+
+      if (fileSizeMB > 100) {
+        Alert.alert('File too large', 'Please upload videos under 100MB');
         return;
       }
 
-      setUploading(true);
-      setUploadProgress(0);
-      setUploadStatus('Getting upload URL...');
+      setSelectedMedia({
+        type: 'video',
+        uri: asset.uri,
+        fileSize: fileSize,
+        mimeType: asset.mimeType
+      });
 
-      const uploadResponse = await mediaApi.requestVideoUpload(
-        selectedRestaurant.google_place_id
-      );
-
-      if (!uploadResponse.uploadUrl || !uploadResponse.videoId) {
-        throw new Error('Invalid response from backend');
-      }
-
-      const fileUri = result.assets[0].uri;
-      const fileSize = result.assets[0].fileSize || 0;
-      const fileSizeMB = (fileSize / 1024 / 1024).toFixed(2);
-      const mimeType = result.assets[0].mimeType || 'video/mp4';
-
-      setUploadStatus(`Uploading ${fileSizeMB} MB...`);
-      setUploadProgress(0.05);
-
-      const uploadStartTime = Date.now();
-
-      // Use the new robust upload method (same as images)
-      // Note: Fetch doesn't support granular progress without XHR, 
-      // so we'll simulate progress for better UX while it uploads
-      const progressInterval = setInterval(() => {
-        setUploadProgress((prev) => {
-          if (prev >= 0.8) return prev; // Cap at 80% until done
-          return prev + 0.05;
-        });
-        setUploadStatus('Uploading...');
-      }, 500);
-
-      try {
-        await mediaApi.uploadVideoToCloudflare(uploadResponse.uploadUrl, result.assets[0].uri);
-      } catch (e: any) {
-        clearInterval(progressInterval);
-        throw e;
-      }
-
-      clearInterval(progressInterval);
-      setUploadProgress(0.9); // 90% when upload call returns success
-
-      setUploadProgress(1.0);
-      setUploadStatus('Upload complete!');
-
-      // Immediate success - backend will handle processing async
-      Alert.alert(
-        'Success',
-        'Video uploaded! It is processing and will appear in your feed shortly.',
-        [{ text: 'View Feed', onPress: () => router.replace('/') }]
-      );
-
-      setUploading(false);
-      setSelectedRestaurant(null);
     } catch (error: any) {
-      console.error('Upload error:', error);
-      Alert.alert('Error', error?.message || 'Failed to upload video');
-      setUploading(false);
-      setUploadProgress(0);
-      setUploadStatus('');
+      Alert.alert('Error', 'Failed to pick video');
     }
   };
 
-  const uploadImages = async () => {
+  const pickImages = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
@@ -208,74 +178,137 @@ export default function CreateScreen() {
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsMultipleSelection: true,
-        quality: 0.8, // Compress slightly for faster uploads
+        allowsMultipleSelection: false,
+        quality: 0.8,
       });
 
       if (result.canceled || !result.assets) return;
 
-      if (result.assets.length < 1 || result.assets.length > 10) {
-        Alert.alert('Error', 'Please select between 1 and 10 images');
-        return;
-      }
+      setSelectedMedia({
+        type: 'image',
+        uri: result.assets[0].uri,
+      });
 
-      // MANDATORY: Check if restaurant is selected
-      if (!selectedRestaurant) {
-        Alert.alert(
-          'Location Required',
-          'Please attach a restaurant to your post so others can find it!',
-          [{ text: 'OK', onPress: () => setShowRestaurantPicker(true) }]
-        );
-        return;
-      }
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Failed to pick images');
+    }
+  };
 
+  const handleUpload = async () => {
+    if (!selectedMedia) return;
+    if (!selectedRestaurant) {
+      Alert.alert('Required', 'Please attach a restaurant to your post.');
+      return;
+    }
+    if (!title.trim()) {
+      Alert.alert('Required', 'Please add a title for your post.');
+      return;
+    }
+
+    try {
       setUploading(true);
+      setUploadStatus('Preparing upload...');
       setUploadProgress(0);
 
-      const imageUris = result.assets.map((asset) => asset.uri);
-      const totalImages = imageUris.length;
+      const tagArray = tags.split(',').map(t => t.trim()).filter(Boolean);
 
-      // Upload images one by one with progress tracking
-      const imageIds: string[] = [];
-      for (let i = 0; i < imageUris.length; i++) {
-        const uri = imageUris[i];
-        setUploadStatus(`Uploading image ${i + 1} of ${totalImages}...`);
-        setUploadProgress((i / totalImages) * 0.9); // 90% for uploads
+      if (selectedMedia.type === 'video') {
+        const fileInfo = await FileSystemLegacy.getInfoAsync(selectedMedia.uri);
+        if (!fileInfo.exists) throw new Error('File does not exist');
 
-        try {
-          // Get upload URL from our backend
-          const { imageId, uploadURL } = await mediaApi.getImageUploadUrl();
+        // 1. Get Upload URL with metadata
+        setUploadStatus('Getting secure upload URL...');
+        const initResponse = await fetch(`${mediaApi.BASE_URL}/upload/video`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            google_place_id: selectedRestaurant.google_place_id,
+            title: title.trim(),
+            description: description.trim(),
+            tags: tagArray
+          }),
+        });
 
-          // Upload directly to Cloudflare
-          await mediaApi.uploadImageToCloudflare(uploadURL, uri);
+        if (!initResponse.ok) throw new Error('Failed to init upload');
+        const { uploadUrl } = await initResponse.json();
 
-          imageIds.push(imageId);
-        } catch (err) {
-          console.error(`Failed to upload image ${i + 1}:`, err);
-          throw new Error(`Failed to upload image ${i + 1}`);
-        }
+        // 2. Upload to Cloudflare
+        setUploadStatus('Uploading video...');
+
+        const xhr = new XMLHttpRequest();
+
+        await new Promise((resolve, reject) => {
+          xhr.open('POST', uploadUrl);
+          const formData = new FormData();
+          formData.append('file', {
+            uri: selectedMedia.uri,
+            name: 'video.mp4',
+            type: 'video/mp4',
+          } as any);
+
+          xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) {
+              const progress = event.loaded / event.total;
+              setUploadProgress(progress);
+            }
+          };
+
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve(xhr.response);
+            } else {
+              reject(new Error(`Upload failed: ${xhr.status}`));
+            }
+          };
+
+          xhr.onerror = () => reject(new Error('Network error during upload'));
+          xhr.send(formData);
+        });
+
+        setUploadStatus('Processing...');
+        setUploadProgress(1);
+
+      } else {
+        // Image Upload
+        setUploadStatus('Uploading images...');
+
+        const base64 = await FileSystemLegacy.readAsStringAsync(selectedMedia.uri, {
+          encoding: FileSystemLegacy.EncodingType.Base64
+        });
+
+        const uploadRes = await fetch(`${mediaApi.BASE_URL}/upload/image-base64`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: base64 })
+        });
+
+        if (!uploadRes.ok) throw new Error('Image upload failed');
+        const { imageId } = await uploadRes.json();
+
+        // Create Post
+        const createRes = await fetch(`${mediaApi.BASE_URL}/upload/images`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            images: [imageId],
+            google_place_id: selectedRestaurant.google_place_id,
+            title: title.trim(),
+            description: description.trim(),
+            tags: tagArray
+          })
+        });
+
+        if (!createRes.ok) throw new Error('Failed to create post');
       }
 
-      setUploadStatus('Creating post...');
-      setUploadProgress(0.95);
-
-      // Create the image post with Cloudflare image IDs
-      await mediaApi.uploadImages(imageIds, selectedRestaurant?.google_place_id);
-
-      setUploadProgress(1.0);
-      setUploadStatus('Upload complete!');
-      setUploading(false);
-      setSelectedRestaurant(null);
-
-      Alert.alert('Success', 'Images uploaded!', [
-        { text: 'View Feed', onPress: () => router.replace('/') },
-      ]);
+      Alert.alert('Success', 'Upload complete!');
+      resetForm();
+      router.push('/(tabs)/');
     } catch (error: any) {
       console.error('Upload error:', error);
-      Alert.alert('Error', error?.message || 'Failed to upload images');
+      Alert.alert('Error', error.message || 'Upload failed');
+    } finally {
       setUploading(false);
-      setUploadProgress(0);
-      setUploadStatus('');
     }
   };
 
@@ -318,66 +351,127 @@ export default function CreateScreen() {
           Share your food discoveries
         </Text>
 
-        {/* Restaurant attachment */}
-        <View style={styles.section}>
-          <Text variant="label" style={styles.sectionLabel}>
-            Attach Restaurant <Text color={colors.coral} style={{ fontWeight: 'bold' }}>*</Text>
-          </Text>
-          <TouchableOpacity
-            style={styles.restaurantSelector}
-            onPress={() => setShowRestaurantPicker(true)}
-          >
-            {selectedRestaurant ? (
-              <View style={styles.selectedRestaurant}>
-                <View
-                  style={[styles.ratingDot, { backgroundColor: ratingColor(selectedRestaurant.rating) }]}
-                />
-                <Text variant="body" numberOfLines={1} style={{ flex: 1 }}>
-                  {selectedRestaurant.name}
-                </Text>
-                <TouchableOpacity onPress={() => setSelectedRestaurant(null)}>
-                  <Ionicons name="close-circle" size={20} color={colors.coral} />
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                <Ionicons name="location-outline" size={16} color={colors.muted} />
-                <Text variant="bodySmall" color={colors.muted}>
-                  Tap to select a nearby restaurant
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
+        {/* Media Selection or Form */}
+        {!selectedMedia ? (
+          <View style={styles.section}>
+            <Text variant="label" style={styles.sectionLabel}>Select Media</Text>
+            <TouchableOpacity
+              style={styles.uploadButton}
+              onPress={pickVideo}
+              disabled={uploading}
+            >
+              <Ionicons name="videocam" size={36} color={colors.bg} style={{ marginBottom: spacing.sm }} />
+              <Text variant="subtitle" color={colors.bg}>Pick Video</Text>
+              <Text variant="caption" color={colors.bg} style={{ opacity: 0.7 }}>Up to 60 seconds</Text>
+            </TouchableOpacity>
 
-        {/* Upload buttons */}
-        <View style={styles.section}>
-          <TouchableOpacity
-            style={[styles.uploadButton, uploading && styles.uploadButtonDisabled]}
-            onPress={uploadVideo}
-            disabled={uploading}
-          >
-            <Ionicons name="videocam" size={36} color={colors.bg} style={{ marginBottom: spacing.sm }} />
-            <Text variant="subtitle" color={colors.bg}>
-              Upload Video
-            </Text>
-            <Text variant="caption" color={colors.bg} style={{ opacity: 0.7 }}>
-              Up to 60 seconds
-            </Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.uploadButton, styles.uploadButtonSecondary]}
+              onPress={pickImages}
+              disabled={uploading}
+            >
+              <Ionicons name="images-outline" size={36} color={colors.text} style={{ marginBottom: spacing.sm }} />
+              <Text variant="subtitle">Pick Image</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.formContainer}>
+            {/* Preview */}
+            <View style={styles.previewContainer}>
+              {selectedMedia.type === 'video' ? (
+                <View style={styles.mediaPreview}>
+                  <Ionicons name="videocam" size={48} color={colors.muted} />
+                  <Text variant="caption">{selectedMedia.mimeType || 'Video'}</Text>
+                </View>
+              ) : (
+                <Image source={{ uri: selectedMedia.uri }} style={styles.mediaPreview} />
+              )}
+              <TouchableOpacity
+                style={styles.changeMediaButton}
+                onPress={() => setSelectedMedia(null)}
+              >
+                <Text variant="caption" color={colors.coral}>Change</Text>
+              </TouchableOpacity>
+            </View>
 
-          <TouchableOpacity
-            style={[styles.uploadButton, styles.uploadButtonSecondary, uploading && styles.uploadButtonDisabled]}
-            onPress={uploadImages}
-            disabled={uploading}
-          >
-            <Ionicons name="images-outline" size={36} color={colors.text} style={{ marginBottom: spacing.sm }} />
-            <Text variant="subtitle">Upload Images</Text>
-            <Text variant="caption" color={colors.muted}>
-              1-10 photos
-            </Text>
-          </TouchableOpacity>
-        </View>
+            {/* Restaurant Picker */}
+            <View style={styles.section}>
+              <Text variant="label" style={styles.sectionLabel}>
+                Restaurant <Text color={colors.coral}>*</Text>
+              </Text>
+              <TouchableOpacity
+                style={styles.restaurantSelector}
+                onPress={() => setShowRestaurantPicker(true)}
+              >
+                {selectedRestaurant ? (
+                  <View style={styles.selectedRestaurant}>
+                    <View style={[styles.ratingDot, { backgroundColor: ratingColor(selectedRestaurant.rating) }]} />
+                    <Text variant="body" numberOfLines={1} style={{ flex: 1 }}>{selectedRestaurant.name}</Text>
+                    <TouchableOpacity onPress={() => setSelectedRestaurant(null)}>
+                      <Ionicons name="close-circle" size={20} color={colors.coral} />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                    <Ionicons name="location-outline" size={16} color={colors.muted} />
+                    <Text variant="bodySmall" color={colors.muted}>Select Restaurant</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {/* Metadata Inputs */}
+            <View style={styles.section}>
+              <Text variant="label" style={styles.sectionLabel}>Title <Text color={colors.coral}>*</Text></Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. Best Sushi in Town!"
+                placeholderTextColor={colors.muted}
+                value={title}
+                onChangeText={setTitle}
+                maxLength={100}
+              />
+            </View>
+
+            <View style={styles.section}>
+              <Text variant="label" style={styles.sectionLabel}>Description</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                placeholder="Tell us about your experience..."
+                placeholderTextColor={colors.muted}
+                value={description}
+                onChangeText={setDescription}
+                multiline
+                maxLength={500}
+              />
+            </View>
+
+            <View style={styles.section}>
+              <Text variant="label" style={styles.sectionLabel}>Tags</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. sushi, spicy, date-night"
+                placeholderTextColor={colors.muted}
+                value={tags}
+                onChangeText={setTags}
+              />
+              <Text variant="caption" color={colors.muted} style={{ marginTop: 4 }}>Comma separated</Text>
+            </View>
+
+            {/* Post Button */}
+            <TouchableOpacity
+              style={[styles.uploadButton, uploading && styles.uploadButtonDisabled]}
+              onPress={handleUpload}
+              disabled={uploading}
+            >
+              {uploading ? (
+                <ActivityIndicator color={colors.bg} />
+              ) : (
+                <Text variant="subtitle" color={colors.bg}>Post Review</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
 
       {/* Upload Progress Modal */}
@@ -599,10 +693,43 @@ const styles = StyleSheet.create({
   },
   restaurantInfo: {
     flex: 1,
+    marginLeft: spacing.sm,
   },
   restaurantMeta: {
     flexDirection: 'row',
     gap: spacing.sm,
     marginTop: spacing.xxs,
+  },
+  formContainer: {
+    gap: spacing.md,
+  },
+  previewContainer: {
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  mediaPreview: {
+    width: '100%',
+    height: 200,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  changeMediaButton: {
+    padding: spacing.sm,
+  },
+  input: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    color: colors.text,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  textArea: {
+    height: 100,
+    textAlignVertical: 'top',
   },
 });

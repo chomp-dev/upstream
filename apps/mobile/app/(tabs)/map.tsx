@@ -61,8 +61,7 @@ export default function MapScreen() {
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [estimatedCount, setEstimatedCount] = useState(0);
 
-  const [loadingProgress, setLoadingProgress] = useState(0);
-  const [estimatedCount, setEstimatedCount] = useState(0);
+
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');

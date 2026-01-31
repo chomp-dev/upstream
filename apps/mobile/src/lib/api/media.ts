@@ -5,6 +5,7 @@
 
 import { Platform } from 'react-native';
 import { MEDIA_API_BASE } from '../env';
+export const BASE_URL = MEDIA_API_BASE;
 import type {
   FeedResponse,
   UploadVideoResponse,

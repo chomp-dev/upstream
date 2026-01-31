@@ -8,19 +8,19 @@ export const uploadRouter = Router();
 // Get signed upload URL for video
 uploadRouter.post('/video', async (req, res) => {
   try {
-    const { google_place_id } = req.body || {};
+    const { google_place_id, title, description, tags } = req.body || {};
     const upload = await createDirectUploadUrl();
 
     if (!upload.id || !upload.uploadURL) {
       throw new Error('Invalid upload response from Cloudflare');
     }
 
-    // Store video record in DB with pending status and optional google_place_id
+    // Store video record in DB with pending status and metadata
     const result = await pool.query(
-      `INSERT INTO videos (cloudflare_video_id, status, google_place_id) 
-       VALUES ($1, 'pending', $2) 
+      `INSERT INTO videos (cloudflare_video_id, status, google_place_id, title, description, tags) 
+       VALUES ($1, 'pending', $2, $3, $4, $5) 
        RETURNING id, cloudflare_video_id, status, google_place_id, created_at`,
-      [upload.id, google_place_id || null]
+      [upload.id, google_place_id || null, title || null, description || null, tags || []]
     );
 
     res.json({
@@ -129,7 +129,7 @@ uploadRouter.post('/image-base64', async (req, res) => {
 // Called after images have been uploaded to Cloudflare
 uploadRouter.post('/images', async (req, res) => {
   try {
-    const { images, google_place_id } = req.body;
+    const { images, google_place_id, title, description, tags } = req.body;
 
     if (!Array.isArray(images) || images.length < 1 || images.length > 10) {
       return res.status(400).json({
@@ -146,12 +146,12 @@ uploadRouter.post('/images', async (req, res) => {
       return getImageDeliveryUrl(img);
     });
 
-    // Store image post with optional google_place_id
+    // Store image post with metadata
     const result = await pool.query(
-      `INSERT INTO image_posts (images, google_place_id) 
-       VALUES ($1, $2) 
+      `INSERT INTO image_posts (images, google_place_id, title, description, tags) 
+       VALUES ($1, $2, $3, $4, $5) 
        RETURNING id, images, google_place_id, created_at`,
-      [imageUrls, google_place_id || null]
+      [imageUrls, google_place_id || null, title || null, description || null, tags || []]
     );
 
     res.json({
