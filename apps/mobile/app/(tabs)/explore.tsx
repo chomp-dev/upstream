@@ -95,9 +95,14 @@ export default function ExploreScreen() {
 
   const handleItemPress = (item: FeedItem, index: number) => {
     // Navigate to home feed with item index to scroll to
+    // We pass the full item data so Home can display it even if it's not in the local feed
     router.push({
       pathname: '/',
-      params: { scrollToIndex: index.toString(), itemId: item.id.toString() },
+      params: {
+        scrollToIndex: index.toString(),
+        itemId: item.id.toString(),
+        videoData: JSON.stringify(item)
+      },
     });
   };
 

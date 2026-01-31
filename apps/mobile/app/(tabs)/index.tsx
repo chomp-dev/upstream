@@ -38,7 +38,7 @@ export default function HomeScreen() {
   const [restaurantCache, setRestaurantCache] = useState<Record<string, Restaurant>>({});
   const flatListRef = useRef<FlatList>(null);
   const isFocused = useIsFocused();
-  const params = useLocalSearchParams<{ scrollToIndex?: string; itemId?: string }>();
+  const params = useLocalSearchParams<{ scrollToIndex?: string; itemId?: string; videoData?: string }>();
   const lastScrolledRef = useRef<string | null>(null);
   const { width, height: SCREEN_HEIGHT } = useContentDimensions();
 
@@ -214,12 +214,38 @@ export default function HomeScreen() {
     loadNearbyFeed();
   }, [loadNearbyFeed]);
 
-  // Handle navigation from Explore - scroll to specific item
+  // Handle navigation from Explore - scroll to specific item AND inject if needed
   useEffect(() => {
-    if (params.scrollToIndex && params.itemId && feed.length > 0) {
+    if (params.scrollToIndex && params.itemId) {
       const scrollKey = `${params.scrollToIndex}-${params.itemId}`;
 
-      if (lastScrolledRef.current !== scrollKey) {
+      // Inject video if provided (allows playing out-of-area videos from Explore)
+      // We parse the full item data passed from Explore
+      if (params.videoData && loading === false) {
+        try {
+          const injectedItem = JSON.parse(params.videoData as string) as FeedItem;
+          // Check if already exists to avoid duplicates
+          const exists = feed.find(i => i.id === injectedItem.id);
+
+          if (!exists) {
+            console.log('[Feed] Injecting out-of-area video from Explore:', injectedItem.id);
+            // Prepend or insert at specific index? Prepending is safest for "just show me this"
+            setFeed(prev => [injectedItem, ...prev]);
+
+            // Reset scroll target to 0 since we put it at top
+            // We need to wait for state update to reflect in FlatList
+            setTimeout(() => {
+              flatListRef.current?.scrollToIndex({ index: 0, animated: false });
+              setCurrentIndex(0);
+            }, 200);
+            return;
+          }
+        } catch (e) {
+          console.error('[Feed] Failed to inject video data:', e);
+        }
+      }
+
+      if (feed.length > 0 && lastScrolledRef.current !== scrollKey) {
         const targetIndex = parseInt(params.scrollToIndex, 10);
         const itemIndex = feed.findIndex(item => item.id.toString() === params.itemId);
         const finalIndex = itemIndex >= 0 ? itemIndex : targetIndex;
@@ -237,7 +263,7 @@ export default function HomeScreen() {
         }
       }
     }
-  }, [params.scrollToIndex, params.itemId, feed]);
+  }, [params.scrollToIndex, params.itemId, params.videoData, feed, loading]);
 
   // Smart polling
   useEffect(() => {

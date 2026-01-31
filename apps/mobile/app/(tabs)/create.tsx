@@ -93,12 +93,22 @@ export default function CreateScreen() {
 
       if (result.canceled) return;
 
+      // MANDATORY: Check if restaurant is selected
+      if (!selectedRestaurant) {
+        Alert.alert(
+          'Location Required',
+          'Please attach a restaurant to your video so others can find it!',
+          [{ text: 'OK', onPress: () => setShowRestaurantPicker(true) }]
+        );
+        return;
+      }
+
       setUploading(true);
       setUploadProgress(0);
       setUploadStatus('Getting upload URL...');
 
       const uploadResponse = await mediaApi.requestVideoUpload(
-        selectedRestaurant?.google_place_id
+        selectedRestaurant.google_place_id
       );
 
       if (!uploadResponse.uploadUrl || !uploadResponse.videoId) {
@@ -217,6 +227,16 @@ export default function CreateScreen() {
 
       if (result.assets.length < 1 || result.assets.length > 10) {
         Alert.alert('Error', 'Please select between 1 and 10 images');
+        return;
+      }
+
+      // MANDATORY: Check if restaurant is selected
+      if (!selectedRestaurant) {
+        Alert.alert(
+          'Location Required',
+          'Please attach a restaurant to your post so others can find it!',
+          [{ text: 'OK', onPress: () => setShowRestaurantPicker(true) }]
+        );
         return;
       }
 
