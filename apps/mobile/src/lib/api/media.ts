@@ -127,6 +127,19 @@ export async function checkVideoUploadStatus(
 }
 
 /**
+ * Report a playback error for a video
+ * This triggers a status check on the backend to see if the video was deleted
+ */
+export async function reportPlaybackError(cloudflareVideoId: string): Promise<void> {
+  try {
+    // We use the feed check-status endpoint which now syncs the DB
+    await fetch(`${MEDIA_API_BASE}/api/feed/check-status/${cloudflareVideoId}`);
+  } catch (error) {
+    console.warn('[API] Failed to report playback error:', error);
+  }
+}
+
+/**
  * Upload an image file directly to Cloudflare
  * @param uploadUrl - The one-time upload URL from getImageUploadUrl()
  * @param imageUri - The local file URI to upload

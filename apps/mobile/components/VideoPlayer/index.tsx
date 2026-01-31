@@ -18,6 +18,7 @@ interface VideoPlayerProps {
 const isIOSMobileWeb = Platform.OS === 'web' && typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent);
 
 export function VideoPlayer({
+    videoId,
     playbackUrl,
     thumbnailUrl,
     isActive
@@ -40,11 +41,29 @@ export function VideoPlayer({
     const [isPlaying, setIsPlaying] = React.useState(false);
 
     useEffect(() => {
-        const sub = player.addListener('playingChange', ({ isPlaying: newIsPlaying }) => {
+        const sub1 = player.addListener('playingChange', ({ isPlaying: newIsPlaying }) => {
             setIsPlaying(newIsPlaying);
         });
-        return () => sub.remove();
-    }, [player]);
+
+        // Listen for status changes to detect errors (e.g. video deleted)
+        const sub2 = player.addListener('statusChange', ({ status, error }) => {
+            if (status === 'error' && videoId) {
+                console.log('[VideoPlayer] Playback error for video:', videoId, error);
+
+                // Report error to backend to check if video was deleted
+                import('../../src/lib/api').then(({ mediaApi }) => {
+                    mediaApi.reportPlaybackError(videoId).catch(err => {
+                        console.warn('[VideoPlayer] Failed to report error:', err);
+                    });
+                });
+            }
+        });
+
+        return () => {
+            sub1.remove();
+            sub2.remove();
+        };
+    }, [player, videoId]);
 
     // Handle active state changes
     useEffect(() => {

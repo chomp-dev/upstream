@@ -22,14 +22,59 @@ feedRouter.get('/debug/all-videos', async (req, res) => {
   }
 });
 
-// Debug endpoint to manually check video status from Cloudflare
-feedRouter.get('/check-status/:videoId', async (req, res) => {
+// Debug endpoint to manually check video status from Cloudflare and sync DB
+feedRouter.get('/check-status/:cloudflareVideoId', async (req, res) => {
   try {
-    const { videoId } = req.params;
-    console.log(`[Debug] Checking status for video: ${videoId}`);
-    const cloudflareVideo = await getVideo(videoId);
-    console.log(`[Debug] Cloudflare response:`, cloudflareVideo);
-    res.json({ success: true, video: cloudflareVideo });
+    const { cloudflareVideoId } = req.params;
+    console.log(`[Debug] Checking status for video: ${cloudflareVideoId}`);
+
+    try {
+      const cloudflareVideo = await getVideo(cloudflareVideoId);
+      console.log(`[Debug] Cloudflare status: ${cloudflareVideo.status}`);
+
+      // Update DB with latest status
+      const newPlaybackUrl = cloudflareVideo.playback?.hls || cloudflareVideo.playback?.dash || null;
+      const durationInt = cloudflareVideo.duration ? Math.round(cloudflareVideo.duration) : null;
+
+      await pool.query(
+        `UPDATE videos 
+                SET status = $1, 
+                    playback_url = $2, 
+                    thumbnail_url = $3,
+                    duration = $4,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE cloudflare_video_id = $5`,
+        [
+          cloudflareVideo.status,
+          newPlaybackUrl,
+          cloudflareVideo.thumbnail || null,
+          durationInt,
+          cloudflareVideoId,
+        ]
+      );
+
+      res.json({ success: true, video: cloudflareVideo });
+
+    } catch (error: any) {
+      // Handle 404 (Deleted on Cloudflare)
+      const is404 = error?.statusCode === 404 ||
+        error?.message?.includes('404') ||
+        error?.message?.includes('not found') ||
+        // Cloudflare sometimes returns 400 for invalid/deleted IDs
+        error?.statusCode === 400;
+
+      if (is404) {
+        console.log(`[Debug] Video ${cloudflareVideoId} not found on Cloudflare (deleted), marking as error`);
+
+        await pool.query(
+          `UPDATE videos SET status = 'error', updated_at = CURRENT_TIMESTAMP WHERE cloudflare_video_id = $1`,
+          [cloudflareVideoId]
+        );
+        return res.json({ success: true, status: 'error', message: 'Video marked as deleted' });
+      }
+
+      throw error;
+    }
   } catch (error: any) {
     console.error(`[Debug] Error checking video:`, error);
     res.status(500).json({ error: error?.message || 'Failed to check video status' });
