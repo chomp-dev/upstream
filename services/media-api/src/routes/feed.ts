@@ -250,29 +250,28 @@ feedRouter.get('/', async (req, res) => {
 
     console.log(`[Feed] Found ${videosResult.rows.length} videos. Statuses: ${videosResult.rows.map(v => `${v.id}:${v.status}`).join(', ')}`);
 
-    // Check and update status for non-ready videos OR ready videos without playback URLs
-    const videosToCheck = videosResult.rows.filter(v => v.status !== 'ready' || !v.playback_url);
+    // Check and update status for ALL videos to handle manual Cloudflare deletions
+    // This is more aggressive than before but ensures the feed doesn't show deleted videos
+    const videosToCheck = videosResult.rows.filter(v => v.cloudflare_video_id);
+
     if (videosToCheck.length > 0) {
-      console.log(`[Feed] Checking ${videosToCheck.length} videos for status updates...`);
-    }
+      console.log(`[Feed] Validating ${videosToCheck.length} videos with Cloudflare...`);
 
-    for (const video of videosToCheck) {
-      if (video.cloudflare_video_id) {
+      // We process these in parallel but with a concurrency limit if needed
+      // For page size 20, Promise.all is fine
+      await Promise.all(videosToCheck.map(async (video) => {
         try {
-          console.log(`[Feed] Checking Cloudflare status for video ${video.cloudflare_video_id} (current: ${video.status})`);
           const cloudflareVideo = await getVideo(video.cloudflare_video_id);
-          console.log(`[Feed] Video ${video.cloudflare_video_id} status from Cloudflare: ${cloudflareVideo.status}`);
 
-          // Update database if status changed or if we have new playback URL
+          // Update database if status changed OR if we need to sync metadata
           const newPlaybackUrl = cloudflareVideo.playback?.hls || cloudflareVideo.playback?.dash || null;
+          const durationInt = cloudflareVideo.duration ? Math.round(cloudflareVideo.duration) : null;
+
           if (cloudflareVideo.status !== video.status ||
-            cloudflareVideo.status === 'ready' ||
-            (newPlaybackUrl && !video.playback_url)) {
+            !video.playback_url ||
+            video.duration !== durationInt) {
 
-            console.log(`[Feed] Updating video ${video.cloudflare_video_id} to status: ${cloudflareVideo.status}`);
-
-            // Round duration to integer (PostgreSQL INTEGER column)
-            const durationInt = cloudflareVideo.duration ? Math.round(cloudflareVideo.duration) : null;
+            console.log(`[Feed] Syncing video ${video.cloudflare_video_id}: ${video.status} -> ${cloudflareVideo.status}`);
 
             await pool.query(
               `UPDATE videos 
@@ -291,40 +290,34 @@ feedRouter.get('/', async (req, res) => {
               ]
             );
 
-            // Update the video in our result set
+            // Update the video object in place so the response is correct
             video.status = cloudflareVideo.status;
             video.playback_url = newPlaybackUrl;
             video.thumbnail_url = cloudflareVideo.thumbnail || null;
             video.duration = durationInt;
-
-            console.log(`[Feed] ✅ Video ${video.cloudflare_video_id} updated: status=${cloudflareVideo.status}, hasPlaybackUrl=${!!newPlaybackUrl}`);
           }
         } catch (error: any) {
-          // If video returns 404, mark it as deleted
+          // Check for 404 (Deleted)
           const is404 = error?.statusCode === 404 ||
             error?.message?.includes('404') ||
-            error?.message?.includes('not found');
+            error?.message?.includes('not found') ||
+            error?.statusCode === 400;
 
           if (is404) {
-            console.log(`[Feed] Video ${video.cloudflare_video_id} not found on Cloudflare (deleted), marking as error`);
+            console.log(`[Feed] Video ${video.cloudflare_video_id} deleted on Cloudflare, marking as error`);
 
-            // Mark video as error/deleted in database
             await pool.query(
-              `UPDATE videos 
-                 SET status = 'error',
-                     updated_at = CURRENT_TIMESTAMP
-                 WHERE cloudflare_video_id = $1`,
+              `UPDATE videos SET status = 'error', updated_at = CURRENT_TIMESTAMP WHERE cloudflare_video_id = $1`,
               [video.cloudflare_video_id]
             );
 
             video.status = 'error';
-            console.log(`[Feed] ❌ Video ${video.cloudflare_video_id} marked as deleted/error`);
           } else {
-            // Log other errors but don't fail - video might still be uploading or processing
-            console.log(`[Feed] Could not check status for video ${video.cloudflare_video_id}:`, error?.message || error);
+            // Log other errors but don't fail
+            console.warn(`[Feed] Status check failed for ${video.cloudflare_video_id}:`, error?.message);
           }
         }
-      }
+      }));
     }
 
     // Fetch image posts
