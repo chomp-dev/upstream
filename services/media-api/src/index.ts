@@ -73,6 +73,29 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
+// Debug endpoint for database connectivity
+app.get('/debug/db-check', async (req, res) => {
+  try {
+    // @ts-ignore
+    const { pool } = require('./db');
+    const result = await pool.query('SELECT NOW(), current_user, session_user');
+    res.json({
+      status: 'connected',
+      timestamp: result.rows[0].now,
+      currentUser: result.rows[0].current_user,
+      sessionUser: result.rows[0].session_user,
+      connectionString: process.env.DATABASE_URL ? 'Defined (Hidden)' : 'Undefined'
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message,
+      code: error.code,
+      details: error
+    });
+  }
+});
+
 // Initialize database and start server
 // Initialize database and start server
 const startServer = async () => {
