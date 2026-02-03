@@ -371,20 +371,9 @@ export default function HomeScreen() {
       {/* Feed Mode Header Badge */}
       <View style={styles.modeHeader}>
         <Badge
-          label={feedMode === 'nearby' ? '📍 Nearby' : '🎬 Demo Reels'}
-          variant={feedMode === 'nearby' ? 'rating' : 'default'}
+          label="📍 Nearby"
+          variant="rating"
         />
-
-        {/* Toggle button */}
-        {feedMode === 'nearby' ? (
-          <TouchableOpacity style={styles.toggleButton} onPress={switchToDemo}>
-            <Text variant="caption" color={colors.muted}>Switch to Demo</Text>
-          </TouchableOpacity>
-        ) : locationAvailable && (
-          <TouchableOpacity style={styles.toggleButton} onPress={switchToNearby}>
-            <Text variant="caption" color={colors.muted}>Try Nearby</Text>
-          </TouchableOpacity>
-        )}
       </View>
 
       <FlatList
