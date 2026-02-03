@@ -111,9 +111,14 @@ export default function ProfileScreen() {
                 )}
 
                 {user && user.sub === targetUserId && (
-                    <TouchableOpacity style={styles.logoutButton} onPress={() => { logout(); router.replace('/'); }}>
-                        <Text variant="caption" color={colors.muted}>Log Out</Text>
-                    </TouchableOpacity>
+                    <View style={styles.actionButtonsRow}>
+                        <TouchableOpacity style={styles.editProfileButton} onPress={() => router.push('/edit_profile')}>
+                            <Text variant="caption" color={colors.bg}>Edit Profile</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.logoutButton} onPress={() => { logout(); router.replace('/'); }}>
+                            <Text variant="caption" color={colors.muted}>Log Out</Text>
+                        </TouchableOpacity>
+                    </View>
                 )}
             </View>
 
@@ -269,8 +274,21 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         paddingHorizontal: spacing.xl,
     },
-    logoutButton: {
+    actionButtonsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
         marginTop: spacing.md,
+        gap: spacing.sm,
+    },
+    editProfileButton: {
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.xs,
+        borderRadius: radius.pill,
+        backgroundColor: colors.primary,
+        borderWidth: 1,
+        borderColor: colors.primary,
+    },
+    logoutButton: {
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.xs,
         borderRadius: radius.pill,
