@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth0, User } from 'react-native-auth0';
 import { SupabaseClient } from '@supabase/supabase-js';
+import { Platform } from 'react-native';
 import { createSupabaseClient, supabase as publicSupabase } from '../lib/supabase';
 // We will implement this next - keeping for now to avoid breaking imports if used elsewhere, 
 // but we might replace it with direct Supabase calls or keep it as an API layer.
@@ -37,6 +38,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             await authorize({
                 scope: 'openid profile email offline_access',
                 audience: process.env.EXPO_PUBLIC_AUTH0_AUDIENCE,
+                redirectUrl: Platform.OS === 'web'
+                    ? 'https://www.usechomp.com/demo/social'
+                    : undefined
             });
             // User sync will be handled by the effect when user state changes
         } catch (e) {
