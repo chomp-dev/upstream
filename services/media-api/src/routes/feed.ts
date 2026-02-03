@@ -200,6 +200,25 @@ feedRouter.get('/nearby', async (req, res) => {
 
     console.log(`[Feed/Nearby] Found ${imagesResult.rows.length} image posts for nearby restaurants`);
 
+    // Fetch TikTok embeds linked to nearby restaurants (with graceful fallback if table doesn't exist)
+    let tiktokRows: any[] = [];
+    try {
+      const tiktokResult = await queryWithRetry(
+        `SELECT id, tiktok_url, embed_html, title, author_name, author_url, thumbnail_url, 
+                thumbnail_width, thumbnail_height, google_place_id, created_at
+         FROM tiktok_embeds 
+         WHERE google_place_id = ANY($1)
+         ORDER BY created_at DESC 
+         LIMIT $2 OFFSET $3`,
+        [placeIds, limit, offset]
+      );
+      tiktokRows = tiktokResult.rows;
+      console.log(`[Feed/Nearby] Found ${tiktokRows.length} TikTok embeds for nearby restaurants`);
+    } catch (err: any) {
+      // Table might not exist yet - gracefully skip
+      console.log('[Feed/Nearby] TikTok embeds skipped (table may not exist):', err.message);
+    }
+
     // Combine and interleave, sorted by created_at
     const feed = [
       ...videosResult.rows.map((v: any) => ({ type: 'video', ...v })),
@@ -207,6 +226,10 @@ feedRouter.get('/nearby', async (req, res) => {
         type: 'image_post',
         ...i,
         images: Array.isArray(i.images) ? i.images.filter((url: string) => !!url) : []
+      })),
+      ...tiktokRows.map((t: any) => ({
+        type: 'tiktok_embed',
+        ...t,
       })),
     ].sort((a, b) =>
       new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -389,15 +412,21 @@ feedRouter.get('/', async (req, res) => {
       [limit, offset]
     );
 
-    // Fetch TikTok embeds
-    const tiktokResult = await queryWithRetry(
-      `SELECT id, tiktok_url, embed_html, title, author_name, author_url, thumbnail_url, 
-              thumbnail_width, thumbnail_height, google_place_id, created_at
-       FROM tiktok_embeds 
-       ORDER BY created_at DESC 
-       LIMIT $1 OFFSET $2`,
-      [limit, offset]
-    );
+    // Fetch TikTok embeds (with graceful fallback if table doesn't exist)
+    let tiktokRows: any[] = [];
+    try {
+      const tiktokResult = await queryWithRetry(
+        `SELECT id, tiktok_url, embed_html, title, author_name, author_url, thumbnail_url, 
+                thumbnail_width, thumbnail_height, google_place_id, created_at
+         FROM tiktok_embeds 
+         ORDER BY created_at DESC 
+         LIMIT $1 OFFSET $2`,
+        [limit, offset]
+      );
+      tiktokRows = tiktokResult.rows;
+    } catch (err: any) {
+      console.log('[Feed] TikTok embeds skipped (table may not exist):', err.message);
+    }
 
     // Combine and interleave (simple approach - videos first, then images)
     const feed = [
@@ -407,7 +436,7 @@ feedRouter.get('/', async (req, res) => {
         ...i,
         images: Array.isArray(i.images) ? i.images.filter((url: string) => !!url) : []
       })),
-      ...tiktokResult.rows.map((t: any) => ({
+      ...tiktokRows.map((t: any) => ({
         type: 'tiktok_embed',
         ...t,
       })),
