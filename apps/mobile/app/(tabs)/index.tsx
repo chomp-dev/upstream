@@ -473,6 +473,7 @@ export default function HomeScreen() {
                     username: item.username || 'User',
                     avatarUrl: item.user_avatar || undefined
                   }}
+                  caption={item.title || item.description || ''}
                 />
               )}
             </View>

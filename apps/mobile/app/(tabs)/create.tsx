@@ -30,7 +30,7 @@ import type { Restaurant } from '../../src/lib/api/types';
 import { useAuth } from '../../src/context/auth';
 
 export default function CreateScreen() {
-  const { user, login } = useAuth();
+  const { user, login, supabase } = useAuth();
 
   useEffect(() => {
     console.log('[CreateScreen] Mounted - Version: Fix-Image-Upload-V2');
@@ -349,7 +349,7 @@ export default function CreateScreen() {
 
       } else {
         // --- MULTIPLE IMAGE UPLOAD ---
-        const imageIds: string[] = [];
+        const imageUrls: string[] = [];
         const totalImages = selectedMedia.length;
 
         for (let i = 0; i < totalImages; i++) {
@@ -357,62 +357,39 @@ export default function CreateScreen() {
           setUploadStatus(`Uploading image ${i + 1} of ${totalImages}...`);
           setUploadProgress(i / totalImages);
 
-          // 1. Get Upload URL for this image
-          const urlRes = await fetch(`${mediaApi.BASE_URL}/api/upload/image-url`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-          });
+          // 1. Get Upload URL and Delivery URL
+          // We need to use valid delivery URLs for the frontend insert
+          const { uploadURL, deliveryUrl } = await mediaApi.getImageUploadUrl();
 
-          if (!urlRes.ok) throw new Error(`Failed to get upload URL for image ${i + 1}`);
-          const { uploadURL, imageId } = await urlRes.json();
+          // 2. Upload to Cloudflare (Reuse existing helper for consistency)
+          await mediaApi.uploadImageToCloudflare(uploadURL, media.uri);
 
-          // 2. Upload to Cloudflare (Direct XHR)
-          const formData = new FormData();
-          if (Platform.OS === 'web') {
-            const imgRes = await fetch(media.uri);
-            const blob = await imgRes.blob();
-            formData.append('file', blob, 'image.jpg');
-          } else {
-            formData.append('file', {
-              uri: media.uri,
-              name: 'image.jpg',
-              type: 'image/jpeg',
-            } as any);
-          }
-
-          // Perform XHR Upload
-          await new Promise((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', uploadURL);
-            xhr.onload = () => {
-              if (xhr.status >= 200 && xhr.status < 300) resolve(xhr.response);
-              else reject(new Error(`Image upload failed: ${xhr.status}`));
-            };
-            xhr.onerror = () => reject(new Error('Network error during image upload'));
-            xhr.send(formData);
-          });
-
-          imageIds.push(imageId);
+          imageUrls.push(deliveryUrl);
         }
 
         setUploadProgress(1);
         setUploadStatus('Finalizing post...');
 
-        // 3. Create Post
-        const createRes = await fetch(`${mediaApi.BASE_URL}/api/upload/images`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            images: imageIds,
+        console.log('[Create] Inserting image post to Supabase:', imageUrls);
+
+        // 3. Create Post in Supabase directly (RLS protected)
+        const { error } = await supabase
+          .from('image_posts')
+          .insert({
+            images: imageUrls,
             google_place_id: selectedRestaurant.google_place_id,
             title: title.trim(),
             description: description.trim(),
-            tags: tagArray,
+            tags: tagArray, // Assuming backend accepts text array
             user_id: user?.sub
           })
-        });
+          .select();
 
-        if (!createRes.ok) throw new Error('Failed to create post');
+        if (error) {
+          console.error('[Create] Supabase insert failed:', error);
+          throw new Error(error.message || 'Failed to create post record');
+        }
+
       }
 
       Alert.alert('Success', 'Upload complete!');
