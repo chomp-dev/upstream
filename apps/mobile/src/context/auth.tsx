@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth0, User } from 'react-native-auth0';
-import { router } from 'expo-router';
-// We will implement this next
+import { SupabaseClient } from '@supabase/supabase-js';
+import { createSupabaseClient, supabase as publicSupabase } from '../lib/supabase';
+// We will implement this next - keeping for now to avoid breaking imports if used elsewhere, 
+// but we might replace it with direct Supabase calls or keep it as an API layer.
 import { syncUser } from '../lib/api/user';
 
 interface AuthContextType {
@@ -9,6 +11,8 @@ interface AuthContextType {
     isLoading: boolean;
     login: () => Promise<void>;
     logout: () => Promise<void>;
+    accessToken: string | null;
+    supabase: SupabaseClient;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -16,6 +20,8 @@ const AuthContext = createContext<AuthContextType>({
     isLoading: true,
     login: async () => { },
     logout: async () => { },
+    accessToken: null,
+    supabase: publicSupabase,
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -23,6 +29,8 @@ export const useAuth = () => useContext(AuthContext);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { authorize, clearSession, user, isLoading: auth0Loading, getCredentials } = useAuth0();
     const [isSyncing, setIsSyncing] = useState(false);
+    const [accessToken, setAccessToken] = useState<string | null>(null);
+    const [supabaseClient, setSupabaseClient] = useState<SupabaseClient>(publicSupabase);
 
     const login = async () => {
         try {
@@ -30,7 +38,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 scope: 'openid profile email offline_access',
                 audience: process.env.EXPO_PUBLIC_AUTH0_AUDIENCE,
             });
-
             // User sync will be handled by the effect when user state changes
         } catch (e) {
             console.error('Login failed', e);
@@ -40,24 +47,52 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const logout = async () => {
         try {
             await clearSession();
+            setAccessToken(null);
+            setSupabaseClient(publicSupabase);
         } catch (e) {
             console.error('Logout failed', e);
         }
     };
 
+    // Extract token and initialize Supabase
+    useEffect(() => {
+        const initSession = async () => {
+            if (user && !auth0Loading) {
+                try {
+                    const credentials = await getCredentials();
+                    if (credentials?.accessToken) {
+                        setAccessToken(credentials.accessToken);
+                        // Create a new Supabase client with the user's access token
+                        const authenticatedClient = createSupabaseClient(credentials.accessToken);
+                        setSupabaseClient(authenticatedClient);
+                    }
+                } catch (error) {
+                    console.error('Failed to get credentials', error);
+                }
+            } else if (!user && !auth0Loading) {
+                setAccessToken(null);
+                setSupabaseClient(publicSupabase);
+            }
+        };
+
+        initSession();
+    }, [user, auth0Loading]);
+
+
     // Sync user to backend when user changes and is logged in
     useEffect(() => {
         const syncUserProfile = async () => {
-            if (user && !auth0Loading) {
+            // We can rely on the Auth0 Action to sync the user, 
+            // but keeping this hook if the client also needs to trigger something specific.
+            // For now, removing the manual sync call if the Action covers it, 
+            // OR keeping it as a backup/check. 
+            // Since the user requested "Post-Login Action is already live", 
+            // we might not strictly need this client-side sync, but it doesn't hurt.
+            if (user && !auth0Loading && accessToken) {
                 setIsSyncing(true);
                 try {
-                    // Get the access token to send to backend
-                    const credentials = await getCredentials();
-
-                    if (credentials?.accessToken) {
-                        await syncUser(user, credentials.accessToken);
-                        console.log('User synced to backend');
-                    }
+                    await syncUser(user, accessToken);
+                    console.log('User synced to backend (client-side check)');
                 } catch (error) {
                     console.error('Failed to sync user', error);
                 } finally {
@@ -66,8 +101,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
         };
 
-        syncUserProfile();
-    }, [user, auth0Loading]);
+        // Only sync if we have the token
+        if (accessToken) {
+            syncUserProfile();
+        }
+    }, [user, auth0Loading, accessToken]);
 
     return (
         <AuthContext.Provider
@@ -76,6 +114,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 isLoading: auth0Loading || isSyncing,
                 login,
                 logout,
+                accessToken,
+                supabase: supabaseClient,
             }}
         >
             {children}

@@ -22,11 +22,8 @@ export default function SocialScreen() {
     return (
       <Screen edges={['top']} safe>
         <View style={styles.loginContainer}>
-          <Text variant="title" center style={{ marginBottom: spacing.md }}>
-            Join the Club
-          </Text>
-          <Text variant="body" color={colors.muted} center style={{ marginBottom: spacing.xl }}>
-            Sign in to share your food adventures and connect with other creators.
+          <Text variant="title" center style={{ marginBottom: spacing.xxl }}>
+            Login to Chomp
           </Text>
           <Pressable style={styles.loginButton} onPress={login}>
             <Text variant="subtitle" color={colors.bg}>Sign In / Sign Up</Text>
@@ -377,7 +374,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.xl,
-    paddingBottom: 100,
+    paddingTop: 150,
   },
   loginButton: {
     backgroundColor: colors.primary,

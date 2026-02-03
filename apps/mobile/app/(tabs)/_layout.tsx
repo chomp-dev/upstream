@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, tabBar } from '../../src/theme';
+import { AuthHeader } from '../../components/AuthHeader';
 
 interface TabIconProps {
   iconName: keyof typeof Ionicons.glyphMap;
@@ -12,10 +13,10 @@ interface TabIconProps {
 function TabIcon({ iconName, label, focused }: TabIconProps) {
   return (
     <View style={styles.tabItem}>
-      <Ionicons 
-        name={iconName} 
-        size={24} 
-        color={focused ? colors.primary : colors.muted} 
+      <Ionicons
+        name={iconName}
+        size={24}
+        color={focused ? colors.primary : colors.muted}
       />
       <Text style={[styles.label, focused && styles.labelFocused]} numberOfLines={1}>
         {label}
@@ -36,7 +37,8 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerShown: false,
+        headerShown: true, // Enable header
+        header: () => <AuthHeader />, // Use custom header
         tabBarStyle: styles.tabBar,
         tabBarShowLabel: false,
         tabBarActiveTintColor: colors.text,
