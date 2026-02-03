@@ -15,11 +15,19 @@ import { useContentDimensions } from '../src/hooks/useContentDimensions';
 import { MediaOverlay } from './MediaOverlay';
 import { Placeholder } from './Placeholder';
 
+import { Restaurant } from '../src/lib/api/types';
+
 interface ImagePostViewerProps {
   images: string[];
+  restaurant?: Restaurant | null;
+  user?: {
+    userId?: string;
+    username: string;
+    avatarUrl: string;
+  };
 }
 
-export function ImagePostViewer({ images }: ImagePostViewerProps) {
+export function ImagePostViewer({ images, restaurant, user }: ImagePostViewerProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
   const { width, height } = useContentDimensions();
@@ -76,7 +84,7 @@ export function ImagePostViewer({ images }: ImagePostViewerProps) {
         })}
       </ScrollView>
 
-      <MediaOverlay height={height} />
+      <MediaOverlay height={height} restaurant={restaurant} user={user} />
 
       {/* Indicator dots */}
       <View style={styles.indicatorContainer}>

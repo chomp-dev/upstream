@@ -99,6 +99,19 @@ export async function initDb() {
         BEGIN
           ALTER TABLE image_posts ADD COLUMN tags TEXT[];
         EXCEPTION WHEN duplicate_column THEN NULL; END;
+
+        -- User ID columns
+        BEGIN
+          ALTER TABLE videos ADD COLUMN user_id TEXT;
+        EXCEPTION WHEN duplicate_column THEN NULL; END;
+
+        BEGIN
+          ALTER TABLE image_posts ADD COLUMN user_id TEXT;
+        EXCEPTION WHEN duplicate_column THEN NULL; END;
+
+        BEGIN
+          ALTER TABLE tiktok_embeds ADD COLUMN user_id TEXT;
+        EXCEPTION WHEN duplicate_column THEN NULL; END;
       END $$;
     `);
 

@@ -13,8 +13,9 @@ import {
   Dimensions,
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Location from 'expo-location';
+import { Ionicons } from '@expo/vector-icons';
 import { Screen, Text, Badge, Pill } from '../../src/ui';
 import { colors, spacing, radius } from '../../src/theme';
 import { ratingColor, priceDisplay } from '../../src/theme/styles';
@@ -40,6 +41,7 @@ export default function HomeScreen() {
   const flatListRef = useRef<FlatList>(null);
   const isFocused = useIsFocused();
   const params = useLocalSearchParams<{ scrollToIndex?: string; itemId?: string; videoDataId?: string }>();
+  const router = useRouter(); // Added router hook
   const lastScrolledRef = useRef<string | null>(null);
   const { width, height: SCREEN_HEIGHT } = useContentDimensions();
 
@@ -368,13 +370,14 @@ export default function HomeScreen() {
 
   return (
     <Screen safe={false}>
-      {/* Feed Mode Header Badge */}
-      <View style={styles.modeHeader}>
-        <Badge
-          label="📍 Nearby"
-          variant="rating"
-        />
-      </View>
+      {/* Profile Button (Top Right) */}
+      <TouchableOpacity
+        style={styles.profileButton}
+        onPress={() => router.push('/social')}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="person-circle-outline" size={40} color="white" />
+      </TouchableOpacity>
 
       <FlatList
         ref={flatListRef}
@@ -396,6 +399,12 @@ export default function HomeScreen() {
                     playbackUrl={item.playback_url}
                     thumbnailUrl={item.thumbnail_url}
                     isActive={isFocused && index === currentIndex && item.status === 'ready'}
+                    restaurant={restaurant}
+                    user={{
+                      userId: item.user_id,
+                      username: item.username || 'User',
+                      avatarUrl: item.user_avatar || 'https://via.placeholder.com/150'
+                    }}
                   />
                   {item.status !== 'ready' && (
                     <View style={styles.processingOverlay}>
@@ -432,36 +441,15 @@ export default function HomeScreen() {
                   isActive={isFocused && index === currentIndex}
                 />
               ) : (
-                <ImagePostViewer images={item.images || []} />
-              )}
-
-              {/* Restaurant overlay */}
-              {restaurant && (
-                <TouchableOpacity style={styles.restaurantOverlay} activeOpacity={0.9}>
-                  <View style={styles.restaurantInfo}>
-                    <Text variant="subtitle" numberOfLines={1}>
-                      {restaurant.name}
-                    </Text>
-                    <View style={styles.restaurantMeta}>
-                      {restaurant.rating && (
-                        <View style={styles.ratingRow}>
-                          <Text style={[styles.star, { color: ratingColor(restaurant.rating) }]}>
-                            ★
-                          </Text>
-                          <Text variant="bodySmall" color={ratingColor(restaurant.rating)}>
-                            {restaurant.rating.toFixed(1)}
-                          </Text>
-                        </View>
-                      )}
-                      {restaurant.price_level !== null && (
-                        <Badge
-                          label={priceDisplay(restaurant.price_level)}
-                          variant="price"
-                        />
-                      )}
-                    </View>
-                  </View>
-                </TouchableOpacity>
+                <ImagePostViewer
+                  images={item.images || []}
+                  restaurant={restaurant}
+                  user={{
+                    userId: item.user_id,
+                    username: item.username || 'User',
+                    avatarUrl: item.user_avatar || 'https://via.placeholder.com/150'
+                  }}
+                />
               )}
             </View>
           );
@@ -522,15 +510,15 @@ const styles = StyleSheet.create({
     fontSize: 48,
     marginBottom: spacing.sm,
   },
-  modeHeader: {
+  profileButton: {
     position: 'absolute',
-    top: 60,
-    left: spacing.lg,
+    top: 50, // Safe area aware
     right: spacing.lg,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     zIndex: 100,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 4,
   },
   toggleButton: {
     backgroundColor: colors.overlay,
@@ -545,17 +533,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md,
     borderRadius: radius.pill,
-  },
-  restaurantOverlay: {
-    position: 'absolute',
-    bottom: 120,
-    left: spacing.lg,
-    right: spacing.lg,
-    backgroundColor: colors.overlay,
-    borderRadius: 16,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
   restaurantInfo: {
     gap: spacing.xs,

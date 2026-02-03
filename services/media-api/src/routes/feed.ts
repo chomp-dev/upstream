@@ -22,6 +22,48 @@ feedRouter.get('/debug/all-videos', async (req, res) => {
   }
 });
 
+// TEMP MIGRATION: Add user_id to tables
+feedRouter.get('/debug/migrate-user-id', async (req, res) => {
+  try {
+    console.log('[Migration] Adding user_id columns...');
+
+    // Add user_id to videos
+    await pool.query(`
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='videos' AND column_name='user_id') THEN 
+          ALTER TABLE videos ADD COLUMN user_id TEXT; 
+        END IF; 
+      END $$;
+    `);
+
+    // Add user_id to image_posts
+    await pool.query(`
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='image_posts' AND column_name='user_id') THEN 
+          ALTER TABLE image_posts ADD COLUMN user_id TEXT; 
+        END IF; 
+      END $$;
+    `);
+
+    // Add user_id to tiktok_embeds
+    await pool.query(`
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tiktok_embeds' AND column_name='user_id') THEN 
+          ALTER TABLE tiktok_embeds ADD COLUMN user_id TEXT; 
+        END IF; 
+      END $$;
+    `);
+
+    res.json({ success: true, message: 'Migration successful' });
+  } catch (error: any) {
+    console.error('Migration failed:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Debug endpoint to manually check video status from Cloudflare and sync DB
 feedRouter.get('/check-status/:cloudflareVideoId', async (req, res) => {
   try {
@@ -176,12 +218,14 @@ feedRouter.get('/nearby', async (req, res) => {
     // Fetch videos linked to nearby restaurants - exclude error/deleted videos
     // Fetch videos linked to nearby restaurants - exclude error/deleted videos
     const videosResult = await queryWithRetry(
-      `SELECT id, cloudflare_video_id, playback_url, thumbnail_url, 
-              status, duration, google_place_id, created_at, updated_at
-       FROM videos 
-       WHERE status != 'error' 
-         AND google_place_id = ANY($1)
-       ORDER BY created_at DESC 
+      `SELECT v.id, v.cloudflare_video_id, v.playback_url, v.thumbnail_url, 
+              v.status, v.duration, v.google_place_id, v.created_at, v.updated_at,
+              u.name as username, u.avatar as user_avatar, u.auth0_id as user_id
+       FROM videos v
+       LEFT JOIN users u ON v.user_id = u.auth0_id
+       WHERE v.status != 'error' 
+         AND v.google_place_id = ANY($1)
+       ORDER BY v.created_at DESC 
        LIMIT $2 OFFSET $3`,
       [placeIds, limit, offset]
     );
@@ -190,10 +234,12 @@ feedRouter.get('/nearby', async (req, res) => {
 
     // Fetch image posts linked to nearby restaurants
     const imagesResult = await queryWithRetry(
-      `SELECT id, images, google_place_id, created_at
-       FROM image_posts 
-       WHERE google_place_id = ANY($1)
-       ORDER BY created_at DESC 
+      `SELECT i.id, i.images, i.google_place_id, i.created_at,
+              u.name as username, u.avatar as user_avatar, u.auth0_id as user_id
+       FROM image_posts i
+       LEFT JOIN users u ON i.user_id = u.auth0_id
+       WHERE i.google_place_id = ANY($1)
+       ORDER BY i.created_at DESC 
        LIMIT $2 OFFSET $3`,
       [placeIds, limit, offset]
     );
@@ -335,11 +381,13 @@ feedRouter.get('/', async (req, res) => {
     // Fetch videos - exclude error/deleted videos
     // Fetch videos - exclude error/deleted videos
     let videosResult = await queryWithRetry(
-      `SELECT id, cloudflare_video_id, playback_url, thumbnail_url, 
-              status, duration, google_place_id, created_at, updated_at
-       FROM videos 
-       WHERE status != 'error'
-       ORDER BY created_at DESC 
+      `SELECT v.id, v.cloudflare_video_id, v.playback_url, v.thumbnail_url, 
+              v.status, v.duration, v.google_place_id, v.created_at, v.updated_at,
+              u.name as username, u.avatar as user_avatar, u.auth0_id as user_id
+       FROM videos v
+       LEFT JOIN users u ON v.user_id = u.auth0_id
+       WHERE v.status != 'error'
+       ORDER BY v.created_at DESC 
        LIMIT $1 OFFSET $2`,
       [limit, offset]
     );
@@ -408,9 +456,11 @@ feedRouter.get('/', async (req, res) => {
     // Fetch image posts
     // Fetch image posts
     const imagesResult = await queryWithRetry(
-      `SELECT id, images, google_place_id, created_at
-       FROM image_posts 
-       ORDER BY created_at DESC 
+      `SELECT i.id, i.images, i.google_place_id, i.created_at,
+              u.name as username, u.avatar as user_avatar, u.auth0_id as user_id
+       FROM image_posts i
+       LEFT JOIN users u ON i.user_id = u.auth0_id
+       ORDER BY i.created_at DESC 
        LIMIT $1 OFFSET $2`,
       [limit, offset]
     );

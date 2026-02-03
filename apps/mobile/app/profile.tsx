@@ -21,8 +21,12 @@ interface VideoItem {
     likes_count: number;
 }
 
+import { useLocalSearchParams } from 'expo-router';
+
 export default function ProfileScreen() {
-    const { user, logout, supabase: authSupabase } = useAuth();
+    const { user, logout, supabase } = useAuth();
+    const { userId } = useLocalSearchParams();
+    const targetUserId = typeof userId === 'string' ? userId : user?.sub;
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [videos, setVideos] = useState<VideoItem[]>([]);
     const [loading, setLoading] = useState(true);
@@ -38,11 +42,13 @@ export default function ProfileScreen() {
         const fetchData = async () => {
             setLoading(true);
             try {
+                if (!targetUserId) return;
+
                 // 1. Fetch Profile
-                const { data: userData, error: userError } = await authSupabase
+                const { data: userData, error: userError } = await supabase
                     .from('users')
                     .select('name, email, bio, avatar')
-                    .eq('auth0_id', user.sub)
+                    .eq('auth0_id', targetUserId)
                     .single();
 
                 if (userData) {
@@ -52,10 +58,10 @@ export default function ProfileScreen() {
                 }
 
                 // 2. Fetch Videos
-                const { data: videoData, error: videoError } = await authSupabase
+                const { data: videoData, error: videoError } = await supabase
                     .from('videos')
                     .select('*')
-                    .eq('user_id', user.sub)
+                    .eq('user_id', targetUserId)
                     .order('created_at', { ascending: false });
 
                 if (videoData) {
@@ -72,7 +78,7 @@ export default function ProfileScreen() {
         fetchData();
     }, [user]);
 
-    if (!user) {
+    if (!targetUserId) {
         return (
             <View style={styles.container}>
                 <Text>Please log in to view your profile.</Text>
@@ -89,13 +95,15 @@ export default function ProfileScreen() {
                 <>
                     <View style={styles.header}>
                         <Image
-                            source={{ uri: profile?.avatar || user.picture }}
+                            source={{ uri: profile?.avatar || 'https://via.placeholder.com/150' }}
                             style={styles.avatar}
                         />
-                        <Text style={styles.name}>{profile?.name || user.name}</Text>
-                        <Text style={styles.email}>{profile?.email || user.email}</Text>
+                        <Text style={styles.name}>{profile?.name || 'User'}</Text>
+                        <Text style={styles.email}>{profile?.email}</Text>
                         {profile?.bio && <Text style={styles.bio}>{profile.bio}</Text>}
-                        <Button title="Sign Out" onPress={() => { logout(); router.replace('/'); }} color="red" />
+                        {user && user.sub === targetUserId && (
+                            <Button title="Sign Out" onPress={() => { logout(); router.replace('/'); }} color="red" />
+                        )}
                     </View>
 
                     <View style={styles.section}>

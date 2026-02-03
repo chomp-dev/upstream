@@ -27,10 +27,33 @@ import { ratingColor, priceDisplay } from '../../src/theme/styles';
 import { mediaApi, searchApi } from '../../src/lib/api';
 import type { Restaurant } from '../../src/lib/api/types';
 
+import { useAuth } from '../../src/context/auth';
+
 export default function CreateScreen() {
+  const { user, login } = useAuth();
+
   useEffect(() => {
     console.log('[CreateScreen] Mounted - Version: Fix-Image-Upload-V2');
   }, []);
+
+  if (!user) {
+    return (
+      <Screen>
+        <View style={styles.authContainer}>
+          <Ionicons name="lock-closed-outline" size={64} color={colors.primary} />
+          <Text variant="title" center style={{ marginTop: spacing.lg }}>
+            Sign in to Post
+          </Text>
+          <Text variant="body" color={colors.muted} center style={{ marginVertical: spacing.md }}>
+            You need an account to share your food discoveries.
+          </Text>
+          <TouchableOpacity style={styles.loginButton} onPress={() => login()}>
+            <Text variant="subtitle" color={colors.bg}>Sign In / Sign Up</Text>
+          </TouchableOpacity>
+        </View>
+      </Screen>
+    );
+  }
 
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -276,7 +299,8 @@ export default function CreateScreen() {
             google_place_id: selectedRestaurant.google_place_id,
             title: title.trim(),
             description: description.trim(),
-            tags: tagArray
+            tags: tagArray,
+            user_id: user?.sub
           }),
         });
 
@@ -383,7 +407,8 @@ export default function CreateScreen() {
             google_place_id: selectedRestaurant.google_place_id,
             title: title.trim(),
             description: description.trim(),
-            tags: tagArray
+            tags: tagArray,
+            user_id: user?.sub
           })
         });
 
@@ -858,13 +883,29 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   mediaPreview: {
-    width: '100%',
     height: 200,
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    marginRight: spacing.sm,
+  },
+  authContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+    backgroundColor: colors.bg,
+  },
+  loginButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: radius.pill,
+    marginTop: spacing.lg,
   },
   changeMediaButton: {
     padding: spacing.sm,

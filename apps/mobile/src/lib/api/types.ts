@@ -9,19 +9,30 @@
 export interface FeedItem {
   id: number;
   type: 'video' | 'image_post' | 'tiktok_embed';
-  cloudflare_video_id?: string;
   playback_url?: string;
   thumbnail_url?: string;
   status?: string;
+  duration?: number;
+  // Cloudflare video specific
+  cloudflare_video_id?: string;
+  // Image post specific
   images?: string[];
+  // Shared metadata
   google_place_id?: string | null;
   created_at: string;
-  // TikTok embed fields
+  // TikTok specific (some overlap)
   tiktok_url?: string;
   embed_html?: string;
   title?: string;
   author_name?: string;
   author_url?: string;
+  thumbnail_width?: number;
+  thumbnail_height?: number;
+
+  // New User Info
+  username?: string;
+  user_avatar?: string;
+  user_id?: string;
 }
 
 export interface FeedResponse {

@@ -26,6 +26,7 @@ import { ratingColor, priceDisplay } from '../../src/theme/styles';
 import { searchApi, mediaApi } from '../../src/lib/api';
 import type { Restaurant, MediaSummaryResponse } from '../../src/lib/api/types';
 import MapImpl from '../../components/Map';
+import { useAuth } from '../../src/context/auth';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -41,6 +42,27 @@ type ViewMode = 'map' | 'list';
 
 export default function MapScreen() {
   const router = useRouter();
+  const { user, login } = useAuth();
+
+  if (!user) {
+    return (
+      <Screen>
+        <View style={styles.authContainer}>
+          <Ionicons name="map-outline" size={64} color={colors.primary} />
+          <Text variant="title" center style={{ marginTop: spacing.lg }}>
+            Sign in to View Map
+          </Text>
+          <Text variant="body" color={colors.muted} center style={{ marginVertical: spacing.md }}>
+            Explore food spots near you by signing in.
+          </Text>
+          <TouchableOpacity style={styles.loginButton} onPress={() => login()}>
+            <Text variant="subtitle" color={colors.bg}>Sign In / Sign Up</Text>
+          </TouchableOpacity>
+        </View>
+      </Screen>
+    );
+  }
+
   const [viewMode, setViewMode] = useState<ViewMode>('map');
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
@@ -621,5 +643,19 @@ const styles = StyleSheet.create({
   emptyIcon: {
     fontSize: 64,
     marginBottom: spacing.lg,
+  },
+  authContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+    backgroundColor: colors.bg,
+  },
+  loginButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: radius.pill,
+    marginTop: spacing.lg,
   },
 });

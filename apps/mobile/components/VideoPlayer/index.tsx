@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { View, StyleSheet, Image, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
 import { useContentDimensions } from '../../src/hooks/useContentDimensions';
+import { Restaurant } from '../../src/lib/api/types';
 import { MediaOverlay } from '../MediaOverlay';
 import { Placeholder } from '../Placeholder';
 
@@ -11,6 +12,12 @@ interface VideoPlayerProps {
     playbackUrl?: string;
     thumbnailUrl?: string;
     isActive: boolean;
+    restaurant?: Restaurant | null;
+    user?: {
+        userId?: string;
+        username: string;
+        avatarUrl: string;
+    };
 }
 
 // Helper to detect iOS Mobile Web
@@ -21,7 +28,9 @@ export function VideoPlayer({
     videoId,
     playbackUrl,
     thumbnailUrl,
-    isActive
+    isActive,
+    restaurant,
+    user
 }: VideoPlayerProps) {
     const { width, height } = useContentDimensions();
 
@@ -107,7 +116,7 @@ export function VideoPlayer({
                 </View>
             )}
 
-            <MediaOverlay height={height} />
+            <MediaOverlay height={height} restaurant={restaurant} user={user} />
         </TouchableOpacity>
     );
 }

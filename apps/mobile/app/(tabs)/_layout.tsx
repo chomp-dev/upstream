@@ -48,6 +48,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
+          headerShown: false, // Hide header as requested to maximize feed area
           title: 'Home',
           tabBarIcon: ({ focused }) => (
             <TabIcon iconName="play-circle-outline" label="Watch" focused={focused} />

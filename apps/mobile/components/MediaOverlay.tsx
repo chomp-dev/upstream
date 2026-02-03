@@ -1,104 +1,115 @@
-import { View, StyleSheet, Image, TouchableOpacity, Text, Platform } from 'react-native';
+import { View, StyleSheet, Image, TouchableOpacity, Platform } from 'react-native';
+import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { Restaurant } from '../src/lib/api/types';
+import { colors, spacing, radius } from '../src/theme';
+import { ratingColor, priceDisplay } from '../src/theme/styles';
+import { Text } from '../src/ui';
 
 interface MediaOverlayProps {
     height: number;
     user?: {
+        userId?: string;
         username: string;
         avatarUrl: string;
     };
     caption?: string;
-    audio?: string;
-    stats?: {
-        likes: string;
-        comments: string;
-    };
+    restaurant?: Restaurant | null;
 }
 
 export function MediaOverlay({
     height,
-    user = {
-        username: '@foodie_explorer',
-        avatarUrl: 'https://i.pravatar.cc/100?img=12',
-    },
-    caption = 'Best burger in Chicago! 🍔 The vibes here are immaculate',
-    audio = 'Original Audio',
-    stats = {
-        likes: '24K',
-        comments: '832',
-    },
+    user,
+    caption,
+    restaurant,
 }: MediaOverlayProps) {
+    const router = useRouter();
+
+    const handleProfilePress = () => {
+        if (user?.userId) {
+            router.push({
+                pathname: '/profile',
+                params: { userId: user.userId }
+            });
+        }
+    };
+
     return (
         <>
             {/* Bottom gradient for readability */}
             <LinearGradient
-                colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.8)']}
-                style={[styles.bottomGradient, { height: height * 0.4 }]}
+                colors={['transparent', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.9)']}
+                style={[styles.bottomGradient, { height: height * 0.5 }]}
                 pointerEvents="none"
             />
 
             {/* Right side action buttons */}
             <View style={styles.rightActions}>
-                {/* Profile picture */}
-                <TouchableOpacity activeOpacity={0.8}>
-                    <Image source={{ uri: user.avatarUrl }} style={styles.avatar} />
-                </TouchableOpacity>
+                {user && (
+                    <TouchableOpacity activeOpacity={0.8} onPress={handleProfilePress}>
+                        <Image source={{ uri: user.avatarUrl }} style={styles.avatar} />
+                    </TouchableOpacity>
+                )}
 
                 {/* Like button */}
                 <TouchableOpacity style={styles.actionButton} activeOpacity={0.7}>
                     <View style={styles.iconCircle}>
-                        <Ionicons name="heart-outline" size={22} color="#fff" />
+                        <Ionicons name="heart-outline" size={28} color="#fff" />
                     </View>
-                    <Text style={styles.actionCount}>{stats.likes}</Text>
-                </TouchableOpacity>
-
-                {/* Comment button */}
-                <TouchableOpacity style={styles.actionButton} activeOpacity={0.7}>
-                    <View style={styles.iconCircle}>
-                        <Ionicons name="chatbubble-outline" size={20} color="#fff" />
-                    </View>
-                    <Text style={styles.actionCount}>{stats.comments}</Text>
-                </TouchableOpacity>
-
-                {/* Bookmark button */}
-                <TouchableOpacity style={styles.actionButton} activeOpacity={0.7}>
-                    <View style={styles.iconCircle}>
-                        <Ionicons name="bookmark-outline" size={20} color="#fff" />
-                    </View>
+                    <Text style={styles.actionCount}>0</Text>
                 </TouchableOpacity>
 
                 {/* Share button */}
                 <TouchableOpacity style={styles.actionButton} activeOpacity={0.7}>
                     <View style={styles.iconCircle}>
-                        <Ionicons name="arrow-redo-outline" size={20} color="#fff" />
+                        <Ionicons name="arrow-redo-outline" size={26} color="#fff" />
                     </View>
                 </TouchableOpacity>
             </View>
 
-            {/* Bottom left content info */}
+            {/* Bottom content area */}
             <View style={styles.bottomContent}>
-                {/* Username */}
-                <View style={styles.userRow}>
-                    <Image source={{ uri: user.avatarUrl }} style={styles.userAvatar} />
-                    <TouchableOpacity activeOpacity={0.8}>
-                        <Text style={styles.username}>{user.username}</Text>
+
+                {/* Restaurant Card (if available) - Integrated here instead of separate overlay */}
+                {restaurant && (
+                    <TouchableOpacity style={styles.restaurantCard} activeOpacity={0.9}>
+                        <View style={styles.restaurantInfo}>
+                            <Text variant="subtitle" numberOfLines={1} style={styles.restaurantName}>
+                                {restaurant.name}
+                            </Text>
+                            <View style={styles.restaurantMeta}>
+                                {restaurant.rating && (
+                                    <View style={styles.ratingRow}>
+                                        <Text style={[styles.star, { color: ratingColor(restaurant.rating) }]}>★</Text>
+                                        <Text style={[styles.ratingText, { color: ratingColor(restaurant.rating) }]}>
+                                            {restaurant.rating.toFixed(1)}
+                                        </Text>
+                                    </View>
+                                )}
+                                {restaurant.price_level !== null && (
+                                    <View style={styles.priceBadge}>
+                                        <Text style={styles.priceText}>{priceDisplay(restaurant.price_level)}</Text>
+                                    </View>
+                                )}
+                            </View>
+                        </View>
+                        <Ionicons name="chevron-forward" size={20} color={colors.muted} />
                     </TouchableOpacity>
-                </View>
+                )}
 
-                {/* Caption */}
-                <Text style={styles.caption} numberOfLines={2}>
-                    {caption}
-                </Text>
-
-                {/* Audio info */}
-                <View style={styles.audioInfo}>
-                    <View style={styles.audioIcon}>
-                        <Ionicons name="musical-notes" size={14} color="#fff" />
-                    </View>
-                    <Text style={styles.audioText} numberOfLines={1}>
-                        {audio}
-                    </Text>
+                {/* User & Caption Info */}
+                <View style={styles.userInfoContainer}>
+                    {user && (
+                        <TouchableOpacity style={styles.userRow} onPress={handleProfilePress}>
+                            <Text style={styles.username}>@{user.username}</Text>
+                        </TouchableOpacity>
+                    )}
+                    {caption && (
+                        <Text style={styles.caption} numberOfLines={2}>
+                            {caption}
+                        </Text>
+                    )}
                 </View>
             </View>
         </>
@@ -115,123 +126,119 @@ const styles = StyleSheet.create({
     rightActions: {
         position: 'absolute',
         right: 16,
-        bottom: 120, // Tab bar height awareness
+        bottom: 180, // Higher to make room for restaurant card
         alignItems: 'center',
-        gap: 24,
+        gap: 20,
     },
     actionButton: {
         alignItems: 'center',
-        gap: 6,
+        gap: 4,
     },
     avatar: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
+        width: 48,
+        height: 48,
+        borderRadius: 24,
         borderWidth: 2,
         borderColor: '#fff',
-        marginBottom: 4,
+        marginBottom: 8,
     },
     iconCircle: {
-        width: 46,
-        height: 46,
-        borderRadius: 23,
-        backgroundColor: 'rgba(255, 255, 255, 0.25)',
+        // Removed background, just icon with shadow
         justifyContent: 'center',
         alignItems: 'center',
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.5,
+        shadowRadius: 4,
     },
     actionCount: {
         color: '#fff',
-        fontSize: 11,
-        fontWeight: '700',
-        ...Platform.select({
-            web: {
-                textShadow: '0px 1px 4px rgba(0, 0, 0, 0.8)',
-            },
-            default: {
-                textShadowColor: 'rgba(0, 0, 0, 0.8)',
-                textShadowOffset: { width: 0, height: 1 },
-                textShadowRadius: 4,
-            },
-        }),
+        fontSize: 12,
+        fontWeight: '600',
+        textShadowColor: 'rgba(0, 0, 0, 0.8)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 4,
     },
     bottomContent: {
         position: 'absolute',
-        bottom: 120, // Tab bar height awareness
+        bottom: 90, // Above tab bar
         left: 16,
-        right: 90,
-        gap: 10,
+        right: 80, // Leave room for right actions
+        gap: 12,
+    },
+    restaurantCard: {
+        backgroundColor: '#1A1614', // High opacity dark background
+        borderRadius: 12,
+        padding: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        marginBottom: 8,
+    },
+    restaurantInfo: {
+        flex: 1,
+        gap: 4,
+    },
+    restaurantName: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    restaurantMeta: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    ratingRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    star: {
+        fontSize: 14,
+    },
+    ratingText: {
+        fontSize: 14,
+        fontWeight: 'bold',
+    },
+    priceBadge: {
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        borderRadius: 4,
+    },
+    priceText: {
+        color: '#ccc',
+        fontSize: 12,
+        fontWeight: '500',
+    },
+    userInfoContainer: {
+        gap: 4,
     },
     userRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 10,
-    },
-    userAvatar: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        borderWidth: 1.5,
-        borderColor: '#fff',
     },
     username: {
         color: '#fff',
         fontSize: 15,
         fontWeight: '700',
-        ...Platform.select({
-            web: {
-                textShadow: '0px 1px 6px rgba(0, 0, 0, 0.9)',
-            },
-            default: {
-                textShadowColor: 'rgba(0, 0, 0, 0.9)',
-                textShadowOffset: { width: 0, height: 1 },
-                textShadowRadius: 6,
-            },
-        }),
+        textShadowColor: 'rgba(0, 0, 0, 0.8)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 3,
     },
     caption: {
-        color: '#fff',
+        color: '#eee',
         fontSize: 14,
-        fontWeight: '400',
-        lineHeight: 19,
-        ...Platform.select({
-            web: {
-                textShadow: '0px 1px 6px rgba(0, 0, 0, 0.9)',
-            },
-            default: {
-                textShadowColor: 'rgba(0, 0, 0, 0.9)',
-                textShadowOffset: { width: 0, height: 1 },
-                textShadowRadius: 6,
-            },
-        }),
-    },
-    audioInfo: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        marginTop: 2,
-    },
-    audioIcon: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    audioText: {
-        color: '#fff',
-        fontSize: 12,
-        fontWeight: '600',
-        flex: 1,
-        ...Platform.select({
-            web: {
-                textShadow: '0px 1px 6px rgba(0, 0, 0, 0.9)',
-            },
-            default: {
-                textShadowColor: 'rgba(0, 0, 0, 0.9)',
-                textShadowOffset: { width: 0, height: 1 },
-                textShadowRadius: 6,
-            },
-        }),
+        lineHeight: 20,
+        textShadowColor: 'rgba(0, 0, 0, 0.8)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 3,
     },
 });
