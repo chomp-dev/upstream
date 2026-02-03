@@ -62,7 +62,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const logout = async () => {
         try {
-            await clearSession();
+            await clearSession({
+                returnTo: Platform.OS === 'web'
+                    ? 'https://www.usechomp.com/demo/'
+                    : undefined
+            } as any);
             setAccessToken(null);
             setSupabaseClient(publicSupabase);
         } catch (e) {
