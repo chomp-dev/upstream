@@ -73,8 +73,98 @@ export function TikTokEmbed({
         }
     };
 
-    // Web platform OR no embed HTML: show thumbnail fallback with link
-    if (Platform.OS === 'web' || !embedHtml) {
+    // Web platform: use iframe with TikTok embed
+    if (Platform.OS === 'web') {
+        // If we have embed HTML, render it in an iframe-like container
+        if (embedHtml) {
+            return (
+                <View style={[styles.container, { width, height }]}>
+                    {/* Use a div with dangerouslySetInnerHTML for web */}
+                    <div
+                        style={{
+                            width: '100%',
+                            height: '100%',
+                            backgroundColor: '#000',
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            overflow: 'hidden',
+                        }}
+                        dangerouslySetInnerHTML={{
+                            __html: `
+                                <style>
+                                    .tiktok-container {
+                                        width: 100%;
+                                        height: 100%;
+                                        display: flex;
+                                        justify-content: center;
+                                        align-items: center;
+                                        background: #000;
+                                    }
+                                    .tiktok-container blockquote {
+                                        max-width: 100% !important;
+                                        min-width: 325px !important;
+                                    }
+                                    .tiktok-container iframe {
+                                        max-height: 100% !important;
+                                    }
+                                </style>
+                                <div class="tiktok-container">
+                                    ${embedHtml}
+                                </div>
+                                <script async src="https://www.tiktok.com/embed.js"></script>
+                            `
+                        }}
+                    />
+
+                    {/* TikTok branding overlay */}
+                    <View style={styles.brandingOverlay}>
+                        <TouchableOpacity style={styles.tiktokBadge} onPress={openInTikTok}>
+                            <Text style={styles.tiktokLogo}>TikTok</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            );
+        }
+
+        // Fallback to thumbnail if no embed HTML
+        return (
+            <TouchableOpacity
+                style={[styles.container, { width, height }]}
+                onPress={openInTikTok}
+                activeOpacity={0.9}
+            >
+                {thumbnailUrl ? (
+                    <Image source={{ uri: thumbnailUrl }} style={[styles.thumbnail, { width, height }]} />
+                ) : (
+                    <View style={[styles.placeholder, { width, height }]}>
+                        <Text style={styles.tiktokIcon}>🎵</Text>
+                    </View>
+                )}
+                <View style={styles.overlay}>
+                    <View style={styles.tiktokBadge}>
+                        <Text style={styles.tiktokLogo}>TikTok</Text>
+                    </View>
+                    {title && (
+                        <Text variant="body" numberOfLines={2} style={styles.title}>
+                            {title}
+                        </Text>
+                    )}
+                    {authorName && (
+                        <Text variant="caption" color={colors.muted}>
+                            @{authorName}
+                        </Text>
+                    )}
+                    <Text variant="caption" color={colors.primary} style={styles.tapHint}>
+                        Tap to open in TikTok
+                    </Text>
+                </View>
+            </TouchableOpacity>
+        );
+    }
+
+    // No embed HTML on native: show thumbnail fallback
+    if (!embedHtml) {
         return (
             <TouchableOpacity
                 style={[styles.container, { width, height }]}
