@@ -26,7 +26,6 @@ import { colors, spacing, radius } from '../../src/theme';
 import { ratingColor, priceDisplay } from '../../src/theme/styles';
 import { mediaApi, searchApi } from '../../src/lib/api';
 import type { Restaurant } from '../../src/lib/api/types';
-import { TikTokLinkUpload } from '../../components/TikTokLinkUpload';
 
 export default function CreateScreen() {
   useEffect(() => {
@@ -129,13 +128,15 @@ export default function CreateScreen() {
   const [tags, setTags] = useState('');
 
   interface MediaItem {
-    type: 'video' | 'image';
+    type: 'video' | 'image' | 'tiktok';
     uri: string;
     fileSize?: number;
     mimeType?: string;
   }
 
   const [selectedMedia, setSelectedMedia] = useState<MediaItem[]>([]);
+  const [showTikTokInput, setShowTikTokInput] = useState(false);
+  const [tempTikTokUrl, setTempTikTokUrl] = useState('');
 
   const resetForm = () => {
     setSelectedMedia([]);
@@ -213,6 +214,20 @@ export default function CreateScreen() {
     }
   };
 
+  const handleTikTokSelect = () => {
+    if (!tempTikTokUrl.trim() || !tempTikTokUrl.includes('tiktok.com')) {
+      Alert.alert('Invalid URL', 'Please enter a valid TikTok URL');
+      return;
+    }
+
+    setSelectedMedia([{
+      type: 'tiktok',
+      uri: tempTikTokUrl.trim(),
+    }]);
+    setShowTikTokInput(false);
+    setTempTikTokUrl('');
+  };
+
   const handleUpload = async () => {
     if (selectedMedia.length === 0) return;
     if (!selectedRestaurant) {
@@ -230,9 +245,17 @@ export default function CreateScreen() {
       setUploadProgress(0);
 
       const tagArray = tags.split(',').map(t => t.trim()).filter(Boolean);
-      const isVideo = selectedMedia[0].type === 'video';
+      const mediaType = selectedMedia[0].type;
 
-      if (isVideo) {
+      if (mediaType === 'tiktok') {
+        // --- TIKTOK EMBED ---
+        setUploadStatus('Saving TikTok...');
+        const response = await mediaApi.addTikTokEmbed(selectedMedia[0].uri, selectedRestaurant.google_place_id);
+
+        if (!response.success) throw new Error('Failed to add TikTok embed');
+        setUploadProgress(1);
+
+      } else if (mediaType === 'video') {
         // --- VIDEO UPLOAD (Single) ---
         const media = selectedMedia[0];
         let fileSize = media.fileSize || 0;
@@ -433,15 +456,25 @@ export default function CreateScreen() {
                 <Text variant="caption" color={colors.bg} style={{ opacity: 0.7 }}>Up to 60 seconds</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[styles.uploadButton, styles.uploadButtonSecondary]}
-                onPress={pickImages}
-                disabled={uploading}
-              >
-                <Ionicons name="images-outline" size={36} color={colors.text} style={{ marginBottom: spacing.sm }} />
-                <Text variant="subtitle">Pick Images</Text>
-                <Text variant="caption" color={colors.muted} style={{ opacity: 0.7 }}>Up to 10 photos</Text>
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', gap: spacing.md }}>
+                <TouchableOpacity
+                  style={[styles.uploadButton, styles.uploadButtonSecondary, { flex: 1 }]}
+                  onPress={pickImages}
+                  disabled={uploading}
+                >
+                  <Ionicons name="images-outline" size={32} color={colors.text} style={{ marginBottom: spacing.sm }} />
+                  <Text variant="subtitle">Images</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.uploadButton, styles.uploadButtonSecondary, { flex: 1, backgroundColor: '#000', borderColor: '#000' }]}
+                  onPress={() => setShowTikTokInput(true)}
+                  disabled={uploading}
+                >
+                  <Ionicons name="logo-tiktok" size={32} color="#fff" style={{ marginBottom: spacing.sm }} />
+                  <Text variant="subtitle" color="#fff">TikTok</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           ) : (
             <View style={styles.previewContainer}>
@@ -453,6 +486,13 @@ export default function CreateScreen() {
                         <View style={{ alignItems: 'center' }}>
                           <Ionicons name="videocam" size={48} color={colors.muted} />
                           <Text variant="caption">{media.mimeType || 'Video'}</Text>
+                        </View>
+                      ) : media.type === 'tiktok' ? (
+                        <View style={{ alignItems: 'center', padding: spacing.md }}>
+                          <Ionicons name="logo-tiktok" size={48} color={colors.text} />
+                          <Text variant="caption" numberOfLines={1} style={{ marginTop: spacing.sm, maxWidth: '100%' }}>
+                            {media.uri}
+                          </Text>
                         </View>
                       ) : (
                         <Image source={{ uri: media.uri }} style={{ width: 200, height: 200, borderRadius: radius.lg }} resizeMode="cover" />
@@ -472,8 +512,33 @@ export default function CreateScreen() {
           )}
         </View>
 
-        {/* TikTok Link Upload */}
-        <TikTokLinkUpload onUploadComplete={() => router.push('/')} />
+        {/* TikTok Input Modal */}
+        <Modal visible={showTikTokInput} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text variant="title">Add TikTok Link</Text>
+              <TextInput
+                style={[styles.input, { width: '100%', marginTop: spacing.md }]}
+                placeholder="https://www.tiktok.com/..."
+                placeholderTextColor={colors.muted}
+                value={tempTikTokUrl}
+                onChangeText={setTempTikTokUrl}
+                autoCapitalize="none"
+              />
+              <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg }}>
+                <TouchableOpacity onPress={() => setShowTikTokInput(false)} style={{ padding: spacing.md }}>
+                  <Text variant="body" color={colors.muted}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleTikTokSelect}
+                  style={{ backgroundColor: colors.primary, padding: spacing.md, borderRadius: radius.md }}
+                >
+                  <Text variant="body" color={colors.bg}>Add</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
 
         {/* Form Container - ALWAYS VISIBLE */}
         <View style={styles.formContainer}>
@@ -637,7 +702,7 @@ export default function CreateScreen() {
           )}
         </View>
       </Modal>
-    </Screen>
+    </Screen >
   );
 }
 
