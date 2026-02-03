@@ -371,14 +371,7 @@ export default function HomeScreen() {
 
   return (
     <Screen safe={false}>
-      {/* Profile Button (Top Right) */}
-      <TouchableOpacity
-        style={styles.profileButton}
-        onPress={() => router.push('/social')}
-        activeOpacity={0.8}
-      >
-        <Ionicons name="person-circle-outline" size={40} color="white" />
-      </TouchableOpacity>
+
 
       <FlatList
         ref={flatListRef}

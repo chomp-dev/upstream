@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.xl,
-    paddingTop: 150,
+    paddingTop: 100,
   },
   loginButton: {
     backgroundColor: colors.primary,

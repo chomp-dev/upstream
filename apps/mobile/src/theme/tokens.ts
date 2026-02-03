@@ -9,46 +9,46 @@ export const colors = {
   surface: '#1A1614',
   card: '#231E1B',
   elevated: '#2C2520',
-  
+
   // Text colors - warm cream tones
   text: '#FAF7F2',
   textSecondary: '#B8AFA6',
   muted: '#7A716A',
-  
+
   // Border & dividers
   border: 'rgba(255, 248, 240, 0.12)',
   borderSubtle: 'rgba(255, 248, 240, 0.06)',
-  
+
   // Primary accent - warm coral/tomato (appetizing, food-like)
   primary: '#E85D4C',
   primaryLight: '#FF7A6B',
   primaryMuted: '#C44D3F',
-  
+
   // Secondary accents
   amber: '#E8A94D',       // Golden - ratings, stars
   terracotta: '#C47D5C',  // Earthy warmth
   sage: '#7BA37B',        // Fresh, salad greens
   cream: '#F5E6D3',       // Warm highlight
-  
+
   // Legacy aliases (for compatibility)
   lime: '#E85D4C',        // Now maps to primary coral
   blue: '#6B9AC4',        // Softer, warmer blue
   coral: '#E85D4C',       // Primary
   purple: '#9B7BB8',      // Muted purple
   cyan: '#6BBAB8',        // Teal, softer
-  
+
   // Rating bucket colors - warm tones
   ratingExcellent: '#5DB075',  // >= 4.5 - Fresh green
   ratingGood: '#7BA37B',       // >= 4.0 - Sage
   ratingAverage: '#E8A94D',    // >= 3.5 - Amber
   ratingBelowAverage: '#D97B5C', // < 3.5 - Muted orange
-  
+
   // Semantic colors
   success: '#5DB075',
   warning: '#E8A94D',
   error: '#D95D4C',
   info: '#6B9AC4',
-  
+
   // Overlay & transparency
   overlay: 'rgba(13, 11, 10, 0.85)',
   overlayLight: 'rgba(13, 11, 10, 0.6)',
@@ -84,7 +84,7 @@ export const typography = {
     semibold: 'System',
     bold: 'System',
   },
-  
+
   // Font sizes
   fontSize: {
     xs: 10,
@@ -96,14 +96,14 @@ export const typography = {
     xxxl: 32,
     display: 48,
   },
-  
+
   // Line heights (multipliers)
   lineHeight: {
     tight: 1.2,
     normal: 1.4,
     relaxed: 1.6,
   },
-  
+
   // Letter spacing
   letterSpacing: {
     tight: -0.5,

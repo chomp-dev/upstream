@@ -55,7 +55,16 @@ export function MediaOverlay({
                 {/* Like button */}
                 <TouchableOpacity style={styles.actionButton} activeOpacity={0.7}>
                     <View style={styles.iconCircle}>
-                        <Ionicons name="heart-outline" size={28} color="#fff" />
+                        <Ionicons
+                            name="heart-outline"
+                            size={32}
+                            color="#fff"
+                            style={{
+                                textShadowColor: 'rgba(0, 0, 0, 0.5)',
+                                textShadowOffset: { width: 0, height: 1 },
+                                textShadowRadius: 3
+                            }}
+                        />
                     </View>
                     <Text style={styles.actionCount}>0</Text>
                 </TouchableOpacity>
@@ -63,7 +72,16 @@ export function MediaOverlay({
                 {/* Share button */}
                 <TouchableOpacity style={styles.actionButton} activeOpacity={0.7}>
                     <View style={styles.iconCircle}>
-                        <Ionicons name="arrow-redo-outline" size={26} color="#fff" />
+                        <Ionicons
+                            name="arrow-redo-outline"
+                            size={30}
+                            color="#fff"
+                            style={{
+                                textShadowColor: 'rgba(0, 0, 0, 0.5)',
+                                textShadowOffset: { width: 0, height: 1 },
+                                textShadowRadius: 3
+                            }}
+                        />
                     </View>
                 </TouchableOpacity>
             </View>
@@ -143,13 +161,9 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     iconCircle: {
-        // Removed background, just icon with shadow
         justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.5,
-        shadowRadius: 4,
+        // No background or container shadow - pure icon
     },
     actionCount: {
         color: '#fff',
@@ -158,6 +172,7 @@ const styles = StyleSheet.create({
         textShadowColor: 'rgba(0, 0, 0, 0.8)',
         textShadowOffset: { width: 0, height: 1 },
         textShadowRadius: 4,
+        marginTop: -4, // Pull text closer to icon
     },
     bottomContent: {
         position: 'absolute',
