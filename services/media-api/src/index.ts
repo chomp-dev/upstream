@@ -7,6 +7,7 @@ import { webhookRouter } from './routes/webhook';
 import { restaurantsRouter } from './routes/restaurants';
 import { searchRouter } from './routes/search';
 import { usersRouter } from './routes/users';
+import { tiktokRouter } from './routes/tiktok';
 import { initDb } from './db';
 
 dotenv.config();
@@ -57,6 +58,7 @@ app.use('/api/restaurants', restaurantsRouter);
 app.use('/api/search', searchRouter);
 app.use('/api/v1/search', searchRouter); // Alias for compatibility
 app.use('/api/users', usersRouter);
+app.use('/api/tiktok', tiktokRouter);
 
 // Root route for diagnostic testing
 app.get('/', (req, res) => {

@@ -8,7 +8,7 @@
 
 export interface FeedItem {
   id: number;
-  type: 'video' | 'image_post';
+  type: 'video' | 'image_post' | 'tiktok_embed';
   cloudflare_video_id?: string;
   playback_url?: string;
   thumbnail_url?: string;
@@ -16,6 +16,12 @@ export interface FeedItem {
   images?: string[];
   google_place_id?: string | null;
   created_at: string;
+  // TikTok embed fields
+  tiktok_url?: string;
+  embed_html?: string;
+  title?: string;
+  author_name?: string;
+  author_url?: string;
 }
 
 export interface FeedResponse {

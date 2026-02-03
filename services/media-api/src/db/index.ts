@@ -45,6 +45,23 @@ export async function initDb() {
       )
     `);
 
+    // Create tiktok_embeds table for TikTok video embeds
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS tiktok_embeds (
+        id SERIAL PRIMARY KEY,
+        tiktok_url TEXT NOT NULL,
+        embed_html TEXT,
+        title TEXT,
+        author_name TEXT,
+        author_url TEXT,
+        thumbnail_url TEXT,
+        thumbnail_width INTEGER,
+        thumbnail_height INTEGER,
+        google_place_id TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // Add metadata columns if they don't exist
     await pool.query(`
       DO $$ 

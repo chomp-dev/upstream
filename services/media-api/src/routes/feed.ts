@@ -389,6 +389,16 @@ feedRouter.get('/', async (req, res) => {
       [limit, offset]
     );
 
+    // Fetch TikTok embeds
+    const tiktokResult = await queryWithRetry(
+      `SELECT id, tiktok_url, embed_html, title, author_name, author_url, thumbnail_url, 
+              thumbnail_width, thumbnail_height, google_place_id, created_at
+       FROM tiktok_embeds 
+       ORDER BY created_at DESC 
+       LIMIT $1 OFFSET $2`,
+      [limit, offset]
+    );
+
     // Combine and interleave (simple approach - videos first, then images)
     const feed = [
       ...videosResult.rows.map((v: any) => ({ type: 'video', ...v })),
@@ -396,6 +406,10 @@ feedRouter.get('/', async (req, res) => {
         type: 'image_post',
         ...i,
         images: Array.isArray(i.images) ? i.images.filter((url: string) => !!url) : []
+      })),
+      ...tiktokResult.rows.map((t: any) => ({
+        type: 'tiktok_embed',
+        ...t,
       })),
     ].sort((a, b) =>
       new Date(b.created_at).getTime() - new Date(a.created_at).getTime()

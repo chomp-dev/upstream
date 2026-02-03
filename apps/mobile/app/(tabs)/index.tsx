@@ -20,6 +20,7 @@ import { colors, spacing, radius } from '../../src/theme';
 import { ratingColor, priceDisplay } from '../../src/theme/styles';
 import { VideoPlayer } from '../../components/VideoPlayer';
 import { ImagePostViewer } from '../../components/ImagePostViewer';
+import { TikTokEmbed } from '../../components/TikTokEmbed';
 import { mediaApi, searchApi } from '../../src/lib/api';
 import type { FeedItem, Restaurant } from '../../src/lib/api/types';
 
@@ -432,6 +433,15 @@ export default function HomeScreen() {
                     </View>
                   )}
                 </>
+              ) : item.type === 'tiktok_embed' ? (
+                <TikTokEmbed
+                  embedHtml={item.embed_html || ''}
+                  thumbnailUrl={item.thumbnail_url}
+                  title={item.title}
+                  authorName={item.author_name}
+                  tiktokUrl={item.tiktok_url}
+                  isActive={isFocused && index === currentIndex}
+                />
               ) : (
                 <ImagePostViewer images={item.images || []} />
               )}

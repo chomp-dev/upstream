@@ -345,3 +345,29 @@ export async function checkHealth(): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Add a TikTok embed to the feed
+ * @param tiktokUrl - The TikTok video URL
+ * @param googlePlaceId - Optional restaurant association
+ */
+export async function addTikTokEmbed(
+  tiktokUrl: string,
+  googlePlaceId?: string
+): Promise<{ success: boolean; embed?: any }> {
+  const response = await fetch(`${MEDIA_API_BASE}/api/tiktok`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      tiktok_url: tiktokUrl,
+      google_place_id: googlePlaceId || null,
+    }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.error || 'Failed to add TikTok embed');
+  }
+
+  return response.json();
+}
