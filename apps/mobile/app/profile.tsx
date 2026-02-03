@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, ScrollView, ActivityIndicator, Button } from 'react-native';
+import { View, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Button } from 'react-native';
+import { Image } from 'expo-image';
 import { useAuth } from '../src/context/auth';
-import { VideoUpload } from '../components/VideoUpload';
-import { router } from 'expo-router';
-import { Video, ResizeMode } from 'expo-av';
-import { LikeButton } from '../components/LikeButton';
-import { CommentSection } from '../components/CommentSection';
+import { router, useLocalSearchParams } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { Screen, Text } from '../src/ui';
+import { colors, spacing, radius } from '../src/theme';
 
 interface UserProfile {
     name: string;
@@ -15,13 +15,15 @@ interface UserProfile {
 }
 
 interface VideoItem {
-    video_url: string;
+    id: number;
+    video_url?: string;
+    playback_url?: string; // Add this as it might be used
+    thumbnail_url?: string;
     title: string;
     description: string;
     likes_count: number;
+    user_id?: string;
 }
-
-import { useLocalSearchParams } from 'expo-router';
 
 export default function ProfileScreen() {
     const { user, logout, supabase } = useAuth();
@@ -78,145 +80,260 @@ export default function ProfileScreen() {
         fetchData();
     }, [user]);
 
+    const renderProfileHeader = () => (
+        <View style={styles.section}>
+            {/* Profile header */}
+            <View style={styles.profileHeader}>
+                <View style={styles.avatarContainer}>
+                    {profile?.avatar ? (
+                        <Image
+                            source={{ uri: profile.avatar }}
+                            style={styles.avatar}
+                        />
+                    ) : (
+                        <View style={styles.avatarPlaceholder}>
+                            <Ionicons name="person" size={48} color={colors.primary} />
+                        </View>
+                    )}
+                </View>
+                <Text variant="title" style={styles.name}>
+                    {profile?.name || 'User'}
+                </Text>
+                {profile?.email && (
+                    <Text variant="bodySmall" color={colors.muted}>
+                        {profile.email}
+                    </Text>
+                )}
+                {profile?.bio && (
+                    <Text variant="body" style={styles.bio}>
+                        {profile.bio}
+                    </Text>
+                )}
+
+                {user && user.sub === targetUserId && (
+                    <TouchableOpacity style={styles.logoutButton} onPress={() => { logout(); router.replace('/'); }}>
+                        <Text variant="caption" color={colors.muted}>Log Out</Text>
+                    </TouchableOpacity>
+                )}
+            </View>
+
+            {/* Stats */}
+            <View style={styles.statsRow}>
+                <View style={styles.stat}>
+                    <Text variant="title">{videos.length}</Text>
+                    <Text variant="caption" color={colors.muted}>
+                        Posts
+                    </Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.stat}>
+                    <Text variant="title">0</Text>
+                    <Text variant="caption" color={colors.muted}>
+                        Followers
+                    </Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.stat}>
+                    <Text variant="title">0</Text>
+                    <Text variant="caption" color={colors.muted}>
+                        Following
+                    </Text>
+                </View>
+            </View>
+
+            {/* Videos Header */}
+            <View style={styles.videosHeader}>
+                <Ionicons name="grid-outline" size={18} color={colors.text} />
+                <Text variant="label">Posts</Text>
+            </View>
+        </View>
+    );
+
+    if (loading) {
+        return (
+            <Screen safe>
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={colors.primary} />
+                </View>
+            </Screen>
+        );
+    }
+
     if (!targetUserId) {
         return (
-            <View style={styles.container}>
-                <Text>Please log in to view your profile.</Text>
-                <Button title="Go Home" onPress={() => router.replace('/')} />
-            </View>
+            <Screen safe>
+                <View style={styles.loginContainer}>
+                    <Text>Please log in to view this profile.</Text>
+                    <Button title="Go Home" onPress={() => router.replace('/')} />
+                </View>
+            </Screen>
         );
     }
 
     return (
-        <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
-            {loading ? (
-                <ActivityIndicator size="large" />
-            ) : (
-                <>
-                    <View style={styles.header}>
-                        <Image
-                            source={{ uri: profile?.avatar || 'https://via.placeholder.com/150' }}
-                            style={styles.avatar}
-                        />
-                        <Text style={styles.name}>{profile?.name || 'User'}</Text>
-                        <Text style={styles.email}>{profile?.email}</Text>
-                        {profile?.bio && <Text style={styles.bio}>{profile.bio}</Text>}
-                        {user && user.sub === targetUserId && (
-                            <Button title="Sign Out" onPress={() => { logout(); router.replace('/'); }} color="red" />
-                        )}
-                    </View>
+        <Screen safe edges={['top']}>
+            <View style={styles.header}>
+                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                    <Ionicons name="arrow-back" size={24} color={colors.text} />
+                </TouchableOpacity>
+                <Text variant="subtitle">Profile</Text>
+                <View style={{ width: 24 }} />
+            </View>
 
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Upload New Video</Text>
-                        <VideoUpload onUploadComplete={() => { /* refresh videos needed */ }} />
-                    </View>
-
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>My Videos</Text>
-                        {videos.length === 0 ? (
-                            <Text style={{ textAlign: 'center', marginVertical: 20 }}>No videos yet.</Text>
+            <FlatList
+                data={videos}
+                keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
+                renderItem={({ item }) => (
+                    <View style={styles.videoItem}>
+                        {/* Simple Video Item representation */}
+                        {item.thumbnail_url ? (
+                            <Image source={{ uri: item.thumbnail_url }} style={styles.videoThumbnail} />
                         ) : (
-                            videos.map((vid) => (
-                                <View key={vid.video_url} style={styles.videoCard}>
-                                    <Video
-                                        style={styles.video}
-                                        source={{ uri: vid.video_url }}
-                                        useNativeControls
-                                        resizeMode={ResizeMode.CONTAIN}
-                                        isLooping={false}
-                                    />
-                                    <View style={styles.videoMeta}>
-                                        <Text style={styles.videoTitle}>{vid.title || 'Untitled'}</Text>
-                                        <LikeButton videoUrl={vid.video_url} />
-                                    </View>
-                                    <Text style={styles.videoDesc}>{vid.description}</Text>
-
-                                    {/* 
-                            Note: showing full comments on profile might be too much, 
-                            usually you'd tap to view details. But per request listing components/logic.
-                        */}
-                                    <View style={{ marginTop: 10 }}>
-                                        <Text style={{ fontWeight: 'bold' }}>Comments</Text>
-                                        <CommentSection videoUrl={vid.video_url} />
-                                    </View>
-                                </View>
-                            ))
+                            <View style={styles.videoPlaceholder}>
+                                <Ionicons name="play" size={24} color="white" />
+                            </View>
                         )}
+                        <Text numberOfLines={1} style={styles.videoTitle}>{item.title || 'Untitled'}</Text>
                     </View>
-                </>
-            )}
-        </ScrollView>
+                )}
+                ListHeaderComponent={renderProfileHeader}
+                ListEmptyComponent={
+                    <View style={styles.emptyContainer}>
+                        <Text variant="bodySmall" color={colors.muted}>No posts yet</Text>
+                    </View>
+                }
+                contentContainerStyle={styles.content}
+                numColumns={3}
+            />
+        </Screen>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
+    loadingContainer: {
         flex: 1,
-        backgroundColor: '#fff',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    loginContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: spacing.xl,
     },
     header: {
+        flexDirection: 'row',
         alignItems: 'center',
-        padding: 20,
+        justifyContent: 'space-between',
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.md,
         borderBottomWidth: 1,
-        borderBottomColor: '#eee',
+        borderBottomColor: colors.border,
+    },
+    backButton: {
+        padding: spacing.xs,
+    },
+    section: {
+        marginBottom: spacing.lg,
+    },
+    profileHeader: {
+        alignItems: 'center',
+        marginBottom: spacing.xl,
+        marginTop: spacing.lg,
+    },
+    avatarContainer: {
+        marginBottom: spacing.md,
     },
     avatar: {
         width: 100,
         height: 100,
         borderRadius: 50,
-        marginBottom: 10,
+        borderWidth: 3,
+        borderColor: colors.primary,
+    },
+    avatarPlaceholder: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        backgroundColor: colors.surface,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 3,
+        borderColor: colors.primary,
     },
     name: {
-        fontSize: 24,
-        fontWeight: 'bold',
-    },
-    email: {
-        fontSize: 16,
-        color: '#666',
-        marginBottom: 10,
+        marginBottom: spacing.xs,
     },
     bio: {
-        fontSize: 16,
-        fontStyle: 'italic',
+        marginTop: spacing.sm,
         textAlign: 'center',
-        marginBottom: 20,
-        paddingHorizontal: 20,
+        paddingHorizontal: spacing.xl,
     },
-    section: {
-        padding: 20,
-        borderBottomWidth: 1,
-        borderBottomColor: '#eee',
+    logoutButton: {
+        marginTop: spacing.md,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.xs,
+        borderRadius: radius.pill,
+        backgroundColor: colors.surface,
+        borderWidth: 1,
+        borderColor: colors.border,
     },
-    sectionTitle: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        marginBottom: 15,
-    },
-    videoCard: {
-        marginBottom: 30,
-        backgroundColor: '#f9f9f9',
-        borderRadius: 10,
-        padding: 10,
-    },
-    video: {
-        width: '100%',
-        height: 200,
-        borderRadius: 8,
-        backgroundColor: '#000',
-    },
-    videoMeta: {
+    statsRow: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
+        backgroundColor: colors.surface,
+        borderRadius: radius.xl,
+        padding: spacing.lg,
+        marginBottom: spacing.xl,
+        marginHorizontal: spacing.lg,
+    },
+    stat: {
+        flex: 1,
         alignItems: 'center',
-        marginTop: 10,
+    },
+    statDivider: {
+        width: 1,
+        backgroundColor: colors.border,
+        marginHorizontal: spacing.md,
+    },
+    videosHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
+        paddingHorizontal: spacing.lg,
+        marginBottom: spacing.sm,
+    },
+    content: {
+        paddingBottom: 40,
+    },
+    videoItem: {
+        flex: 1 / 3,
+        aspectRatio: 0.8,
+        margin: 1,
+        position: 'relative',
+    },
+    videoThumbnail: {
+        width: '100%',
+        height: '100%',
+    },
+    videoPlaceholder: {
+        width: '100%',
+        height: '100%',
+        backgroundColor: '#333',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     videoTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        flex: 1,
+        position: 'absolute',
+        bottom: 4,
+        left: 4,
+        right: 4,
+        color: 'white',
+        fontSize: 10,
+        textShadowColor: 'black',
+        textShadowRadius: 2,
     },
-    videoDesc: {
-        color: '#444',
-        marginVertical: 5,
+    emptyContainer: {
+        alignItems: 'center',
+        marginTop: spacing.xl,
     },
 });

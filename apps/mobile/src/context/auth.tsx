@@ -78,8 +78,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     const credentials = await getCredentials();
                     if (credentials?.accessToken) {
                         setAccessToken(credentials.accessToken);
-                        // Create a new Supabase client with the user's access token
-                        const authenticatedClient = createSupabaseClient(credentials.accessToken);
+                        // Create a new Supabase client with the user's ID token (JWS)
+                        // because Access Token might be an opaque/encrypted JWE (5 parts)
+                        // which Supabase does not accept.
+                        const tokenToUse = credentials.idToken || credentials.accessToken;
+                        const authenticatedClient = createSupabaseClient(tokenToUse);
                         setSupabaseClient(authenticatedClient);
                     }
                 } catch (error) {
