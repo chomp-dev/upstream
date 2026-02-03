@@ -7,7 +7,6 @@ import { View, StyleSheet, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen, Text, Segmented, Card } from '../../src/ui';
 import { colors, spacing, radius } from '../../src/theme';
-import { TikTokLinkUpload } from '../../components/TikTokLinkUpload';
 
 type SocialSection = 'profile' | 'friends' | 'inbox';
 
@@ -142,9 +141,6 @@ function ProfileSection() {
           Your activity stats will appear here
         </Text>
       </Card>
-
-      {/* TikTok Link Upload */}
-      <TikTokLinkUpload />
     </View>
   );
 }

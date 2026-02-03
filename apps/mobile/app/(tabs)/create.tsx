@@ -26,6 +26,7 @@ import { colors, spacing, radius } from '../../src/theme';
 import { ratingColor, priceDisplay } from '../../src/theme/styles';
 import { mediaApi, searchApi } from '../../src/lib/api';
 import type { Restaurant } from '../../src/lib/api/types';
+import { TikTokLinkUpload } from '../../components/TikTokLinkUpload';
 
 export default function CreateScreen() {
   useEffect(() => {
@@ -470,6 +471,9 @@ export default function CreateScreen() {
             </View>
           )}
         </View>
+
+        {/* TikTok Link Upload */}
+        <TikTokLinkUpload onUploadComplete={() => router.push('/')} />
 
         {/* Form Container - ALWAYS VISIBLE */}
         <View style={styles.formContainer}>
