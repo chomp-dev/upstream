@@ -1,9 +1,14 @@
 import React from 'react';
-import { View, StyleSheet, Image, TouchableOpacity, Linking } from 'react-native';
-import { WebView } from 'react-native-webview';
+import { View, StyleSheet, Image, TouchableOpacity, Linking, Platform } from 'react-native';
 import { useContentDimensions } from '../src/hooks/useContentDimensions';
 import { Text } from '../src/ui';
 import { colors, spacing } from '../src/theme';
+
+// Only import WebView on native platforms
+let WebView: any = null;
+if (Platform.OS !== 'web') {
+    WebView = require('react-native-webview').WebView;
+}
 
 interface TikTokEmbedProps {
     embedHtml: string;
@@ -15,8 +20,9 @@ interface TikTokEmbedProps {
 }
 
 /**
- * TikTokEmbed component renders a TikTok video embed using WebView.
- * Falls back to thumbnail + link if WebView is unavailable.
+ * TikTokEmbed component renders a TikTok video embed.
+ * - Native (iOS/Android): Uses WebView to render the TikTok embed
+ * - Web: Shows thumbnail with link to open in TikTok
  */
 export function TikTokEmbed({
     embedHtml,
@@ -67,8 +73,8 @@ export function TikTokEmbed({
         }
     };
 
-    // If no embed HTML, show thumbnail fallback
-    if (!embedHtml) {
+    // Web platform OR no embed HTML: show thumbnail fallback with link
+    if (Platform.OS === 'web' || !embedHtml) {
         return (
             <TouchableOpacity
                 style={[styles.container, { width, height }]}
@@ -104,6 +110,7 @@ export function TikTokEmbed({
         );
     }
 
+    // Native platforms with WebView
     return (
         <View style={[styles.container, { width, height }]}>
             <WebView
