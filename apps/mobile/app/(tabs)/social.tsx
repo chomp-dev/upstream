@@ -2,7 +2,7 @@
  * Social Tab - Profile/Friends/Inbox hub (UI shell)
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen, Text, Segmented, Card } from '../../src/ui';
@@ -12,7 +12,8 @@ type SocialSection = 'profile' | 'friends' | 'inbox';
 
 import { useAuth } from '../../src/context/auth';
 import { Image } from 'expo-image';
-import { Pressable } from 'react-native';
+import { Pressable, TouchableOpacity } from 'react-native';
+import { useRouter } from 'expo-router';
 
 export default function SocialScreen() {
   const [activeSection, setActiveSection] = useState<SocialSection>('profile');
@@ -64,18 +65,37 @@ export default function SocialScreen() {
 }
 
 function ProfileSection() {
-  const { user, logout } = useAuth();
+  const { user, logout, supabase } = useAuth();
+  const router = useRouter();
+  const [profile, setProfile] = useState<any>(null);
+
+  useEffect(() => {
+    if (user?.sub) {
+      supabase
+        .from('users')
+        .select('*')
+        .eq('auth0_id', user.sub)
+        .single()
+        .then(({ data }) => {
+          if (data) setProfile(data);
+        });
+    }
+  }, [user, supabase]);
 
   if (!user) return null;
+
+  // Use Supabase profile if available, fallback to Auth0 user
+  const displayName = profile?.name || user.name || user.email;
+  const displayAvatar = profile?.avatar || user.picture;
 
   return (
     <View style={styles.section}>
       {/* Profile header */}
       <View style={styles.profileHeader}>
         <View style={styles.avatar}>
-          {user.picture ? (
+          {displayAvatar ? (
             <Image
-              source={{ uri: user.picture }}
+              source={{ uri: displayAvatar }}
               style={{ width: 94, height: 94, borderRadius: 47 }}
             />
           ) : (
@@ -83,15 +103,31 @@ function ProfileSection() {
           )}
         </View>
         <Text variant="title" style={styles.username}>
-          {user.name || user.email}
+          {displayName}
         </Text>
-        <Text variant="bodySmall" color={colors.muted}>
-          {user.email}
-        </Text>
+        {profile?.bio ? (
+          <Text variant="bodySmall" color={colors.muted} style={{ marginBottom: spacing.xs, paddingHorizontal: spacing.xl }} center>
+            {profile.bio}
+          </Text>
+        ) : (
+          <Text variant="bodySmall" color={colors.muted}>
+            {user.email}
+          </Text>
+        )}
 
-        <Pressable style={styles.logoutButton} onPress={logout}>
-          <Text variant="caption" color={colors.muted}>Log Out</Text>
-        </Pressable>
+        {/* Action Buttons Row */}
+        <View style={styles.actionButtonsRow}>
+          <TouchableOpacity
+            style={styles.editProfileButton}
+            onPress={() => router.push('/edit_profile')}
+          >
+            <Text variant="caption" color={colors.bg}>Edit Profile</Text>
+          </TouchableOpacity>
+
+          <Pressable style={styles.logoutButton} onPress={logout}>
+            <Text variant="caption" color={colors.muted}>Log Out</Text>
+          </Pressable>
+        </View>
       </View>
 
       {/* Stats */}
@@ -382,8 +418,21 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     borderRadius: radius.pill,
   },
-  logoutButton: {
+  actionButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginTop: spacing.md,
+    gap: spacing.sm,
+  },
+  editProfileButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primary,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  logoutButton: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     borderRadius: radius.pill,
