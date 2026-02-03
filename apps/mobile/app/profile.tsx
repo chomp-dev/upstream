@@ -14,15 +14,18 @@ interface UserProfile {
     avatar: string;
 }
 
-interface VideoItem {
+interface PostItem {
     id: number;
+    type: 'video' | 'image';
     video_url?: string;
-    playback_url?: string; // Add this as it might be used
+    playback_url?: string;
     thumbnail_url?: string;
+    images?: string[];
     title: string;
     description: string;
     likes_count: number;
     user_id?: string;
+    created_at: string;
 }
 
 export default function ProfileScreen() {
@@ -30,21 +33,17 @@ export default function ProfileScreen() {
     const { userId } = useLocalSearchParams();
     const targetUserId = typeof userId === 'string' ? userId : user?.sub;
     const [profile, setProfile] = useState<UserProfile | null>(null);
-    const [videos, setVideos] = useState<VideoItem[]>([]);
+    const [posts, setPosts] = useState<PostItem[]>([]);
     const [loading, setLoading] = useState(true);
 
     useFocusEffect(
         useCallback(() => {
             if (!user) {
-                // Redirect or show login
-                // router.replace('/'); 
                 setLoading(false);
                 return;
             }
 
             const fetchData = async () => {
-                // Only show loading if we don't have data yet, or if we want to confirm refresh
-                // But for better UX, maybe just refresh silently or show loading if empty
                 if (!profile) setLoading(true);
 
                 try {
@@ -68,11 +67,30 @@ export default function ProfileScreen() {
                         .from('videos')
                         .select('*')
                         .eq('user_id', targetUserId)
+                        .neq('status', 'error') // Exclude error videos
                         .order('created_at', { ascending: false });
 
+                    // 3. Fetch Image Posts
+                    const { data: imageData, error: imageError } = await supabase
+                        .from('image_posts')
+                        .select('*')
+                        .eq('user_id', targetUserId)
+                        .order('created_at', { ascending: false });
+
+                    // Combine and Sort
+                    const combinedPosts: PostItem[] = [];
+
                     if (videoData) {
-                        setVideos(videoData);
+                        combinedPosts.push(...videoData.map((v: any) => ({ ...v, type: 'video' })));
                     }
+                    if (imageData) {
+                        combinedPosts.push(...imageData.map((i: any) => ({ ...i, type: 'image' })));
+                    }
+
+                    // Sort by created_at desc
+                    combinedPosts.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+                    setPosts(combinedPosts);
 
                 } catch (err) {
                     console.error(err);
@@ -82,7 +100,7 @@ export default function ProfileScreen() {
             };
 
             fetchData();
-        }, [user, targetUserId]) // Dependencies for callback
+        }, [user, targetUserId])
     );
 
     const renderProfileHeader = () => (
@@ -130,7 +148,7 @@ export default function ProfileScreen() {
             {/* Stats */}
             <View style={styles.statsRow}>
                 <View style={styles.stat}>
-                    <Text variant="title">{videos.length}</Text>
+                    <Text variant="title">{posts.length}</Text>
                     <Text variant="caption" color={colors.muted}>
                         Posts
                     </Text>
@@ -191,19 +209,25 @@ export default function ProfileScreen() {
             </View>
 
             <FlatList
-                data={videos}
-                keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
+                data={posts}
+                keyExtractor={(item) => `${item.type}-${item.id}`}
                 renderItem={({ item }) => (
                     <View style={styles.videoItem}>
-                        {/* Simple Video Item representation */}
-                        {item.thumbnail_url ? (
+                        {item.type === 'video' && item.thumbnail_url ? (
                             <Image source={{ uri: item.thumbnail_url }} style={styles.videoThumbnail} />
+                        ) : item.type === 'image' && item.images && item.images.length > 0 ? (
+                            <Image source={{ uri: item.images[0] }} style={styles.videoThumbnail} />
                         ) : (
                             <View style={styles.videoPlaceholder}>
-                                <Ionicons name="play" size={24} color="white" />
+                                <Ionicons name={item.type === 'image' ? "images" : "play"} size={24} color="white" />
                             </View>
                         )}
                         <Text numberOfLines={1} style={styles.videoTitle}>{item.title || 'Untitled'}</Text>
+                        {item.type === 'image' && (
+                            <View style={{ position: 'absolute', top: 4, right: 4 }}>
+                                <Ionicons name="images" size={12} color="white" />
+                            </View>
+                        )}
                     </View>
                 )}
                 ListHeaderComponent={renderProfileHeader}

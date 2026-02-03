@@ -518,55 +518,20 @@ feedRouter.get('/', async (req, res) => {
 
 // Helper to validate image posts in background
 async function validateImagePosts(imagePosts: any[]) {
-  if (!imagePosts || imagePosts.length === 0) return;
+  // DISABLE VALIDATION FOR NOW - It's too aggressive and causing data loss
+  // if (!imagePosts || imagePosts.length === 0) return;
 
-  // @ts-ignore
-  const { getImage } = require('../services/cloudflare');
+  // // @ts-ignore
+  // const { getImage } = require('../services/cloudflare');
 
-  Promise.all(imagePosts.map(async (post) => {
-    try {
-      if (!post.images || !Array.isArray(post.images) || post.images.length === 0) return;
-
-      const validImages: string[] = [];
-      let hasChanges = false;
-
-      for (const imageUrl of post.images) {
-        // Extract ID from URL
-        // https://imagedelivery.net/<hash>/<id>/<variant>
-        const matches = imageUrl.match(/imagedelivery\.net\/[^\/]+\/([^\/]+)/);
-        if (matches && matches[1]) {
-          const imageId = matches[1];
-          try {
-            await getImage(imageId);
-            validImages.push(imageUrl);
-          } catch (error: any) {
-            if (error.statusCode === 404) {
-              console.log(`[Feed/Images] Image ${imageId} in post ${post.id} deleted on Cloudflare, removing.`);
-              hasChanges = true;
-            } else {
-              // If other error, keep it (innocent until proven guilty)
-              validImages.push(imageUrl);
-            }
-          }
-        } else {
-          // Not a cloudflare URL, keep it
-          validImages.push(imageUrl);
-        }
-      }
-
-      if (hasChanges) {
-        if (validImages.length === 0) {
-          console.log(`[Feed/Images] Post ${post.id} has no valid images left, deleting.`);
-          await pool.query('DELETE FROM image_posts WHERE id = $1', [post.id]);
-        } else {
-          console.log(`[Feed/Images] Updating post ${post.id} with valid images.`);
-          await pool.query('UPDATE image_posts SET images = $1 WHERE id = $2', [validImages, post.id]);
-        }
-      }
-    } catch (e) {
-      console.error(`[Feed/Images] Error validating post ${post.id}:`, e);
-    }
-  })).catch(err => console.error('[Feed/Images] Validation error:', err));
+  // Promise.all(imagePosts.map(async (post) => {
+  //   try {
+  //     if (!post.images || !Array.isArray(post.images) || post.images.length === 0) return;
+  //     // ... (Deletion logic commented out)
+  //   } catch (e) {
+  //     console.error(`[Feed/Images] Error validating post ${post.id}:`, e);
+  //   }
+  // })).catch(err => console.error('[Feed/Images] Validation error:', err));
 }
 
 export default feedRouter;

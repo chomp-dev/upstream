@@ -389,12 +389,16 @@ export default function CreateScreen() {
           console.error('[Create] Supabase insert failed:', error);
           throw new Error(error.message || 'Failed to create post record');
         }
-
       }
 
-      Alert.alert('Success', 'Upload complete!');
+      console.log('[Create] Upload flow complete. Resetting form and navigating home.');
       resetForm();
-      router.push('/');
+
+      // Force navigation on next tick to ensure state updates process
+      setTimeout(() => {
+        router.push('/');
+      }, 100);
+
     } catch (error: any) {
       console.error('Upload error:', error);
       Alert.alert('Error', error.message || 'Upload failed');

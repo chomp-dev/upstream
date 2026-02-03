@@ -130,6 +130,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 12,
     elevation: 8,
+    borderWidth: 3,
+    borderColor: '#ffffffff',
   },
   createButtonFocused: {
     backgroundColor: colors.primaryLight,
