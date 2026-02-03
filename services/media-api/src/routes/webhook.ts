@@ -36,8 +36,7 @@ webhookRouter.post('/cloudflare-stream', async (req, res) => {
        SET status = $1, 
            playback_url = $2, 
            thumbnail_url = $3,
-           duration = $4,
-           updated_at = CURRENT_TIMESTAMP
+           duration = $4
        WHERE cloudflare_video_id = $5`,
       [
         videoDetails.status || status,

@@ -9,18 +9,27 @@ export const uploadRouter = Router();
 uploadRouter.post('/video', async (req, res) => {
   try {
     const { google_place_id, title, description, tags, user_id } = req.body || {};
+
+    // user_id is required by the videos table (NOT NULL constraint)
+    if (!user_id) {
+      return res.status(400).json({ error: 'user_id is required' });
+    }
+
     const upload = await createDirectUploadUrl();
 
     if (!upload.id || !upload.uploadURL) {
       throw new Error('Invalid upload response from Cloudflare');
     }
 
+    // video_url is the PRIMARY KEY - we use Cloudflare stream URL format
+    const videoUrl = `https://watch.cloudflarestream.com/${upload.id}`;
+
     // Store video record in DB with pending status and metadata
     const result = await pool.query(
-      `INSERT INTO videos (cloudflare_video_id, status, google_place_id, title, description, tags, user_id) 
-       VALUES ($1, 'pending', $2, $3, $4, $5, $6) 
-       RETURNING id, cloudflare_video_id, status, google_place_id, created_at`,
-      [upload.id, google_place_id || null, title || null, description || null, tags || [], user_id || null]
+      `INSERT INTO videos (video_url, cloudflare_video_id, status, google_place_id, title, description, tags, user_id) 
+       VALUES ($1, $2, 'pending', $3, $4, $5, $6, $7) 
+       RETURNING id, video_url, cloudflare_video_id, status, google_place_id, created_at`,
+      [videoUrl, upload.id, google_place_id || null, title || null, description || null, tags || [], user_id]
     );
 
     res.json({
@@ -52,8 +61,7 @@ uploadRouter.get('/video/:videoId/status', async (req, res) => {
          SET status = $1, 
              playback_url = $2, 
              thumbnail_url = $3,
-             duration = $4,
-             updated_at = CURRENT_TIMESTAMP
+             duration = $4
          WHERE cloudflare_video_id = $5`,
         [
           video.status,

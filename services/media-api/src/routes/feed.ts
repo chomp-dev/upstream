@@ -83,8 +83,7 @@ feedRouter.get('/check-status/:cloudflareVideoId', async (req, res) => {
                 SET status = $1, 
                     playback_url = $2, 
                     thumbnail_url = $3,
-                    duration = $4,
-                    updated_at = CURRENT_TIMESTAMP
+                    duration = $4
                 WHERE cloudflare_video_id = $5`,
         [
           cloudflareVideo.status,
@@ -109,7 +108,7 @@ feedRouter.get('/check-status/:cloudflareVideoId', async (req, res) => {
         console.log(`[Debug] Video ${cloudflareVideoId} not found on Cloudflare (deleted), marking as error`);
 
         await pool.query(
-          `UPDATE videos SET status = 'error', updated_at = CURRENT_TIMESTAMP WHERE cloudflare_video_id = $1`,
+          `UPDATE videos SET status = 'error' WHERE cloudflare_video_id = $1`,
           [cloudflareVideoId]
         );
         return res.json({ success: true, status: 'error', message: 'Video marked as deleted' });
@@ -150,7 +149,7 @@ feedRouter.post('/admin/verify-all-videos', async (req, res) => {
           if (is404 && video.status !== 'error') {
             // Mark as error
             await pool.query(
-              `UPDATE videos SET status = 'error', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+              `UPDATE videos SET status = 'error' WHERE id = $1`,
               [video.id]
             );
             markedAsError++;
@@ -219,7 +218,7 @@ feedRouter.get('/nearby', async (req, res) => {
     // Fetch videos linked to nearby restaurants - exclude error/deleted videos
     const videosResult = await queryWithRetry(
       `SELECT v.id, v.cloudflare_video_id, v.playback_url, v.thumbnail_url, 
-              v.status, v.duration, v.google_place_id, v.created_at, v.updated_at,
+              v.status, v.duration, v.google_place_id, v.created_at,
               u.name as username, u.avatar as user_avatar, u.auth0_id as user_id
        FROM videos v
        LEFT JOIN users u ON v.user_id = u.auth0_id
@@ -321,8 +320,7 @@ feedRouter.get('/nearby', async (req, res) => {
                  SET status = $1, 
                      playback_url = $2, 
                      thumbnail_url = $3,
-                     duration = $4,
-                     updated_at = CURRENT_TIMESTAMP
+                     duration = $4
                  WHERE cloudflare_video_id = $5`,
               [
                 cloudflareVideo.status,
@@ -344,7 +342,7 @@ feedRouter.get('/nearby', async (req, res) => {
             console.log(`[Feed/Nearby] Video ${video.cloudflare_video_id} deleted on Cloudflare, marking as error`);
 
             await pool.query(
-              `UPDATE videos SET status = 'error', updated_at = CURRENT_TIMESTAMP WHERE cloudflare_video_id = $1`,
+              `UPDATE videos SET status = 'error' WHERE cloudflare_video_id = $1`,
               [video.cloudflare_video_id]
             );
           } else {
@@ -382,7 +380,7 @@ feedRouter.get('/', async (req, res) => {
     // Fetch videos - exclude error/deleted videos
     let videosResult = await queryWithRetry(
       `SELECT v.id, v.cloudflare_video_id, v.playback_url, v.thumbnail_url, 
-              v.status, v.duration, v.google_place_id, v.created_at, v.updated_at,
+              v.status, v.duration, v.google_place_id, v.created_at,
               u.name as username, u.avatar as user_avatar, u.auth0_id as user_id
        FROM videos v
        LEFT JOIN users u ON v.user_id = u.auth0_id
@@ -420,8 +418,7 @@ feedRouter.get('/', async (req, res) => {
                  SET status = $1, 
                      playback_url = $2, 
                      thumbnail_url = $3,
-                     duration = $4,
-                     updated_at = CURRENT_TIMESTAMP
+                     duration = $4
                  WHERE cloudflare_video_id = $5`,
               [
                 cloudflareVideo.status,
@@ -443,7 +440,7 @@ feedRouter.get('/', async (req, res) => {
             console.log(`[Feed] Video ${video.cloudflare_video_id} deleted on Cloudflare, marking as error`);
 
             await pool.query(
-              `UPDATE videos SET status = 'error', updated_at = CURRENT_TIMESTAMP WHERE cloudflare_video_id = $1`,
+              `UPDATE videos SET status = 'error' WHERE cloudflare_video_id = $1`,
               [video.cloudflare_video_id]
             );
           } else {
