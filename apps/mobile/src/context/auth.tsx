@@ -34,17 +34,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [supabaseClient, setSupabaseClient] = useState<SupabaseClient>(publicSupabase);
 
     const login = async () => {
+        console.log('Login triggered');
+        const options = {
+            scope: 'openid profile email offline_access',
+            audience: process.env.EXPO_PUBLIC_AUTH0_AUDIENCE,
+            redirectUrl: Platform.OS === 'web'
+                ? 'https://www.usechomp.com/demo/social'
+                : undefined
+        };
+        console.log('Auth Options:', JSON.stringify(options, null, 2));
+
         try {
-            await authorize({
-                scope: 'openid profile email offline_access',
-                audience: process.env.EXPO_PUBLIC_AUTH0_AUDIENCE,
-                redirectUrl: Platform.OS === 'web'
-                    ? 'https://www.usechomp.com/demo/social'
-                    : undefined
-            });
+            await authorize(options);
             // User sync will be handled by the effect when user state changes
-        } catch (e) {
+        } catch (e: any) {
             console.error('Login failed', e);
+            // Alert is not available on web in the same way as RN sometimes, but usually works or polyfilled.
+            // On web assume console is main tool, but we can try window.alert or log.
+            if (Platform.OS === 'web') {
+                window.alert(`Login Failed: ${e.message || JSON.stringify(e)}`);
+            } else {
+                // Import Alert if not imported or use console
+                console.log('Login Error Alert:', e.message);
+            }
         }
     };
 
