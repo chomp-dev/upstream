@@ -403,7 +403,7 @@ export default function HomeScreen() {
                     user={{
                       userId: item.user_id,
                       username: item.username || 'User',
-                      avatarUrl: item.user_avatar || 'https://via.placeholder.com/150'
+                      avatarUrl: item.user_avatar || undefined
                     }}
                   />
                   {item.status !== 'ready' && (
@@ -447,7 +447,7 @@ export default function HomeScreen() {
                   user={{
                     userId: item.user_id,
                     username: item.username || 'User',
-                    avatarUrl: item.user_avatar || 'https://via.placeholder.com/150'
+                    avatarUrl: item.user_avatar || undefined
                   }}
                 />
               )}

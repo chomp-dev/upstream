@@ -75,7 +75,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const initSession = async () => {
             if (user && !auth0Loading) {
                 try {
-                    const credentials = await getCredentials();
+                    const credentials = await getCredentials('openid profile email offline_access');
+                    console.log('Credentials obtained:', Object.keys(credentials || {}));
+
                     if (credentials?.accessToken) {
                         setAccessToken(credentials.accessToken);
                         // Create a new Supabase client with the user's ID token (JWS)
