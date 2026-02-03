@@ -6,6 +6,8 @@ import { Restaurant } from '../src/lib/api/types';
 import { colors, spacing, radius } from '../src/theme';
 import { ratingColor, priceDisplay } from '../src/theme/styles';
 import { Text } from '../src/ui';
+import { useAuth } from '../src/context/auth';
+import React, { useEffect, useState } from 'react';
 
 interface MediaOverlayProps {
     height: number;
@@ -16,6 +18,7 @@ interface MediaOverlayProps {
     };
     caption?: string;
     restaurant?: Restaurant | null;
+    postId: number;
 }
 
 export function MediaOverlay({
@@ -23,8 +26,84 @@ export function MediaOverlay({
     user,
     caption,
     restaurant,
+    postId
 }: MediaOverlayProps) {
     const router = useRouter();
+    const { user: authUser, supabase } = useAuth();
+    const [likesCount, setLikesCount] = useState(0);
+    const [isLiked, setIsLiked] = useState(false);
+
+    // Fetch likes
+    useEffect(() => {
+        const fetchLikes = async () => {
+            if (!postId) return;
+
+            // Get count
+            const { data: postData } = await supabase
+                .from('posts')
+                .select('likes_count')
+                .eq('id', postId)
+                .single();
+
+            if (postData) {
+                setLikesCount(postData.likes_count || 0);
+            }
+
+            // Check if user liked
+            if (authUser) {
+                const { data: likeData } = await supabase
+                    .from('post_likes')
+                    .select('*')
+                    .eq('post_id', postId)
+                    .eq('user_id', authUser.sub)
+                    .single();
+
+                setIsLiked(!!likeData);
+            }
+        };
+
+        fetchLikes();
+    }, [postId, authUser]);
+
+    const toggleLike = async () => {
+        if (!authUser) return; // Or show login prompt
+
+        const previousLiked = isLiked;
+        const previousCount = likesCount;
+
+        // Optimistic update
+        setIsLiked(!previousLiked);
+        setLikesCount(previousLiked ? previousCount - 1 : previousCount + 1);
+
+        if (previousLiked) {
+            // Unlike
+            const { error } = await supabase
+                .from('post_likes')
+                .delete()
+                .eq('post_id', postId)
+                .eq('user_id', authUser.sub);
+
+            if (error) {
+                console.error('Error unliking:', error);
+                setIsLiked(previousLiked);
+                setLikesCount(previousCount);
+            }
+        } else {
+            // Like
+            const { error } = await supabase
+                .from('post_likes')
+                .insert({
+                    post_id: postId,
+                    user_id: authUser.sub
+                });
+
+            if (error) {
+                console.error('Error liking:', error);
+                setIsLiked(previousLiked);
+                setLikesCount(previousCount);
+            }
+        }
+    };
 
     const handleProfilePress = () => {
         if (user?.userId) {
@@ -53,11 +132,15 @@ export function MediaOverlay({
                 )}
 
                 {/* Like button */}
-                <TouchableOpacity style={styles.actionButton} activeOpacity={0.7}>
+                <TouchableOpacity style={styles.actionButton} activeOpacity={0.7} onPress={toggleLike}>
                     <View style={styles.iconCircle}>
-                        <Ionicons name="heart-outline" size={28} color="#fff" />
+                        <Ionicons
+                            name={isLiked ? "heart" : "heart-outline"}
+                            size={28}
+                            color={isLiked ? "#ff4040" : "#fff"}
+                        />
                     </View>
-                    <Text style={styles.actionCount}>0</Text>
+                    <Text style={styles.actionCount}>{likesCount}</Text>
                 </TouchableOpacity>
 
                 {/* Share button */}

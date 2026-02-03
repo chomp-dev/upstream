@@ -396,6 +396,7 @@ export default function HomeScreen() {
                 <>
                   <VideoPlayer
                     videoId={item.cloudflare_video_id}
+                    postId={item.id as number}
                     playbackUrl={item.playback_url}
                     thumbnailUrl={item.thumbnail_url}
                     isActive={isFocused && index === currentIndex && item.status === 'ready'}
@@ -443,6 +444,7 @@ export default function HomeScreen() {
               ) : (
                 <ImagePostViewer
                   images={item.images || []}
+                  postId={item.id as number}
                   restaurant={restaurant}
                   user={{
                     userId: item.user_id,

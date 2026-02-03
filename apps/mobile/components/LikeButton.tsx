@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { useAuth } from '../src/context/auth';
 
-export const LikeButton = ({ videoUrl }: { videoUrl: string }) => {
+export const LikeButton = ({ postId }: { postId: number }) => {
     const { user, supabase: authSupabase } = useAuth();
     const [likesCount, setLikesCount] = useState(0);
     const [isLiked, setIsLiked] = useState(false);
@@ -10,23 +10,25 @@ export const LikeButton = ({ videoUrl }: { videoUrl: string }) => {
     // Fetch initial state
     useEffect(() => {
         const fetchLikes = async () => {
-            // Get count
-            const { data: videoData } = await authSupabase
-                .from('videos')
+            if (!postId) return;
+
+            // Get count from posts table
+            const { data: postData } = await authSupabase
+                .from('posts')
                 .select('likes_count')
-                .eq('video_url', videoUrl)
+                .eq('id', postId)
                 .single();
 
-            if (videoData) {
-                setLikesCount(videoData.likes_count || 0);
+            if (postData) {
+                setLikesCount(postData.likes_count || 0);
             }
 
             // Check if user liked
             if (user) {
                 const { data: likeData } = await authSupabase
-                    .from('video_likes') // make sure this matches the table name
+                    .from('post_likes')
                     .select('*')
-                    .eq('video_url', videoUrl)
+                    .eq('post_id', postId)
                     .eq('user_id', user.sub)
                     .single();
 
@@ -35,10 +37,10 @@ export const LikeButton = ({ videoUrl }: { videoUrl: string }) => {
         };
 
         fetchLikes();
-    }, [videoUrl, user]);
+    }, [postId, user]);
 
     const toggleLike = async () => {
-        if (!user) return; // Or show login prompt
+        if (!user || !postId) return; // Or show login prompt
 
         const previousLiked = isLiked;
         const previousCount = likesCount;
@@ -50,9 +52,9 @@ export const LikeButton = ({ videoUrl }: { videoUrl: string }) => {
         if (previousLiked) {
             // Unlike
             const { error } = await authSupabase
-                .from('video_likes')
+                .from('post_likes')
                 .delete()
-                .eq('video_url', videoUrl)
+                .eq('post_id', postId)
                 .eq('user_id', user.sub);
 
             if (error) {
@@ -64,9 +66,9 @@ export const LikeButton = ({ videoUrl }: { videoUrl: string }) => {
         } else {
             // Like
             const { error } = await authSupabase
-                .from('video_likes')
+                .from('post_likes')
                 .insert({
-                    video_url: videoUrl,
+                    post_id: postId,
                     user_id: user.sub
                 });
 
@@ -108,3 +110,4 @@ const styles = StyleSheet.create({
         color: '#666',
     },
 });
+

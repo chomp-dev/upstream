@@ -1,125 +1,23 @@
 import { Router } from 'express';
 import { pool, queryWithRetry } from '../db';
-import { getVideo } from '../services/cloudflare';
 
 export const feedRouter = Router();
 
-// Debug endpoint to see all videos in database
-feedRouter.get('/debug/all-videos', async (req, res) => {
+// Debug endpoint to see all posts in database
+feedRouter.get('/debug/all-posts', async (req, res) => {
   try {
-    const result = await pool.query(
-      `SELECT id, cloudflare_video_id, status, playback_url IS NOT NULL as has_playback, 
-              thumbnail_url IS NOT NULL as has_thumbnail, google_place_id, created_at
-       FROM videos 
-       ORDER BY created_at DESC`
-    );
+    const result = await pool.query(`
+       SELECT * 
+       FROM posts 
+       ORDER BY created_at DESC
+    `);
+
     res.json({
-      count: result.rows.length,
-      videos: result.rows
+      count: result.rowCount,
+      posts: result.rows
     });
   } catch (error: any) {
-    res.status(500).json({ error: error?.message });
-  }
-});
-
-// TEMP MIGRATION: Add user_id to tables
-feedRouter.get('/debug/migrate-user-id', async (req, res) => {
-  try {
-    console.log('[Migration] Adding user_id columns...');
-
-    // Add user_id to videos
-    await pool.query(`
-      DO $$ 
-      BEGIN 
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='videos' AND column_name='user_id') THEN 
-          ALTER TABLE videos ADD COLUMN user_id TEXT; 
-        END IF; 
-      END $$;
-    `);
-
-    // Add user_id to image_posts
-    await pool.query(`
-      DO $$ 
-      BEGIN 
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='image_posts' AND column_name='user_id') THEN 
-          ALTER TABLE image_posts ADD COLUMN user_id TEXT; 
-        END IF; 
-      END $$;
-    `);
-
-    // Add user_id to tiktok_embeds
-    await pool.query(`
-      DO $$ 
-      BEGIN 
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tiktok_embeds' AND column_name='user_id') THEN 
-          ALTER TABLE tiktok_embeds ADD COLUMN user_id TEXT; 
-        END IF; 
-      END $$;
-    `);
-
-    res.json({ success: true, message: 'Migration successful' });
-  } catch (error: any) {
-    console.error('Migration failed:', error);
     res.status(500).json({ error: error.message });
-  }
-});
-
-// Debug endpoint to manually check video status from Cloudflare and sync DB
-feedRouter.get('/check-status/:cloudflareVideoId', async (req, res) => {
-  try {
-    const { cloudflareVideoId } = req.params;
-    console.log(`[Debug] Checking status for video: ${cloudflareVideoId}`);
-
-    try {
-      const cloudflareVideo = await getVideo(cloudflareVideoId);
-      console.log(`[Debug] Cloudflare status: ${cloudflareVideo.status}`);
-
-      // Update DB with latest status
-      const newPlaybackUrl = cloudflareVideo.playback?.hls || cloudflareVideo.playback?.dash || null;
-      const durationInt = cloudflareVideo.duration ? Math.round(cloudflareVideo.duration) : null;
-
-      await pool.query(
-        `UPDATE videos 
-                SET status = $1, 
-                    playback_url = $2, 
-                    thumbnail_url = $3,
-                    duration = $4,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE cloudflare_video_id = $5`,
-        [
-          cloudflareVideo.status,
-          newPlaybackUrl,
-          cloudflareVideo.thumbnail || null,
-          durationInt,
-          cloudflareVideoId,
-        ]
-      );
-
-      res.json({ success: true, video: cloudflareVideo });
-
-    } catch (error: any) {
-      // Handle 404 (Deleted on Cloudflare)
-      const is404 = error?.statusCode === 404 ||
-        error?.message?.includes('404') ||
-        error?.message?.includes('not found') ||
-        // Cloudflare sometimes returns 400 for invalid/deleted IDs
-        error?.statusCode === 400;
-
-      if (is404) {
-        console.log(`[Debug] Video ${cloudflareVideoId} not found on Cloudflare (deleted), marking as error`);
-
-        await pool.query(
-          `UPDATE videos SET status = 'error', updated_at = CURRENT_TIMESTAMP WHERE cloudflare_video_id = $1`,
-          [cloudflareVideoId]
-        );
-        return res.json({ success: true, status: 'error', message: 'Video marked as deleted' });
-      }
-
-      throw error;
-    }
-  } catch (error: any) {
-    console.error(`[Debug] Error checking video:`, error);
-    res.status(500).json({ error: error?.message || 'Failed to check video status' });
   }
 });
 
@@ -127,449 +25,326 @@ feedRouter.get('/check-status/:cloudflareVideoId', async (req, res) => {
 feedRouter.post('/admin/verify-all-videos', async (req, res) => {
   try {
     console.log('[Admin] Starting verification of all videos...');
+    // @ts-ignore
+    const { getVideo } = require('../services/cloudflare');
 
     // Get all videos from database
     const allVideos = await pool.query(
-      `SELECT id, cloudflare_video_id, status FROM videos ORDER BY created_at DESC`
+      `SELECT id, cloudflare_video_id, status FROM posts WHERE post_type = 'video' AND cloudflare_video_id IS NOT NULL ORDER BY created_at DESC`
     );
 
-    let checked = 0;
-    let markedAsError = 0;
-    let stillValid = 0;
+    console.log(`[Admin] Found ${allVideos.rows.length} videos to verify`);
+
+    let verifiedCount = 0;
+    let markedDeletedCount = 0;
+    let errorCount = 0;
 
     for (const video of allVideos.rows) {
-      if (video.cloudflare_video_id) {
-        try {
-          await getVideo(video.cloudflare_video_id);
-          stillValid++;
-        } catch (error: any) {
-          const is404 = error?.statusCode === 404 ||
-            error?.message?.includes('404') ||
-            error?.message?.includes('not found');
+      try {
+        const cloudflareStatus = await getVideo(video.cloudflare_video_id);
 
-          if (is404 && video.status !== 'error') {
-            // Mark as error
-            await pool.query(
-              `UPDATE videos SET status = 'error', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
-              [video.id]
-            );
-            markedAsError++;
-            console.log(`[Admin] Marked video ${video.cloudflare_video_id} as error (deleted from Cloudflare)`);
-          }
+        // If 404/deleted, update DB
+        if (!cloudflareStatus || (cloudflareStatus.status && cloudflareStatus.status.state === 'deleted')) {
+          console.log(`[Admin] Video ${video.id} (${video.cloudflare_video_id}) is deleted on Cloudflare`);
+
+          await pool.query(
+            `UPDATE posts SET status = 'error', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+            [video.id]
+          );
+          markedDeletedCount++;
+        } else {
+          verifiedCount++;
         }
-        checked++;
+      } catch (e: any) {
+        // If 404 error from API
+        if (e.statusCode === 404 || e.message?.includes('404')) {
+          console.log(`[Admin] Video ${video.id} (${video.cloudflare_video_id}) not found on Cloudflare`);
+          await pool.query(
+            `UPDATE posts SET status = 'error', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+            [video.id]
+          );
+          markedDeletedCount++;
+        } else {
+          console.error(`[Admin] Error checking video ${video.id}:`, e.message);
+          errorCount++;
+        }
       }
     }
 
-    console.log(`[Admin] Verification complete: ${checked} checked, ${markedAsError} marked as error, ${stillValid} still valid`);
-
     res.json({
       success: true,
-      totalVideos: allVideos.rows.length,
-      checked,
-      markedAsError,
-      stillValid,
+      summary: {
+        totalVideos: allVideos.rows.length,
+        verified: verifiedCount,
+        markedDeleted: markedDeletedCount,
+        errors: errorCount
+      }
     });
+
   } catch (error: any) {
     console.error('[Admin] Error verifying videos:', error);
     res.status(500).json({ error: error?.message || 'Failed to verify videos' });
   }
 });
 
-// ============================================================================
-// Location-Based Feed - Videos from nearby restaurants
-// ============================================================================
-
-/**
- * Get feed of videos and image posts for nearby restaurants
- * GET /api/feed/nearby?place_ids=id1,id2,id3&limit=20&offset=0
- * 
- * Returns only content linked to the specified google_place_ids.
- * Used by mobile app to show location-relevant content.
- */
+// Location-Based Feed - Posts from nearby restaurants
 feedRouter.get('/nearby', async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit as string) || 20;
+    const limit = parseInt(req.query.limit as string) || 50;
     const offset = parseInt(req.query.offset as string) || 0;
 
-    // Parse place_ids from query string (comma-separated or repeated params)
     let placeIds: string[] = [];
-    const placeIdsParam = req.query.place_ids;
 
-    if (typeof placeIdsParam === 'string') {
-      placeIds = placeIdsParam.split(',').map(id => id.trim()).filter(Boolean);
-    } else if (Array.isArray(placeIdsParam)) {
-      placeIds = placeIdsParam.map(id => String(id).trim()).filter(Boolean);
+    // Check if place_ids are provided directly (from frontend that already fetched nearby)
+    if (req.query.place_ids) {
+      const placeIdsParam = req.query.place_ids as string;
+      placeIds = placeIdsParam.split(',').filter(Boolean);
+      console.log(`[Feed/Nearby] Using ${placeIds.length} place_ids from request`);
+    } else {
+      // Fallback to lat/lng lookup
+      const lat = parseFloat(req.query.lat as string);
+      const lng = parseFloat(req.query.lng as string);
+
+      if (isNaN(lat) || isNaN(lng)) {
+        return res.status(400).json({ error: 'Valid lat/lng or place_ids required' });
+      }
+
+      // Get nearby places from Google Places API
+      // @ts-ignore
+      const { searchRestaurants } = require('../services/googlePlaces');
+      const places = await searchRestaurants("restaurant", lat, lng);
+      placeIds = places.restaurants.map((r: any) => r.id);
     }
 
-    console.log(`[Feed/Nearby] Request with ${placeIds.length} place_ids, limit=${limit}, offset=${offset}`);
-
-    // If no place_ids provided, return empty feed
     if (placeIds.length === 0) {
-      return res.json({
-        feed: [],
-        hasMore: false,
-        feedMode: 'nearby',
-        nearbyPlaceIds: [],
-        totalNearbyRestaurants: 0,
-      });
+      return res.json({ feed: [], count: 0, hasMore: false, feedMode: 'nearby', nearbyPlaceIds: [], totalNearbyRestaurants: 0 });
     }
 
-    // Fetch videos linked to nearby restaurants - exclude error/deleted videos
-    // Fetch videos linked to nearby restaurants - exclude error/deleted videos
-    const videosResult = await queryWithRetry(
-      `SELECT v.id, v.cloudflare_video_id, v.playback_url, v.thumbnail_url, 
-              v.status, v.duration, v.google_place_id, v.created_at, v.updated_at,
-              u.name as username, u.avatar as user_avatar, u.auth0_id as user_id
-       FROM videos v
-       LEFT JOIN users u ON v.user_id = u.auth0_id
-       WHERE v.status != 'error' 
-         AND v.google_place_id = ANY($1)
-       ORDER BY v.created_at DESC 
+    // Fetch posts linked to nearby restaurants - exclude error/deleted/pending posts
+    const result = await queryWithRetry(
+      `SELECT p.*, u.name as username, u.avatar as user_avatar, u.auth0_id as user_id
+       FROM posts p
+       LEFT JOIN users u ON p.user_id = u.auth0_id
+       WHERE p.google_place_id = ANY($1)
+       AND p.status = 'ready'
+       AND (p.post_type != 'video' OR p.playback_url IS NOT NULL)
+       ORDER BY p.created_at DESC 
        LIMIT $2 OFFSET $3`,
       [placeIds, limit, offset]
     );
 
-    console.log(`[Feed/Nearby] Found ${videosResult.rows.length} videos for nearby restaurants`);
+    console.log(`[Feed/Nearby] Found ${result.rows.length} posts for nearby restaurants`);
 
-    // Fetch image posts linked to nearby restaurants
-    const imagesResult = await queryWithRetry(
-      `SELECT i.id, i.images, i.google_place_id, i.created_at,
-              u.name as username, u.avatar as user_avatar, u.auth0_id as user_id
-       FROM image_posts i
-       LEFT JOIN users u ON i.user_id = u.auth0_id
-       WHERE i.google_place_id = ANY($1)
-       ORDER BY i.created_at DESC 
-       LIMIT $2 OFFSET $3`,
-      [placeIds, limit, offset]
-    );
+    // Process posts
+    const feed = await Promise.all(result.rows.map(async (post: any) => {
+      // Map post_type to type
+      const feedItem = {
+        ...post,
+        type: post.post_type // 'video', 'image', or 'tiktok_embed'
+      };
 
-    console.log(`[Feed/Nearby] Found ${imagesResult.rows.length} image posts for nearby restaurants`);
+      // Backward compatibility for 'image_post' type if frontend strictly checks 'image_post'
+      if (feedItem.type === 'image') {
+        feedItem.type = 'image_post';
+      }
 
-    // Fetch TikTok embeds linked to nearby restaurants (with graceful fallback if table doesn't exist)
-    let tiktokRows: any[] = [];
-    try {
-      const tiktokResult = await queryWithRetry(
-        `SELECT id, tiktok_url, embed_html, title, author_name, author_url, thumbnail_url, 
-                thumbnail_width, thumbnail_height, google_place_id, created_at
-         FROM tiktok_embeds 
-         WHERE google_place_id = ANY($1)
-         ORDER BY created_at DESC 
-         LIMIT $2 OFFSET $3`,
-        [placeIds, limit, offset]
-      );
-      tiktokRows = tiktokResult.rows;
-      console.log(`[Feed/Nearby] Found ${tiktokRows.length} TikTok embeds for nearby restaurants`);
-    } catch (err: any) {
-      // Table might not exist yet - gracefully skip
-      console.log('[Feed/Nearby] TikTok embeds skipped (table may not exist):', err.message);
-    }
+      // Filter out empty image URLs if any
+      if (feedItem.type === 'image_post' && Array.isArray(feedItem.images)) {
+        feedItem.images = feedItem.images.filter((url: string) => !!url);
+      }
 
-    // Combine and interleave, sorted by created_at
-    const feed = [
-      ...videosResult.rows.map((v: any) => ({ type: 'video', ...v })),
-      ...imagesResult.rows.map((i: any) => ({
-        type: 'image_post',
-        ...i,
-        images: Array.isArray(i.images) ? i.images.filter((url: string) => !!url) : []
-      })),
-      // Filter TikTok rows to ensure they have required fields (graceful deletion handling)
-      ...tiktokRows
-        .filter((t: any) => t && t.id && t.tiktok_url)
-        .map((t: any) => ({
-          type: 'tiktok_embed',
-          ...t,
-        })),
-    ].sort((a, b) =>
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
+      return feedItem;
+    }));
 
-    // Get unique place_ids that actually have content
-    const matchedPlaceIds = [...new Set(feed.map((item: any) => item.google_place_id).filter(Boolean))];
+    const validFeed = feed.filter(item => item !== null);
+    const matchedPlaceIds = [...new Set(validFeed.map((item: any) => item.google_place_id).filter(Boolean))];
 
     res.json({
-      feed,
-      hasMore: feed.length === limit,
+      feed: validFeed,
+      count: validFeed.length,
+      hasMore: validFeed.length === limit,
       feedMode: 'nearby',
       nearbyPlaceIds: matchedPlaceIds,
       totalNearbyRestaurants: placeIds.length,
     });
 
-    // Background validation (Fire-and-forget)
-    // Check and update status for ALL videos to handle manual Cloudflare deletions
-    const videosToCheck = videosResult.rows.filter((v: any) => v.cloudflare_video_id);
-
-    if (videosToCheck.length > 0) {
-      Promise.all(videosToCheck.map(async (video: any) => {
-        try {
-          // We need to import getVideo at the top or assumed it's available
-          const cloudflareVideo = await getVideo(video.cloudflare_video_id);
-          // ... existing code ...
-
-          // Update database if status changed OR if we need to sync metadata
-          const newPlaybackUrl = cloudflareVideo.playback?.hls || cloudflareVideo.playback?.dash || null;
-          const durationInt = cloudflareVideo.duration ? Math.round(cloudflareVideo.duration) : null;
-
-          if (cloudflareVideo.status !== video.status ||
-            !video.playback_url ||
-            video.duration !== durationInt) {
-
-            console.log(`[Feed/Nearby] Syncing video ${video.cloudflare_video_id}: ${video.status} -> ${cloudflareVideo.status}`);
-
-            await pool.query(
-              `UPDATE videos 
-                 SET status = $1, 
-                     playback_url = $2, 
-                     thumbnail_url = $3,
-                     duration = $4,
-                     updated_at = CURRENT_TIMESTAMP
-                 WHERE cloudflare_video_id = $5`,
-              [
-                cloudflareVideo.status,
-                newPlaybackUrl,
-                cloudflareVideo.thumbnail || null,
-                durationInt,
-                video.cloudflare_video_id,
-              ]
-            );
-          }
-        } catch (error: any) {
-          // Check for 404 (Deleted)
-          const is404 = error?.statusCode === 404 ||
-            error?.message?.includes('404') ||
-            error?.message?.includes('not found') ||
-            error?.statusCode === 400;
-
-          if (is404) {
-            console.log(`[Feed/Nearby] Video ${video.cloudflare_video_id} deleted on Cloudflare, marking as error`);
-
-            await pool.query(
-              `UPDATE videos SET status = 'error', updated_at = CURRENT_TIMESTAMP WHERE cloudflare_video_id = $1`,
-              [video.cloudflare_video_id]
-            );
-          } else {
-            console.warn(`[Feed/Nearby] Status check failed for ${video.cloudflare_video_id}:`, error?.message);
-          }
-        }
-      })).catch(err => console.error('[Feed/Nearby] Background validation error:', err));
-    }
-
-    // Validate images in background
-    if (imagesResult.rows.length > 0) {
-      validateImagePosts(imagesResult.rows);
-    }
   } catch (error: any) {
-    console.error('[Feed/Nearby] Error:', error.message, error.stack);
-    res.status(500).json({
-      error: 'Failed to fetch nearby feed',
-      details: error.message,
-      code: error.code
-    });
+    console.error('Nearby feed error:', error);
+    res.status(500).json({ error: 'Failed to fetch nearby feed' });
   }
 });
 
-// ============================================================================
-// Demo Feed - All videos (original behavior)
-// ============================================================================
-
-// Get feed of videos and image posts
+// Demo Feed - All posts
 feedRouter.get('/', async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit as string) || 20;
+    const limit = parseInt(req.query.limit as string) || 50;
     const offset = parseInt(req.query.offset as string) || 0;
 
-    // Fetch videos - exclude error/deleted videos
-    // Fetch videos - exclude error/deleted videos
-    let videosResult = await queryWithRetry(
-      `SELECT v.id, v.cloudflare_video_id, v.playback_url, v.thumbnail_url, 
-              v.status, v.duration, v.google_place_id, v.created_at, v.updated_at,
-              u.name as username, u.avatar as user_avatar, u.auth0_id as user_id
-       FROM videos v
-       LEFT JOIN users u ON v.user_id = u.auth0_id
-       WHERE v.status != 'error'
-       ORDER BY v.created_at DESC 
+    // Fetch posts - exclude error/deleted/pending posts, require playback_url for videos
+    let result = await queryWithRetry(
+      `SELECT p.*, u.name as username, u.avatar as user_avatar, u.auth0_id as user_id
+       FROM posts p
+       LEFT JOIN users u ON p.user_id = u.auth0_id
+       WHERE p.status = 'ready'
+       AND (p.post_type != 'video' OR p.playback_url IS NOT NULL)
+       ORDER BY p.created_at DESC 
        LIMIT $1 OFFSET $2`,
       [limit, offset]
     );
 
-    console.log(`[Feed] Found ${videosResult.rows.length} videos. Statuses: ${videosResult.rows.map(v => `${v.id}:${v.status}`).join(', ')}`);
+    console.log(`[Feed] Found ${result.rows.length} posts.`);
 
-    // Check and update status for ALL videos to handle manual Cloudflare deletions
-    // We run this in the background (no await) to keep the feed fast
-    const videosToCheck = videosResult.rows.filter((v: any) => v.cloudflare_video_id);
+    // Check and update status for video posts
+    const videosToCheck = result.rows.filter((p: any) => p.post_type === 'video' && p.cloudflare_video_id);
 
     if (videosToCheck.length > 0) {
-      // Fire-and-forget validation
-      // This means the current response might show deleted videos (stale), but they will be fixed on next refresh
       Promise.all(videosToCheck.map(async (video: any) => {
         try {
-          const cloudflareVideo = await getVideo(video.cloudflare_video_id);
+          // @ts-ignore
+          const { getVideo } = require('../services/cloudflare');
+          const status = await getVideo(video.cloudflare_video_id);
 
-          // Update database if status changed OR if we need to sync metadata
-          const newPlaybackUrl = cloudflareVideo.playback?.hls || cloudflareVideo.playback?.dash || null;
-          const durationInt = cloudflareVideo.duration ? Math.round(cloudflareVideo.duration) : null;
-
-          if (cloudflareVideo.status !== video.status ||
-            !video.playback_url ||
-            video.duration !== durationInt) {
-
-            console.log(`[Feed] Syncing video ${video.cloudflare_video_id}: ${video.status} -> ${cloudflareVideo.status}`);
-
+          if (!status || (status.status && status.status.state === 'deleted')) {
             await pool.query(
-              `UPDATE videos 
-                 SET status = $1, 
-                     playback_url = $2, 
-                     thumbnail_url = $3,
-                     duration = $4,
-                     updated_at = CURRENT_TIMESTAMP
-                 WHERE cloudflare_video_id = $5`,
-              [
-                cloudflareVideo.status,
-                newPlaybackUrl,
-                cloudflareVideo.thumbnail || null,
-                durationInt,
-                video.cloudflare_video_id,
-              ]
-            );
-          }
-        } catch (error: any) {
-          // Check for 404 (Deleted)
-          const is404 = error?.statusCode === 404 ||
-            error?.message?.includes('404') ||
-            error?.message?.includes('not found') ||
-            error?.statusCode === 400;
-
-          if (is404) {
-            console.log(`[Feed] Video ${video.cloudflare_video_id} deleted on Cloudflare, marking as error`);
-
-            await pool.query(
-              `UPDATE videos SET status = 'error', updated_at = CURRENT_TIMESTAMP WHERE cloudflare_video_id = $1`,
+              `UPDATE posts SET status = 'error', updated_at = CURRENT_TIMESTAMP WHERE cloudflare_video_id = $1`,
               [video.cloudflare_video_id]
             );
-          } else {
-            console.warn(`[Feed] Status check failed for ${video.cloudflare_video_id}:`, error?.message);
+          }
+        } catch (e: any) {
+          if (e.statusCode === 404) {
+            await pool.query(
+              `UPDATE posts SET status = 'error', updated_at = CURRENT_TIMESTAMP WHERE cloudflare_video_id = $1`,
+              [video.cloudflare_video_id]
+            );
           }
         }
-      })).catch(err => console.error('[Feed] Background validation error:', err));
+      })).catch(err => console.error('Background status check failed:', err));
     }
 
-    // Fetch image posts
-    // Fetch image posts
-    const imagesResult = await queryWithRetry(
-      `SELECT i.id, i.images, i.google_place_id, i.created_at,
-              u.name as username, u.avatar as user_avatar, u.auth0_id as user_id
-       FROM image_posts i
-       LEFT JOIN users u ON i.user_id = u.auth0_id
-       ORDER BY i.created_at DESC 
-       LIMIT $1 OFFSET $2`,
-      [limit, offset]
-    );
+    const feed = await Promise.all(result.rows.map(async (post: any) => {
+      // Map post_type
+      const feedItem = {
+        ...post,
+        type: post.post_type
+      };
 
-    // Fetch TikTok embeds (with graceful fallback if table doesn't exist)
-    let tiktokRows: any[] = [];
-    try {
-      const tiktokResult = await queryWithRetry(
-        `SELECT id, tiktok_url, embed_html, title, author_name, author_url, thumbnail_url, 
-                thumbnail_width, thumbnail_height, google_place_id, created_at
-         FROM tiktok_embeds 
-         ORDER BY created_at DESC 
-         LIMIT $1 OFFSET $2`,
-        [limit, offset]
-      );
-      tiktokRows = tiktokResult.rows;
-    } catch (err: any) {
-      console.log('[Feed] TikTok embeds skipped (table may not exist):', err.message);
-    }
+      if (feedItem.type === 'image') {
+        feedItem.type = 'image_post';
+      }
 
-    // Combine and interleave (simple approach - videos first, then images)
-    const feed = [
-      ...videosResult.rows.map((v: any) => ({ type: 'video', ...v })),
-      ...imagesResult.rows.map((i: any) => ({
-        type: 'image_post',
-        ...i,
-        images: Array.isArray(i.images) ? i.images.filter((url: string) => !!url) : []
-      })),
-      // Filter TikTok rows to ensure they have required fields (graceful deletion handling)
-      ...tiktokRows
-        .filter((t: any) => t && t.id && t.tiktok_url)
-        .map((t: any) => ({
-          type: 'tiktok_embed',
-          ...t,
-        })),
-    ].sort((a, b) =>
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
-
-    // Debug logging
-    console.log('[Feed] Serving feed with ' + feed.length + ' items');
-    const imagePosts = feed.filter((i: any) => i.type === 'image_post');
-    if (imagePosts.length > 0) {
-      console.log('[Feed] content check:', JSON.stringify(imagePosts[0], null, 2));
-      // Validate images in background
-      validateImagePosts(imagesResult.rows);
-    }
+      return feedItem;
+    }));
 
     res.json({
       feed,
+      count: feed.length,
       hasMore: feed.length === limit,
     });
-  } catch (error) {
+
+  } catch (error: any) {
     console.error('Feed error:', error);
     res.status(500).json({ error: 'Failed to fetch feed' });
   }
 });
 
-// Helper to validate image posts in background
-async function validateImagePosts(imagePosts: any[]) {
-  if (!imagePosts || imagePosts.length === 0) return;
+// Delete a post
+feedRouter.delete('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
 
-  // @ts-ignore
-  const { getImage } = require('../services/cloudflare');
+    // First get the post to know its type and details
+    const result = await pool.query('SELECT * FROM posts WHERE id = $1', [id]);
 
-  Promise.all(imagePosts.map(async (post) => {
-    try {
-      if (!post.images || !Array.isArray(post.images) || post.images.length === 0) return;
-
-      const validImages: string[] = [];
-      let hasChanges = false;
-
-      for (const imageUrl of post.images) {
-        // Extract ID from URL
-        // https://imagedelivery.net/<hash>/<id>/<variant>
-        const matches = imageUrl.match(/imagedelivery\.net\/[^\/]+\/([^\/]+)/);
-        if (matches && matches[1]) {
-          const imageId = matches[1];
-          try {
-            await getImage(imageId);
-            validImages.push(imageUrl);
-          } catch (error: any) {
-            if (error.statusCode === 404) {
-              console.log(`[Feed/Images] Image ${imageId} in post ${post.id} deleted on Cloudflare, removing.`);
-              hasChanges = true;
-            } else {
-              // If other error, keep it (innocent until proven guilty)
-              validImages.push(imageUrl);
-            }
-          }
-        } else {
-          // Not a cloudflare URL, keep it
-          validImages.push(imageUrl);
-        }
-      }
-
-      if (hasChanges) {
-        if (validImages.length === 0) {
-          console.log(`[Feed/Images] Post ${post.id} has no valid images left, deleting.`);
-          await pool.query('DELETE FROM image_posts WHERE id = $1', [post.id]);
-        } else {
-          console.log(`[Feed/Images] Updating post ${post.id} with valid images.`);
-          await pool.query('UPDATE image_posts SET images = $1 WHERE id = $2', [validImages, post.id]);
-        }
-      }
-    } catch (e) {
-      console.error(`[Feed/Images] Error validating post ${post.id}:`, e);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Post not found' });
     }
-  })).catch(err => console.error('[Feed/Images] Validation error:', err));
-}
 
-export default feedRouter;
+    const post = result.rows[0];
+
+    // Delete from DB
+    await pool.query('DELETE FROM posts WHERE id = $1', [id]);
+
+    // Perform cleanup based on type (e.g. delete from Cloudflare)
+    if (post.post_type === 'video' && post.cloudflare_video_id) {
+      // @ts-ignore
+      const { deleteVideo } = require('../services/cloudflare');
+      try {
+        await deleteVideo(post.cloudflare_video_id);
+      } catch (e) {
+        console.error('Failed to delete video from Cloudflare', e);
+      }
+    }
+
+    res.json({ success: true, deletedId: id });
+  } catch (error: any) {
+    console.error('Delete error:', error);
+    res.status(500).json({ error: 'Failed to delete post' });
+  }
+});
+
+// Edit a post (images only for now in original code?)
+feedRouter.put('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { images, title, description, tags } = req.body;
+
+    // Check if post exists
+    const result = await pool.query('SELECT * FROM posts WHERE id = $1', [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+
+    const post = result.rows[0];
+
+    // Update fields
+    const updateFields: string[] = [];
+    const values: any[] = [];
+    let paramCount = 1;
+
+    if (typeof title !== 'undefined') {
+      updateFields.push(`title = $${paramCount++}`);
+      values.push(title);
+    }
+    if (typeof description !== 'undefined') {
+      updateFields.push(`description = $${paramCount++}`);
+      values.push(description);
+    }
+    if (typeof tags !== 'undefined') {
+      updateFields.push(`tags = $${paramCount++}`);
+      values.push(tags);
+    }
+    if (typeof images !== 'undefined' && (post.post_type === 'image' || post.post_type === 'image_post')) {
+      // Validate images
+      if (!Array.isArray(images) || images.length < 1 || images.length > 10) {
+        return res.status(400).json({ error: 'Must provide between 1 and 10 images' });
+      }
+
+      // @ts-ignore
+      const { getImageDeliveryUrl } = require('../services/cloudflareImages');
+      const validImages = images.map((img: string) => {
+        if (img.startsWith('http')) return img;
+        return getImageDeliveryUrl(img);
+      });
+
+      updateFields.push(`images = $${paramCount++}`);
+      values.push(validImages);
+    }
+
+    if (updateFields.length === 0) {
+      return res.json({ success: true, post });
+    }
+
+    updateFields.push(`updated_at = CURRENT_TIMESTAMP`);
+    values.push(id);
+
+    const updateQuery = `UPDATE posts SET ${updateFields.join(', ')} WHERE id = $${paramCount} RETURNING *`;
+
+    const updateResult = await pool.query(updateQuery, values);
+
+    res.json({ success: true, post: updateResult.rows[0] });
+
+  } catch (error: any) {
+    console.error('Update error:', error);
+    res.status(500).json({ error: 'Failed to update post' });
+  }
+});

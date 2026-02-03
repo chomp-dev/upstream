@@ -32,7 +32,7 @@ webhookRouter.post('/cloudflare-stream', async (req, res) => {
 
     // Update database with video details
     await pool.query(
-      `UPDATE videos 
+      `UPDATE posts 
        SET status = $1, 
            playback_url = $2, 
            thumbnail_url = $3,

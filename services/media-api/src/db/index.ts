@@ -20,111 +20,83 @@ export async function initDb() {
     await pool.query('SELECT NOW()');
     console.log('✅ Database connection successful');
 
-    // Create videos table with google_place_id
+    // Create posts table if not exists (replacing videos and image_posts)
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS videos (
+      CREATE TABLE IF NOT EXISTS posts (
         id SERIAL PRIMARY KEY,
-        cloudflare_video_id VARCHAR(255) UNIQUE NOT NULL,
+        cloudflare_video_id VARCHAR(255),
         playback_url TEXT,
         thumbnail_url TEXT,
+        images TEXT[],
+        post_type VARCHAR(50) NOT NULL,
         status VARCHAR(50) DEFAULT 'pending',
         duration INTEGER,
         google_place_id TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    // Create image_posts table with google_place_id
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS image_posts (
-        id SERIAL PRIMARY KEY,
-        images TEXT[] NOT NULL,
-        google_place_id TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    // Create tiktok_embeds table for TikTok video embeds
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS tiktok_embeds (
-        id SERIAL PRIMARY KEY,
-        tiktok_url TEXT NOT NULL,
-        embed_html TEXT,
         title TEXT,
-        author_name TEXT,
-        author_url TEXT,
-        thumbnail_url TEXT,
-        thumbnail_width INTEGER,
-        thumbnail_height INTEGER,
-        google_place_id TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        description TEXT,
+        tags TEXT[],
+        likes_count INTEGER DEFAULT 0,
+        user_id TEXT REFERENCES users(auth0_id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(cloudflare_video_id)
       )
     `);
 
-    // Add metadata columns if they don't exist
+    // Create comments table
     await pool.query(`
-      DO $$ 
-      BEGIN 
-        -- Videos table columns
-        BEGIN
-          ALTER TABLE videos ADD COLUMN google_place_id TEXT;
-        EXCEPTION WHEN duplicate_column THEN NULL; END;
-
-        BEGIN
-          ALTER TABLE videos ADD COLUMN title TEXT;
-        EXCEPTION WHEN duplicate_column THEN NULL; END;
-
-        BEGIN
-          ALTER TABLE videos ADD COLUMN description TEXT;
-        EXCEPTION WHEN duplicate_column THEN NULL; END;
-
-        BEGIN
-          ALTER TABLE videos ADD COLUMN tags TEXT[];
-        EXCEPTION WHEN duplicate_column THEN NULL; END;
-        
-        -- Image posts table columns
-        BEGIN
-          ALTER TABLE image_posts ADD COLUMN google_place_id TEXT;
-        EXCEPTION WHEN duplicate_column THEN NULL; END;
-
-        BEGIN
-          ALTER TABLE image_posts ADD COLUMN title TEXT;
-        EXCEPTION WHEN duplicate_column THEN NULL; END;
-
-        BEGIN
-          ALTER TABLE image_posts ADD COLUMN description TEXT;
-        EXCEPTION WHEN duplicate_column THEN NULL; END;
-
-        BEGIN
-          ALTER TABLE image_posts ADD COLUMN tags TEXT[];
-        EXCEPTION WHEN duplicate_column THEN NULL; END;
-
-        -- User ID columns
-        BEGIN
-          ALTER TABLE videos ADD COLUMN user_id TEXT;
-        EXCEPTION WHEN duplicate_column THEN NULL; END;
-
-        BEGIN
-          ALTER TABLE image_posts ADD COLUMN user_id TEXT;
-        EXCEPTION WHEN duplicate_column THEN NULL; END;
-
-        BEGIN
-          ALTER TABLE tiktok_embeds ADD COLUMN user_id TEXT;
-        EXCEPTION WHEN duplicate_column THEN NULL; END;
-      END $$;
+      CREATE TABLE IF NOT EXISTS comments (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(auth0_id) ON DELETE CASCADE,
+        content TEXT NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )
     `);
 
-    // Create indexes for google_place_id
+    // Create post_likes table
     await pool.query(`
-      CREATE INDEX IF NOT EXISTS idx_videos_google_place_id ON videos (google_place_id);
+      CREATE TABLE IF NOT EXISTS post_likes (
+        post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(auth0_id) ON DELETE CASCADE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        PRIMARY KEY (post_id, user_id)
+      )
     `);
 
+    // Create function to update likes count
     await pool.query(`
-      CREATE INDEX IF NOT EXISTS idx_image_posts_google_place_id ON image_posts (google_place_id);
+      CREATE OR REPLACE FUNCTION update_likes_count()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        IF (TG_OP = 'INSERT') THEN
+          UPDATE posts SET likes_count = likes_count + 1 WHERE id = NEW.post_id;
+          RETURN NEW;
+        ELSIF (TG_OP = 'DELETE') THEN
+          UPDATE posts SET likes_count = likes_count - 1 WHERE id = OLD.post_id;
+          RETURN OLD;
+        END IF;
+        RETURN NULL;
+      END;
+      $$ LANGUAGE plpgsql;
     `);
 
-    console.log('✅ Database tables initialized with google_place_id support');
+    // Create trigger
+    await pool.query(`
+      DROP TRIGGER IF EXISTS update_post_likes_count ON post_likes;
+      CREATE TRIGGER update_post_likes_count
+      AFTER INSERT OR DELETE ON post_likes
+      FOR EACH ROW
+      EXECUTE FUNCTION update_likes_count();
+    `);
+
+    // Create index on google_place_id for faster lookups
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_posts_google_place_id ON posts(google_place_id);
+      CREATE INDEX IF NOT EXISTS idx_posts_user_id ON posts(user_id);
+    `);
+
+    console.log('✅ Database tables initialized (posts, comments, post_likes)');
     return pool;
   } catch (error: any) {
     console.error('❌ Database initialization error:', error.message);

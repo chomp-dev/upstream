@@ -36,29 +36,25 @@ restaurantsRouter.post('/media-summary', async (req, res) => {
       });
     }
 
-    // Get video counts and latest thumbnail per place_id
-    const videoResult = await queryWithRetry(
+    // Get aggregated counts and latest thumbnail per place_id
+    // We can do this in one query with conditional aggregation
+    // or two queries if simpler.
+    // Let's do a single query for counts and thumbnail
+    const summaryResult = await queryWithRetry(
       `SELECT 
          google_place_id,
-         COUNT(*) as video_count,
+         COUNT(*) FILTER (WHERE post_type = 'video') as video_count,
+         COUNT(*) FILTER (WHERE post_type = 'image') as image_count,
          (SELECT thumbnail_url 
-          FROM videos v2 
-          WHERE v2.google_place_id = videos.google_place_id 
+          FROM posts p2 
+          WHERE p2.google_place_id = p.google_place_id 
+            AND p2.post_type = 'video' 
+            AND p2.thumbnail_url IS NOT NULL 
           ORDER BY created_at DESC 
           LIMIT 1) as latest_thumbnail_url
-       FROM videos 
+       FROM posts p
        WHERE google_place_id = ANY($1)
-       GROUP BY google_place_id`,
-      [place_ids]
-    );
-
-    // Get image post counts per place_id
-    const imageResult = await queryWithRetry(
-      `SELECT 
-         google_place_id,
-         COUNT(*) as image_count
-       FROM image_posts 
-       WHERE google_place_id = ANY($1)
+         AND (status != 'error' OR status IS NULL)
        GROUP BY google_place_id`,
       [place_ids]
     );
@@ -75,18 +71,12 @@ restaurantsRouter.post('/media-summary', async (req, res) => {
       };
     }
 
-    // Fill in video data
-    for (const row of videoResult.rows) {
+    // Fill in data
+    for (const row of summaryResult.rows) {
       if (summary[row.google_place_id]) {
         summary[row.google_place_id].video_count = parseInt(row.video_count, 10);
-        summary[row.google_place_id].latest_thumbnail_url = row.latest_thumbnail_url;
-      }
-    }
-
-    // Fill in image data
-    for (const row of imageResult.rows) {
-      if (summary[row.google_place_id]) {
         summary[row.google_place_id].image_count = parseInt(row.image_count, 10);
+        summary[row.google_place_id].latest_thumbnail_url = row.latest_thumbnail_url;
       }
     }
 
@@ -111,34 +101,31 @@ restaurantsRouter.get('/:place_id/media', async (req, res) => {
     const limit = parseInt(req.query.limit as string) || 20;
     const offset = parseInt(req.query.offset as string) || 0;
 
-    // Fetch videos for this restaurant
-    const videosResult = await queryWithRetry(
-      `SELECT id, cloudflare_video_id, playback_url, thumbnail_url, 
-              status, duration, created_at
-       FROM videos 
+    // Fetch posts for this restaurant
+    const result = await queryWithRetry(
+      `SELECT *
+       FROM posts 
        WHERE google_place_id = $1
+         AND (status != 'error' OR status IS NULL)
        ORDER BY created_at DESC 
        LIMIT $2 OFFSET $3`,
       [place_id, limit, offset]
     );
 
-    // Fetch image posts for this restaurant
-    const imagesResult = await queryWithRetry(
-      `SELECT id, images, created_at
-       FROM image_posts 
-       WHERE google_place_id = $1
-       ORDER BY created_at DESC 
-       LIMIT $2 OFFSET $3`,
-      [place_id, limit, offset]
-    );
+    // Map to feed items
+    const media = result.rows.map((post: any) => {
+      // Map post_type
+      const item = {
+        ...post,
+        type: post.post_type
+      };
 
-    // Combine and sort by created_at
-    const media = [
-      ...videosResult.rows.map((v: any) => ({ type: 'video', ...v })),
-      ...imagesResult.rows.map((i: any) => ({ type: 'image_post', ...i })),
-    ].sort((a: any, b: any) =>
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
+      if (item.type === 'image') {
+        item.type = 'image_post';
+      }
+
+      return item;
+    });
 
     res.json({
       place_id,

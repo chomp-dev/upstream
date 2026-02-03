@@ -9,6 +9,7 @@ import { Placeholder } from '../Placeholder';
 
 interface VideoPlayerProps {
     videoId?: string;
+    postId: number;
     playbackUrl?: string;
     thumbnailUrl?: string;
     isActive: boolean;
@@ -26,6 +27,7 @@ const isIOSMobileWeb = Platform.OS === 'web' && typeof navigator !== 'undefined'
 
 export function VideoPlayer({
     videoId,
+    postId,
     playbackUrl,
     thumbnailUrl,
     isActive,
@@ -116,7 +118,7 @@ export function VideoPlayer({
                 </View>
             )}
 
-            <MediaOverlay height={height} restaurant={restaurant} user={user} />
+            <MediaOverlay height={height} restaurant={restaurant} user={user} postId={postId} />
         </TouchableOpacity>
     );
 }

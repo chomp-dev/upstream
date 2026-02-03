@@ -10,17 +10,19 @@ interface Comment {
     // Could join user name if needed, but for now showing raw or fetching
 }
 
-export const CommentSection = ({ videoUrl }: { videoUrl: string }) => {
+export const CommentSection = ({ postId }: { postId: number }) => {
     const { user, supabase: authSupabase } = useAuth();
     const [comments, setComments] = useState<Comment[]>([]);
     const [newComment, setNewComment] = useState('');
     const [loading, setLoading] = useState(false);
 
     const fetchComments = async () => {
+        if (!postId) return;
+
         const { data, error } = await authSupabase
             .from('comments')
             .select('*')
-            .eq('video_url', videoUrl)
+            .eq('post_id', postId)
             .order('created_at', { ascending: false });
 
         if (error) {
@@ -34,16 +36,16 @@ export const CommentSection = ({ videoUrl }: { videoUrl: string }) => {
         fetchComments();
 
         // Optional: Realtime subscription could go here
-    }, [videoUrl]);
+    }, [postId]);
 
     const postComment = async () => {
-        if (!newComment.trim() || !user) return;
+        if (!newComment.trim() || !user || !postId) return;
         setLoading(true);
 
         const { error } = await authSupabase
             .from('comments')
             .insert({
-                video_url: videoUrl, // Make sure this matches the PK in videos table
+                post_id: postId,
                 user_id: user.sub,
                 content: newComment.trim(),
             });
@@ -164,3 +166,4 @@ const styles = StyleSheet.create({
         marginLeft: 8,
     },
 });
+

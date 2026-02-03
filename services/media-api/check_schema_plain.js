@@ -10,14 +10,14 @@ const start = async () => {
     });
 
     try {
-        console.log('🔍 Checking Videos Table Schema...');
+        console.log('🔍 Checking Posts Table Schema...');
 
         const res = await pool.query(`
             SELECT column_name, data_type 
             FROM information_schema.columns 
-            WHERE table_name = 'videos';
+            WHERE table_name = 'posts';
         `);
-        console.log('Table "videos" columns:', res.rows);
+        console.log('Table "posts" columns:', res.rows);
     } catch (err) {
         console.error('❌ Check Failed:', err.message);
     } finally {

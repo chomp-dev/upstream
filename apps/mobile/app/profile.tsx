@@ -16,9 +16,10 @@ interface UserProfile {
 
 interface VideoItem {
     id: number;
-    video_url?: string;
-    playback_url?: string; // Add this as it might be used
+    playback_url?: string;
     thumbnail_url?: string;
+    images?: string[]; // Add images for image posts
+    post_type: 'video' | 'image' | 'tiktok_embed';
     title: string;
     description: string;
     likes_count: number;
@@ -59,15 +60,16 @@ export default function ProfileScreen() {
                     console.log("User fetch error:", userError);
                 }
 
-                // 2. Fetch Videos
-                const { data: videoData, error: videoError } = await supabase
-                    .from('videos')
+                // 2. Fetch Posts (videos + images)
+                const { data: postData, error: postError } = await supabase
+                    .from('posts')
                     .select('*')
                     .eq('user_id', targetUserId)
+                    .neq('status', 'error') // Exclude failed uploads
                     .order('created_at', { ascending: false });
 
-                if (videoData) {
-                    setVideos(videoData);
+                if (postData) {
+                    setVideos(postData);
                 }
 
             } catch (err) {
@@ -183,19 +185,26 @@ export default function ProfileScreen() {
             <FlatList
                 data={videos}
                 keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
-                renderItem={({ item }) => (
-                    <View style={styles.videoItem}>
-                        {/* Simple Video Item representation */}
-                        {item.thumbnail_url ? (
-                            <Image source={{ uri: item.thumbnail_url }} style={styles.videoThumbnail} />
-                        ) : (
-                            <View style={styles.videoPlaceholder}>
-                                <Ionicons name="play" size={24} color="white" />
-                            </View>
-                        )}
-                        <Text numberOfLines={1} style={styles.videoTitle}>{item.title || 'Untitled'}</Text>
-                    </View>
-                )}
+                renderItem={({ item }) => {
+                    const thumbnail = item.thumbnail_url || item.images?.[0];
+                    return (
+                        <View style={styles.videoItem}>
+                            {/* Simple Video Item representation */}
+                            {thumbnail ? (
+                                <Image source={{ uri: thumbnail }} style={styles.videoThumbnail} />
+                            ) : (
+                                <View style={styles.videoPlaceholder}>
+                                    <Ionicons
+                                        name={item.post_type === 'image' ? "images" : "play"}
+                                        size={24}
+                                        color="white"
+                                    />
+                                </View>
+                            )}
+                            <Text numberOfLines={1} style={styles.videoTitle}>{item.title || 'Untitled'}</Text>
+                        </View>
+                    );
+                }}
                 ListHeaderComponent={renderProfileHeader}
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>

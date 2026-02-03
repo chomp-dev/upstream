@@ -25,9 +25,10 @@ interface ImagePostViewerProps {
     username: string;
     avatarUrl: string;
   };
+  postId: number;
 }
 
-export function ImagePostViewer({ images, restaurant, user }: ImagePostViewerProps) {
+export function ImagePostViewer({ images, restaurant, user, postId }: ImagePostViewerProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
   const { width, height } = useContentDimensions();
@@ -84,7 +85,7 @@ export function ImagePostViewer({ images, restaurant, user }: ImagePostViewerPro
         })}
       </ScrollView>
 
-      <MediaOverlay height={height} restaurant={restaurant} user={user} />
+      <MediaOverlay height={height} restaurant={restaurant} user={user} postId={postId} />
 
       {/* Indicator dots */}
       <View style={styles.indicatorContainer}>

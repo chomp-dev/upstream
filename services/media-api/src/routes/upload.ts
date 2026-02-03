@@ -9,6 +9,14 @@ export const uploadRouter = Router();
 uploadRouter.post('/video', async (req, res) => {
   try {
     const { google_place_id, title, description, tags, user_id } = req.body || {};
+
+    console.log('[Upload] Video upload request received:');
+    console.log('[Upload] - user_id:', user_id);
+    console.log('[Upload] - title:', title);
+    console.log('[Upload] - description:', description);
+    console.log('[Upload] - google_place_id:', google_place_id);
+    console.log('[Upload] - Full req.body:', JSON.stringify(req.body));
+
     const upload = await createDirectUploadUrl();
 
     if (!upload.id || !upload.uploadURL) {
@@ -17,8 +25,8 @@ uploadRouter.post('/video', async (req, res) => {
 
     // Store video record in DB with pending status and metadata
     const result = await pool.query(
-      `INSERT INTO videos (cloudflare_video_id, status, google_place_id, title, description, tags, user_id) 
-       VALUES ($1, 'pending', $2, $3, $4, $5, $6) 
+      `INSERT INTO posts (cloudflare_video_id, status, google_place_id, title, description, tags, user_id, post_type) 
+       VALUES ($1, 'pending', $2, $3, $4, $5, $6, 'video') 
        RETURNING id, cloudflare_video_id, status, google_place_id, created_at`,
       [upload.id, google_place_id || null, title || null, description || null, tags || [], user_id || null]
     );
@@ -48,7 +56,7 @@ uploadRouter.get('/video/:videoId/status', async (req, res) => {
     // Update DB if status changed
     if (video.status && video.status !== 'pendingupload') {
       await pool.query(
-        `UPDATE videos 
+        `UPDATE posts 
          SET status = $1, 
              playback_url = $2, 
              thumbnail_url = $3,
@@ -148,8 +156,8 @@ uploadRouter.post('/images', async (req, res) => {
 
     // Store image post with metadata
     const result = await pool.query(
-      `INSERT INTO image_posts (images, google_place_id, title, description, tags, user_id) 
-       VALUES ($1, $2, $3, $4, $5, $6) 
+      `INSERT INTO posts (images, google_place_id, title, description, tags, user_id, post_type) 
+       VALUES ($1, $2, $3, $4, $5, $6, 'image') 
        RETURNING id, images, google_place_id, created_at`,
       [imageUrls, google_place_id || null, title || null, description || null, tags || [], user_id || null]
     );
@@ -162,3 +170,4 @@ uploadRouter.post('/images', async (req, res) => {
     res.status(500).json({ error: 'Failed to create image post' });
   }
 });
+

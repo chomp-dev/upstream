@@ -305,7 +305,9 @@ export default function CreateScreen() {
         });
 
         if (!initResponse.ok) throw new Error('Failed to init upload');
-        const { uploadUrl } = await initResponse.json();
+        const initData = await initResponse.json();
+        const uploadUrl = initData.uploadUrl;
+        const videoId = initData.videoId;
 
         // 2. Upload to Cloudflare
         setUploadStatus('Uploading video...');
@@ -344,7 +346,30 @@ export default function CreateScreen() {
           xhr.send(formData);
         });
 
-        setUploadStatus('Processing...');
+        // 3. Poll for video status (since webhooks can't reach localhost in dev)
+        setUploadStatus('Processing video...');
+
+        // Poll status endpoint to trigger DB update
+        let attempts = 0;
+        const maxAttempts = 30; // 30 seconds max wait
+        while (attempts < maxAttempts) {
+          try {
+            const statusRes = await fetch(`${mediaApi.BASE_URL}/api/upload/video/${videoId}/status`);
+            if (statusRes.ok) {
+              const statusData = await statusRes.json();
+              if (statusData.status === 'ready') {
+                console.log('[Upload] Video is ready!');
+                break;
+              }
+            }
+          } catch (e) {
+            // Ignore errors during polling
+          }
+          await new Promise(r => setTimeout(r, 1000));
+          attempts++;
+          setUploadStatus(`Processing video... (${attempts}s)`);
+        }
+
         setUploadProgress(1);
 
       } else {

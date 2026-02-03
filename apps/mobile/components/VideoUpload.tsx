@@ -57,12 +57,14 @@ export const VideoUpload = ({ onUploadComplete }: { onUploadComplete?: () => voi
 
             // 3. Insert into Database
             const { error: dbError } = await authSupabase
-                .from('videos')
+                .from('posts')
                 .insert({
-                    video_url: publicUrl,
+                    playback_url: publicUrl,
                     user_id: user.sub, // Using Auth0 ID
                     description: description || 'No description',
                     title: 'My Video', // Could add title input
+                    post_type: 'video',
+                    status: 'ready' // Direct Supabase storage is ready immediately
                 });
 
             if (dbError) throw dbError;
