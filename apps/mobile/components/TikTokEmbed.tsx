@@ -85,26 +85,38 @@ export function TikTokEmbed({
                     <Image source={{ uri: thumbnailUrl }} style={[styles.thumbnail, { width, height }]} />
                 ) : (
                     <View style={[styles.placeholder, { width, height }]}>
-                        <Text style={styles.tiktokIcon}>🎵</Text>
+                        <Text style={styles.tiktokIconLarge}>🎵</Text>
                     </View>
                 )}
-                <View style={styles.overlay}>
-                    <View style={styles.tiktokBadge}>
-                        <Text style={styles.tiktokLogo}>TikTok</Text>
+
+                {/* Dark gradient overlay */}
+                <View style={styles.gradientOverlay} />
+
+                {/* Centered Play Button with TikTok Logo */}
+                <View style={styles.centerPlayContainer}>
+                    <View style={styles.playButton}>
+                        <Text style={styles.playIcon}>▶</Text>
                     </View>
-                    {title && (
-                        <Text variant="body" numberOfLines={2} style={styles.title}>
-                            {title}
-                        </Text>
-                    )}
-                    {authorName && (
-                        <Text variant="caption" color={colors.muted}>
-                            @{authorName}
-                        </Text>
-                    )}
-                    <Text variant="caption" color={colors.primary} style={styles.tapHint}>
-                        Tap to open in TikTok
-                    </Text>
+                    <View style={styles.tiktokLogoContainer}>
+                        <Text style={styles.tiktokLogoText}>TikTok</Text>
+                    </View>
+                    <Text style={styles.watchText}>Watch on TikTok</Text>
+                </View>
+
+                {/* Bottom info bar */}
+                <View style={styles.bottomBar}>
+                    <View style={styles.bottomContent}>
+                        {authorName && (
+                            <Text variant="body" style={styles.authorText}>
+                                @{authorName}
+                            </Text>
+                        )}
+                        {title && (
+                            <Text variant="caption" numberOfLines={2} style={styles.titleText}>
+                                {title}
+                            </Text>
+                        )}
+                    </View>
                 </View>
             </TouchableOpacity>
         );
@@ -126,24 +138,26 @@ export function TikTokEmbed({
 
             {/* TikTok branding overlay */}
             <View style={styles.brandingOverlay}>
-                <TouchableOpacity style={styles.tiktokBadge} onPress={openInTikTok}>
-                    <Text style={styles.tiktokLogo}>TikTok</Text>
+                <TouchableOpacity style={styles.tiktokBadgeSmall} onPress={openInTikTok}>
+                    <Text style={styles.tiktokBadgeText}>TikTok</Text>
                 </TouchableOpacity>
             </View>
 
             {/* Author info at bottom */}
             {(title || authorName) && (
-                <View style={styles.infoOverlay}>
-                    {title && (
-                        <Text variant="bodySmall" numberOfLines={2} style={styles.title}>
-                            {title}
-                        </Text>
-                    )}
-                    {authorName && (
-                        <Text variant="caption" color={colors.muted}>
-                            @{authorName}
-                        </Text>
-                    )}
+                <View style={styles.bottomBar}>
+                    <View style={styles.bottomContent}>
+                        {authorName && (
+                            <Text variant="body" style={styles.authorText}>
+                                @{authorName}
+                            </Text>
+                        )}
+                        {title && (
+                            <Text variant="caption" numberOfLines={2} style={styles.titleText}>
+                                {title}
+                            </Text>
+                        )}
+                    </View>
                 </View>
             )}
         </View>
@@ -164,29 +178,88 @@ const styles = StyleSheet.create({
         resizeMode: 'cover',
     },
     placeholder: {
-        backgroundColor: '#111',
+        backgroundColor: '#121212',
         justifyContent: 'center',
         alignItems: 'center',
     },
-    tiktokIcon: {
-        fontSize: 64,
+    tiktokIconLarge: {
+        fontSize: 80,
     },
-    overlay: {
+    gradientOverlay: {
         position: 'absolute',
-        bottom: 120,
-        left: spacing.lg,
-        right: spacing.lg,
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+    },
+    centerPlayContainer: {
+        position: 'absolute',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    playButton: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
         backgroundColor: 'rgba(0,0,0,0.7)',
+        borderWidth: 3,
+        borderColor: '#fff',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: spacing.md,
+    },
+    playIcon: {
+        color: '#fff',
+        fontSize: 32,
+        marginLeft: 4, // Optical alignment for play icon
+    },
+    tiktokLogoContainer: {
+        backgroundColor: '#000',
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.sm,
+        borderRadius: 8,
+        marginBottom: spacing.sm,
+    },
+    tiktokLogoText: {
+        color: '#fff',
+        fontSize: 24,
+        fontWeight: 'bold',
+        letterSpacing: 1,
+    },
+    watchText: {
+        color: '#fff',
+        fontSize: 14,
+        opacity: 0.9,
+    },
+    bottomBar: {
+        position: 'absolute',
+        bottom: 100,
+        left: 0,
+        right: 0,
+        paddingHorizontal: spacing.lg,
+    },
+    bottomContent: {
+        backgroundColor: 'rgba(0,0,0,0.8)',
         borderRadius: 12,
         padding: spacing.md,
         gap: spacing.xs,
+    },
+    authorText: {
+        color: '#fff',
+        fontWeight: '600',
+        fontSize: 16,
+    },
+    titleText: {
+        color: 'rgba(255,255,255,0.8)',
+        fontSize: 14,
     },
     brandingOverlay: {
         position: 'absolute',
         top: 80,
         right: spacing.lg,
     },
-    tiktokBadge: {
+    tiktokBadgeSmall: {
         backgroundColor: '#000',
         paddingHorizontal: spacing.sm,
         paddingVertical: spacing.xs,
@@ -194,26 +267,10 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#fff',
     },
-    tiktokLogo: {
+    tiktokBadgeText: {
         color: '#fff',
         fontWeight: 'bold',
         fontSize: 12,
-    },
-    infoOverlay: {
-        position: 'absolute',
-        bottom: 120,
-        left: spacing.lg,
-        right: spacing.lg,
-        backgroundColor: 'rgba(0,0,0,0.7)',
-        borderRadius: 12,
-        padding: spacing.md,
-        gap: spacing.xs,
-    },
-    title: {
-        color: '#fff',
-    },
-    tapHint: {
-        marginTop: spacing.sm,
     },
 });
 
