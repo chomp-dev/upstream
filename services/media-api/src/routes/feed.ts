@@ -227,10 +227,13 @@ feedRouter.get('/nearby', async (req, res) => {
         ...i,
         images: Array.isArray(i.images) ? i.images.filter((url: string) => !!url) : []
       })),
-      ...tiktokRows.map((t: any) => ({
-        type: 'tiktok_embed',
-        ...t,
-      })),
+      // Filter TikTok rows to ensure they have required fields (graceful deletion handling)
+      ...tiktokRows
+        .filter((t: any) => t && t.id && t.tiktok_url)
+        .map((t: any) => ({
+          type: 'tiktok_embed',
+          ...t,
+        })),
     ].sort((a, b) =>
       new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
@@ -436,10 +439,13 @@ feedRouter.get('/', async (req, res) => {
         ...i,
         images: Array.isArray(i.images) ? i.images.filter((url: string) => !!url) : []
       })),
-      ...tiktokRows.map((t: any) => ({
-        type: 'tiktok_embed',
-        ...t,
-      })),
+      // Filter TikTok rows to ensure they have required fields (graceful deletion handling)
+      ...tiktokRows
+        .filter((t: any) => t && t.id && t.tiktok_url)
+        .map((t: any) => ({
+          type: 'tiktok_embed',
+          ...t,
+        })),
     ].sort((a, b) =>
       new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
