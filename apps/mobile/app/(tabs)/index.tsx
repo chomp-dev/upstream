@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -385,13 +386,43 @@ export default function HomeScreen() {
         keyExtractor={(item) => `${item.type}-${item.id}`}
         refreshing={loading}
         onRefresh={() => feedMode === 'nearby' ? loadNearbyFeed() : loadDemoFeed()}
+        pagingEnabled={true} // Native: Handles strict paging
+        bounces={Platform.OS !== 'web'} // Web: Disable bounce to prevent overscroll issues
+        showsVerticalScrollIndicator={false}
+        snapToInterval={SCREEN_HEIGHT}
+        snapToAlignment="start"
+        decelerationRate="fast"
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
+        getItemLayout={(_, index) => ({
+          length: SCREEN_HEIGHT,
+          offset: SCREEN_HEIGHT * index,
+          index,
+        })}
+        onScrollToIndexFailed={(info) => {
+          setTimeout(() => {
+            flatListRef.current?.scrollToIndex({
+              index: info.index,
+              animated: false,
+            });
+          }, 200);
+        }}
+        // Web: Force strict CSS snapping via style injection
+        {...(Platform.OS === 'web' ? {
+          style: { height: '100%', scrollSnapType: 'y mandatory', overflowY: 'scroll' } as any
+        } : {})}
         renderItem={({ item, index }) => {
           const restaurant = item.google_place_id
             ? restaurantCache[item.google_place_id]
             : null;
 
           return (
-            <View style={{ width, height: SCREEN_HEIGHT }}>
+            <View style={[
+              { width, height: SCREEN_HEIGHT },
+              // Web: STRICT snapping on children (scrollSnapStop: always = strictly lock to this item)
+              // @ts-ignore
+              Platform.OS === 'web' ? { scrollSnapAlign: 'start', scrollSnapStop: 'always' } : {}
+            ]}>
               {item.type === 'video' ? (
                 <>
                   <VideoPlayer
@@ -453,26 +484,6 @@ export default function HomeScreen() {
               )}
             </View>
           );
-        }}
-        pagingEnabled
-        showsVerticalScrollIndicator={false}
-        snapToInterval={SCREEN_HEIGHT}
-        snapToAlignment="start"
-        decelerationRate="fast"
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={viewabilityConfig}
-        getItemLayout={(_, index) => ({
-          length: SCREEN_HEIGHT,
-          offset: SCREEN_HEIGHT * index,
-          index,
-        })}
-        onScrollToIndexFailed={(info) => {
-          setTimeout(() => {
-            flatListRef.current?.scrollToIndex({
-              index: info.index,
-              animated: false,
-            });
-          }, 200);
         }}
       />
     </Screen>
