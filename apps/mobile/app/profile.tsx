@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Button } from 'react-native';
 import { Image } from 'expo-image';
 import { useAuth } from '../src/context/auth';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen, Text } from '../src/ui';
 import { colors, spacing, radius } from '../src/theme';
@@ -33,52 +33,57 @@ export default function ProfileScreen() {
     const [videos, setVideos] = useState<VideoItem[]>([]);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        if (!user) {
-            // Redirect or show login
-            // router.replace('/'); 
-            setLoading(false);
-            return;
-        }
-
-        const fetchData = async () => {
-            setLoading(true);
-            try {
-                if (!targetUserId) return;
-
-                // 1. Fetch Profile
-                const { data: userData, error: userError } = await supabase
-                    .from('users')
-                    .select('name, email, bio, avatar')
-                    .eq('auth0_id', targetUserId)
-                    .single();
-
-                if (userData) {
-                    setProfile(userData);
-                } else {
-                    console.log("User fetch error:", userError);
-                }
-
-                // 2. Fetch Videos
-                const { data: videoData, error: videoError } = await supabase
-                    .from('videos')
-                    .select('*')
-                    .eq('user_id', targetUserId)
-                    .order('created_at', { ascending: false });
-
-                if (videoData) {
-                    setVideos(videoData);
-                }
-
-            } catch (err) {
-                console.error(err);
-            } finally {
+    useFocusEffect(
+        useCallback(() => {
+            if (!user) {
+                // Redirect or show login
+                // router.replace('/'); 
                 setLoading(false);
+                return;
             }
-        };
 
-        fetchData();
-    }, [user]);
+            const fetchData = async () => {
+                // Only show loading if we don't have data yet, or if we want to confirm refresh
+                // But for better UX, maybe just refresh silently or show loading if empty
+                if (!profile) setLoading(true);
+
+                try {
+                    if (!targetUserId) return;
+
+                    // 1. Fetch Profile
+                    const { data: userData, error: userError } = await supabase
+                        .from('users')
+                        .select('name, email, bio, avatar')
+                        .eq('auth0_id', targetUserId)
+                        .single();
+
+                    if (userData) {
+                        setProfile(userData);
+                    } else {
+                        console.log("User fetch error:", userError);
+                    }
+
+                    // 2. Fetch Videos
+                    const { data: videoData, error: videoError } = await supabase
+                        .from('videos')
+                        .select('*')
+                        .eq('user_id', targetUserId)
+                        .order('created_at', { ascending: false });
+
+                    if (videoData) {
+                        setVideos(videoData);
+                    }
+
+                } catch (err) {
+                    console.error(err);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            fetchData();
+        }, [user, targetUserId]) // Dependencies for callback
+    );
 
     const renderProfileHeader = () => (
         <View style={styles.section}>

@@ -108,21 +108,43 @@ export default function EditProfileScreen() {
         try {
             setSaving(true);
 
-            const { error } = await supabase
+            // Updated to select data to ensure we know if it worked
+            const { data, error } = await supabase
                 .from('users')
                 .update({
                     name: name,
                     bio: bio,
                     avatar: avatarUrl,
-                    updated_at: new Date().toISOString(), // Good practice
+                    updated_at: new Date().toISOString(),
                 })
-                .eq('auth0_id', user.sub);
+                .eq('auth0_id', user.sub)
+                .select();
 
             if (error) throw error;
 
-            Alert.alert('Success', 'Profile updated!', [
-                { text: 'OK', onPress: () => router.back() }
-            ]);
+            if (!data || data.length === 0) {
+                // If no user row was found/updated, we might need to insert it (lazy sync)
+                // or just alert the user something is wrong.
+                // For now, let's try to upsert as a fallback or just log it.
+                // Since this is "Edit Profile", the user *should* exist. 
+                // If not, let's try an upsert based on auth0_id.
+                const { error: upsertError } = await supabase
+                    .from('users')
+                    .upsert({
+                        auth0_id: user.sub,
+                        email: user.email,
+                        name: name,
+                        bio: bio,
+                        avatar: avatarUrl,
+                        updated_at: new Date().toISOString(),
+                    })
+                    .select();
+
+                if (upsertError) throw upsertError;
+            }
+
+            // Success - navigate back immediately
+            router.back();
 
         } catch (e) {
             console.error('Save error:', e);
