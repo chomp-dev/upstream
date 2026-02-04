@@ -8,6 +8,8 @@ import { colors } from '../src/theme';
 import { AuthProvider } from '../src/context/auth';
 
 export default function RootLayout() {
+  const [isSplashComplete, setIsSplashComplete] = useState(false);
+
   const content = (
     <>
       <StatusBar style="light" />
@@ -34,32 +36,26 @@ export default function RootLayout() {
     </Auth0Provider>
   );
 
+  const appWithSplash = (
+    <View style={{ flex: 1 }}>
+      {wrappedContent}
+      {!isSplashComplete && (
+        <SplashAnimation onComplete={() => setIsSplashComplete(true)} />
+      )}
+    </View>
+  );
+
   if (Platform.OS === 'web') {
     return (
       <View style={styles.webContainer}>
         <View style={styles.mobileWrapper}>
-          {wrappedContent}
+          {appWithSplash}
         </View>
       </View>
     );
   }
 
-  const [isSplashComplete, setIsSplashComplete] = useState(false);
-
-  // Mobile layout with splash screen overlay
-  if (Platform.OS !== 'web') {
-    return (
-      <View style={{ flex: 1 }}>
-        {wrappedContent}
-        {/* Splash Animation Overlay */}
-        {!isSplashComplete && (
-          <SplashAnimation onComplete={() => setIsSplashComplete(true)} />
-        )}
-      </View>
-    );
-  }
-
-  return wrappedContent;
+  return appWithSplash;
 }
 
 const styles = StyleSheet.create({
