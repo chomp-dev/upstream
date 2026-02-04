@@ -48,6 +48,11 @@ export default function RootLayout() {
   if (Platform.OS === 'web') {
     return (
       <View style={styles.webContainer}>
+        {/* Hide Scrollbar Globally on Web */}
+        <style type="text/css">{`
+          ::-webkit-scrollbar { display: none; }
+          body { -ms-overflow-style: none; scrollbar-width: none; }
+        `}</style>
         <View style={styles.mobileWrapper}>
           {appWithSplash}
         </View>
