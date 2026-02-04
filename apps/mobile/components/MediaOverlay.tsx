@@ -8,6 +8,7 @@ import { Restaurant } from '../src/lib/api/types';
 import { colors, spacing, radius } from '../src/theme';
 import { Text } from '../src/ui';
 import { useAuth } from '../src/context/auth';
+import { CommentSheet } from './CommentSheet';
 
 interface MediaOverlayProps {
     height: number;
@@ -42,6 +43,7 @@ export function MediaOverlay({
     const [savesCount, setSavesCount] = useState(0);
     const [isLiked, setIsLiked] = useState(false);
     const [isSaved, setIsSaved] = useState(false);
+    const [showComments, setShowComments] = useState(false);
 
     // Calculate distance on mount
     useEffect(() => {
@@ -215,13 +217,8 @@ export function MediaOverlay({
     };
 
     const handleComment = () => {
-        // For now, navigate to a comments view or show inline
-        // This could be enhanced with a bottom sheet modal
         if (!videoUrl) return;
-
-        // Simple approach: Could show bottom sheet here
-        // For now we'll just log - full implementation would use a modal
-        console.log('Open comments for:', videoUrl);
+        setShowComments(true);
     };
 
     const handleShare = async () => {
@@ -349,6 +346,15 @@ export function MediaOverlay({
                 </View>
 
             </View>
+
+            {/* Comment Sheet */}
+            {videoUrl && (
+                <CommentSheet
+                    videoUrl={videoUrl}
+                    visible={showComments}
+                    onClose={() => setShowComments(false)}
+                />
+            )}
         </>
     );
 }

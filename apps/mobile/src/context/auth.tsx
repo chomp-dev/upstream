@@ -64,7 +64,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
             await clearSession({
                 returnTo: Platform.OS === 'web'
-                    ? 'https://www.usechomp.com/demo/'
+                    ? 'https://www.usechomp.com/demo'
                     : undefined
             } as any);
             setAccessToken(null);
@@ -80,16 +80,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (user && !auth0Loading) {
                 try {
                     const credentials = await getCredentials('openid profile email offline_access');
-                    console.log('Credentials obtained:', Object.keys(credentials || {}));
+                    // console.log('Credentials obtained:', Object.keys(credentials || {}));
 
-                    if (credentials?.accessToken) {
+                    if (credentials?.idToken) {
                         setAccessToken(credentials.accessToken);
-                        // Create a new Supabase client with the user's ID token (JWS)
-                        // because Access Token might be an opaque/encrypted JWE (5 parts)
-                        // which Supabase does not accept.
-                        const tokenToUse = credentials.idToken || credentials.accessToken;
-                        const authenticatedClient = createSupabaseClient(tokenToUse);
-                        setSupabaseClient(authenticatedClient);
+
+                        // Exchange Auth0 ID Token for Supabase Session
+                        // requires Auth0 Provider to be configured in Supabase
+                        const { data, error } = await publicSupabase.auth.signInWithIdToken({
+                            provider: 'auth0',
+                            token: credentials.idToken,
+                        });
+
+                        if (error) {
+                            console.error('Supabase auth error:', error);
+                            // Fallback to manual token if exchange fails (legacy)
+                            const tokenToUse = credentials.idToken || credentials.accessToken;
+                            const authenticatedClient = createSupabaseClient(tokenToUse);
+                            setSupabaseClient(authenticatedClient);
+                        } else if (data.session) {
+                            console.log('Supabase session established');
+                            // publicSupabase now holds the session
+                            setSupabaseClient(publicSupabase);
+                        }
                     }
                 } catch (error) {
                     console.error('Failed to get credentials', error);
