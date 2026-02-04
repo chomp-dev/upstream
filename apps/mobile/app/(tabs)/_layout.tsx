@@ -37,8 +37,7 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerShown: true, // Enable header
-        header: () => <AuthHeader />, // Use custom header
+        headerShown: false, // Disable global header (white bar with logo)
         tabBarStyle: styles.tabBar,
         tabBarShowLabel: false,
         tabBarActiveTintColor: colors.text,

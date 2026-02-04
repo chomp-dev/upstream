@@ -112,7 +112,7 @@ export function MediaOverlay({
                                 {distance && (
                                     <>
                                         <Text style={styles.dotSeparator}>•</Text>
-                                        <Text style={styles.distanceText}>{distance} mi</Text>
+                                        <Text style={styles.distanceText}>{distance}</Text>
                                     </>
                                 )}
                                 <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.6)" style={{ marginLeft: 4 }} />

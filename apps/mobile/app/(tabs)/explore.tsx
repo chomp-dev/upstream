@@ -76,11 +76,15 @@ export default function ExploreScreen() {
     loadFeed();
   }, [loadFeed]);
 
+  /* Search loading state */
+  const [isSearchLoading, setIsSearchLoading] = useState(false);
+
   // Handle Search
   const performSearch = useCallback(async (text: string) => {
     setSearchQuery(text);
     if (text.trim().length > 2) {
       setIsSearching(true);
+      setIsSearchLoading(true);
       try {
         // Import searchApi locally if needed or ensure it's imported at top
         const { searchApi } = require('../../src/lib/api');
@@ -89,12 +93,16 @@ export default function ExploreScreen() {
         setSearchResults(response.restaurants);
       } catch (e) {
         console.error('Explore search failed', e);
+      } finally {
+        setIsSearchLoading(false);
       }
     } else {
       setIsSearching(false);
       setSearchResults([]);
     }
   }, []);
+
+
 
   const getItemThumbnail = (item: FeedItem): string | undefined => {
     if (item.type === 'video') {
@@ -158,12 +166,12 @@ export default function ExploreScreen() {
           </View>
         )}
 
-        {/* Type indicator */}
-        <View style={styles.typeIndicator}>
-          <Text style={styles.typeIcon}>
-            {item.type === 'video' ? '▶' : '📷'}
-          </Text>
-        </View>
+        {/* Type indicator - Only show for TikTok */}
+        {item.type === 'tiktok_embed' && (
+          <View style={styles.typeIndicator}>
+            <Ionicons name="logo-tiktok" size={12} color="white" />
+          </View>
+        )}
 
         {/* Processing overlay */}
         {isProcessing && (
@@ -239,19 +247,25 @@ export default function ExploreScreen() {
       {/* Grid or Search List */}
       {/* Grid or Search List */}
       {isSearching ? (
-        <FlatList
-          key="search-list"
-          data={searchResults}
-          keyExtractor={(item) => item.id}
-          renderItem={renderRestaurantItem}
-          contentContainerStyle={styles.searchListContainer}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text variant="body" color={colors.muted}>No restaurants found</Text>
-            </View>
-          }
-        />
+        isSearchLoading ? (
+          <View style={styles.centered}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        ) : (
+          <FlatList
+            key="search-list"
+            data={searchResults}
+            keyExtractor={(item) => item.id}
+            renderItem={renderRestaurantItem}
+            contentContainerStyle={styles.searchListContainer}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Text variant="body" color={colors.muted}>No restaurants found</Text>
+              </View>
+            }
+          />
+        )
       ) : (
         <FlatList
           key="feed-grid"
