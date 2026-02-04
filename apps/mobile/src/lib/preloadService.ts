@@ -111,22 +111,22 @@ export const preloadService = {
                 (async () => {
                     if (limitedPlaceIds.length === 0) return { feed: [], raw: 0 };
 
-                    // Chunk place IDs for feed loading
+                    // Fetch all chunks in parallel for speed
                     const CHUNK_SIZE = 10;
                     const chunks = [];
                     for (let i = 0; i < limitedPlaceIds.length; i += CHUNK_SIZE) {
                         chunks.push(limitedPlaceIds.slice(i, i + CHUNK_SIZE));
                     }
 
+                    // Load all chunks in parallel
+                    const chunkResults = await Promise.allSettled(
+                        chunks.map(chunk => mediaApi.fetchNearbyFeed(chunk, 10))
+                    );
+
                     let allFeedItems: any[] = [];
-                    for (const chunk of chunks) {
-                        try {
-                            const response = await mediaApi.fetchNearbyFeed(chunk, 10);
-                            if (response.feed?.length > 0) {
-                                allFeedItems = [...allFeedItems, ...response.feed];
-                            }
-                        } catch (err) {
-                            console.warn('[Preload] Feed chunk error:', err);
+                    for (const result of chunkResults) {
+                        if (result.status === 'fulfilled' && result.value.feed?.length > 0) {
+                            allFeedItems = [...allFeedItems, ...result.value.feed];
                         }
                     }
 
