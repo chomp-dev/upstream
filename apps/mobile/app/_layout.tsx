@@ -45,9 +45,12 @@ export default function RootLayout() {
   );
 
   const wrappedContent = (
+    // @ts-ignore - Web-only props for persistence
     <Auth0Provider
       domain={process.env.EXPO_PUBLIC_AUTH0_DOMAIN!}
       clientId={process.env.EXPO_PUBLIC_AUTH0_CLIENT_ID!}
+      cacheLocation="localstorage"
+      useRefreshTokens={true}
     >
       <AuthProvider>
         {content}
