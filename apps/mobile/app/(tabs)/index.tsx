@@ -64,7 +64,7 @@ export default function HomeScreen() {
   const loadNearbyFeed = useCallback(async (forceRefresh = false) => {
     // Check cache first (unless force refresh)
     if (!forceRefresh) {
-      const cached = feedStore.getFeed();
+      const cached = await feedStore.getFeed();
       if (cached && !feedStore.shouldRefetch()) {
         console.log('[Feed] Using cached feed:', cached.feed.length, 'items');
         setFeed(cached.feed);
@@ -105,14 +105,21 @@ export default function HomeScreen() {
         loc.coords.latitude,
         loc.coords.longitude,
         NEARBY_RADIUS,
-        200
+        100 // Limit search to 100 max
       );
 
-      const placeIds = nearbyResponse.restaurants.map(r => r.google_place_id);
+      let placeIds = nearbyResponse.restaurants.map(r => r.google_place_id);
+
+      // Limit to top 50 closest to avoid massive wait times/timeouts
+      if (placeIds.length > 50) {
+        console.log(`[Feed] Limiting processing to top 50 of ${placeIds.length} restaurants`);
+        placeIds = placeIds.slice(0, 50);
+      }
+
       setNearbyPlaceIds(placeIds);
       setNearbyRestaurantCount(nearbyResponse.restaurants.length);
 
-      console.log(`[Feed] Found ${placeIds.length} nearby restaurants`);
+      console.log(`[Feed] Found ${nearbyResponse.restaurants.length} nearby restaurants, checking ${placeIds.length}`);
 
       if (placeIds.length === 0) {
         console.log('[Feed] No nearby restaurants, staying in nearby mode with empty state');
@@ -144,7 +151,7 @@ export default function HomeScreen() {
           setLoadingProgress(percentComplete);
           setLoadingStatus(`Checking ${chunk.length} spots (${i + 1}/${chunks.length})...`);
 
-          const response = await mediaApi.fetchNearbyFeed(chunk, 10); // Limit 10 per chunk to avoid huge payload
+          const response = await mediaApi.fetchNearbyFeed(chunk, 10); // Limit 10 per chunk
           if (response.feed && response.feed.length > 0) {
             allFeedItems = [...allFeedItems, ...response.feed];
           }
@@ -188,7 +195,7 @@ export default function HomeScreen() {
       setFeedMode('nearby');
 
       // Cache the feed for instant loading next time
-      feedStore.setFeed(uniqueFeed, placeIds, 'nearby');
+      await feedStore.setFeed(uniqueFeed, placeIds, 'nearby');
 
       // Prefetch restaurant data
       const feedPlaceIds = uniqueFeed

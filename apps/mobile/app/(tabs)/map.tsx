@@ -133,7 +133,7 @@ export default function MapScreen() {
 
       // Check local cache first (unless force refresh)
       if (!isRefresh && !skipCache) {
-        const cached = mapStore.getRestaurants();
+        const cached = await mapStore.getRestaurants();
         if (cached && !mapStore.hasLocationChanged(loc.coords.latitude, loc.coords.longitude, radiusIndex)) {
           console.log('[Map] Using cached restaurants:', cached.restaurants.length, 'items');
           setRestaurants(cached.restaurants);
@@ -198,8 +198,8 @@ export default function MapScreen() {
           const summary = await mediaApi.getMediaSummary(placeIds);
           setMediaSummary(summary);
 
-          // Cache for instant loading next time
-          mapStore.setRestaurants(
+          // Cache the results locally and persist
+          await mapStore.setRestaurants(
             response.restaurants,
             summary,
             loc.coords.latitude,

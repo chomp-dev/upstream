@@ -12,14 +12,26 @@ interface MapCache {
     lastRadiusIndex: number;
     lastFetchedAt: number;
 }
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-let cache: MapCache | null = null;
+interface MapCache {
+    restaurants: Restaurant[];
+    mediaSummary: MediaSummaryResponse;
+    lastLocation: { lat: number; lng: number };
+    lastRadiusIndex: number;
+    lastFetchedAt: number;
+}
 
-// Cache expires after 10 minutes
-const CACHE_TTL_MS = 10 * 60 * 1000;
+// Cache keys
+const MAP_CACHE_KEY = 'chomp_map_cache';
+
+// Cache expires after 60 minutes (increased for better persistence)
+const CACHE_TTL_MS = 60 * 60 * 1000;
 
 // Location deviation threshold in meters (~500m)
 const LOCATION_THRESHOLD_M = 500;
+
+let memoryCache: MapCache | null = null;
 
 /**
  * Calculate distance between two coordinates in meters (Haversine formula)
@@ -45,65 +57,94 @@ function getDistanceMeters(
 
 export const mapStore = {
     /**
+     * Hydrate cache from disk on startup
+     */
+    hydrate: async (): Promise<void> => {
+        try {
+            const data = await AsyncStorage.getItem(MAP_CACHE_KEY);
+            if (data) {
+                memoryCache = JSON.parse(data);
+                console.log('[MapStore] Hydrated from disk:', memoryCache?.restaurants.length, 'restaurants');
+            }
+        } catch (error) {
+            console.error('[MapStore] Failed to hydrate:', error);
+        }
+    },
+
+    /**
      * Get cached restaurant data if available and not expired
      */
-    getRestaurants: (): MapCache | null => {
-        if (!cache) return null;
+    getRestaurants: async (): Promise<MapCache | null> => {
+        // If no memory cache, try looking on disk if we haven't already
+        if (!memoryCache) {
+            await mapStore.hydrate();
+        }
+
+        if (!memoryCache) return null;
 
         // Check if cache is expired
         const now = Date.now();
-        if (now - cache.lastFetchedAt > CACHE_TTL_MS) {
+        if (now - memoryCache.lastFetchedAt > CACHE_TTL_MS) {
             console.log('[MapStore] Cache expired');
-            cache = null;
+            await mapStore.clear();
             return null;
         }
 
-        return cache;
+        return memoryCache;
     },
 
     /**
      * Store restaurant data in cache
      */
-    setRestaurants: (
+    setRestaurants: async (
         restaurants: Restaurant[],
         mediaSummary: MediaSummaryResponse,
         lat: number,
         lng: number,
         radiusIndex: number
     ) => {
-        cache = {
+        const newCache: MapCache = {
             restaurants,
             mediaSummary,
             lastLocation: { lat, lng },
             lastRadiusIndex: radiusIndex,
             lastFetchedAt: Date.now(),
         };
-        console.log(`[MapStore] Cached ${restaurants.length} restaurants`);
+
+        memoryCache = newCache;
+
+        // Persist to disk
+        try {
+            await AsyncStorage.setItem(MAP_CACHE_KEY, JSON.stringify(newCache));
+            console.log(`[MapStore] Cached & Persisted ${restaurants.length} restaurants`);
+        } catch (error) {
+            console.error('[MapStore] Failed to persist:', error);
+        }
     },
 
     /**
      * Check if location has changed significantly
      */
     hasLocationChanged: (newLat: number, newLng: number, newRadiusIndex: number): boolean => {
-        if (!cache) return true;
+        if (!memoryCache) return true;
 
         // Check if radius changed
-        if (cache.lastRadiusIndex !== newRadiusIndex) {
+        if (memoryCache.lastRadiusIndex !== newRadiusIndex) {
             console.log('[MapStore] Radius changed, need refetch');
             return true;
         }
 
         // Check if expired
         const now = Date.now();
-        if (now - cache.lastFetchedAt > CACHE_TTL_MS) {
+        if (now - memoryCache.lastFetchedAt > CACHE_TTL_MS) {
             console.log('[MapStore] Cache expired');
             return true;
         }
 
         // Check location deviation
         const distance = getDistanceMeters(
-            cache.lastLocation.lat,
-            cache.lastLocation.lng,
+            memoryCache.lastLocation.lat,
+            memoryCache.lastLocation.lng,
             newLat,
             newLng
         );
@@ -119,8 +160,13 @@ export const mapStore = {
     /**
      * Clear the cache (force refetch on next load)
      */
-    clear: () => {
-        cache = null;
-        console.log('[MapStore] Cache cleared');
+    clear: async () => {
+        memoryCache = null;
+        try {
+            await AsyncStorage.removeItem(MAP_CACHE_KEY);
+            console.log('[MapStore] Cache cleared');
+        } catch (error) {
+            console.error('[MapStore] Failed to clear cache:', error);
+        }
     },
 };
