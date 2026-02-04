@@ -87,7 +87,15 @@ export async function searchNearby(
   });
 
   if (!response.ok) {
-    throw new Error(`Nearby search failed: ${response.status}`);
+    let errorMessage = `Nearby search failed: ${response.status}`;
+    try {
+      const errorData = await response.json();
+      if (errorData.detail) errorMessage += ` - ${errorData.detail}`;
+      if (errorData.error_type) errorMessage += ` (${errorData.error_type})`;
+    } catch {
+      // ignore JSON parse error
+    }
+    throw new Error(errorMessage);
   }
 
   return response.json();
