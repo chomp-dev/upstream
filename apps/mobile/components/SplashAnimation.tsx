@@ -1,6 +1,6 @@
 
-import React, { useEffect } from 'react';
-import { StyleSheet, View, Dimensions, Image as RNImage } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { StyleSheet, View, LayoutChangeEvent } from 'react-native';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -10,13 +10,11 @@ import Animated, {
     withDelay,
     Easing,
     runOnJS,
-    interpolate,
-    Extrapolate
+    ZoomIn,
+    FadeOut
 } from 'react-native-reanimated';
 import { Image } from 'expo-image';
-import Constants from 'expo-constants';
-
-const { width, height } = Dimensions.get('window');
+import { LinearGradient } from 'expo-linear-gradient';
 
 // Local Assets
 const ASSETS = {
@@ -28,109 +26,146 @@ const ASSETS = {
     soda: require('../assets/images/splash_assets/soda.png'),
 };
 
+const FOOD_ITEMS = [
+    ASSETS.burger, ASSETS.pizza, ASSETS.taco, ASSETS.sushi, ASSETS.soda,
+    ASSETS.burger, ASSETS.pizza, ASSETS.taco, ASSETS.sushi, ASSETS.soda,
+    ASSETS.burger, ASSETS.pizza, ASSETS.taco, ASSETS.sushi // ~14 items
+];
+
 interface SplashAnimationProps {
     onComplete: () => void;
 }
 
-// Floating item interface
 interface FloatingItemProps {
     source: any;
-    delay: number;
-    initialX: number;
-    initialY: number;
-    size: number;
+    containerWidth: number;
+    containerHeight: number;
+    index: number;
 }
 
-const FloatingItem: React.FC<FloatingItemProps> = ({ source, delay, initialX, initialY, size }) => {
+const FloatingItem = ({ source, containerWidth, containerHeight, index }: FloatingItemProps) => {
+    // Deterministic pseudo-random based on index to ensure consistent spread
+    const random = (seed: number) => {
+        const x = Math.sin(seed) * 10000;
+        return x - Math.floor(x);
+    };
+
+    const size = 60 + random(index) * 60; // 60-120px
+    const initialX = random(index * 13) * (containerWidth - size);
+    const initialY = random(index * 7) * (containerHeight - size);
+    const delay = random(index * 3) * 800;
+    const durationX = 2000 + random(index) * 1000;
+    const durationRotate = 3000 + random(index * 2) * 2000;
+
     const translateY = useSharedValue(0);
     const rotate = useSharedValue(0);
 
     useEffect(() => {
-        // Floating animation
         translateY.value = withDelay(
             delay,
             withRepeat(
                 withSequence(
-                    withTiming(-20, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
-                    withTiming(0, { duration: 2000, easing: Easing.inOut(Easing.ease) })
+                    withTiming(-30, { duration: durationX, easing: Easing.inOut(Easing.quad) }),
+                    withTiming(0, { duration: durationX, easing: Easing.inOut(Easing.quad) })
                 ),
                 -1,
                 true
             )
         );
 
-        // Rotation animation
-        rotate.value = withDelay(
-            delay,
-            withRepeat(
-                withTiming(15, { duration: 4000, easing: Easing.inOut(Easing.ease) }),
-                -1,
-                true
-            )
+        rotate.value = withRepeat(
+            withTiming(15, { duration: durationRotate, easing: Easing.inOut(Easing.sin) }),
+            -1,
+            true
         );
     }, []);
 
-    const style = useAnimatedStyle(() => {
-        return {
-            transform: [
-                { translateY: translateY.value },
-                { rotate: `${rotate.value}deg` }
-            ],
-            position: 'absolute',
-            left: initialX,
-            top: initialY,
-            width: size,
-            height: size,
-        };
-    });
+    const style = useAnimatedStyle(() => ({
+        transform: [
+            { translateY: translateY.value },
+            { rotate: `${rotate.value}deg` }
+        ],
+        position: 'absolute',
+        left: initialX,
+        top: initialY,
+        width: size,
+        height: size,
+        zIndex: 1, // Behinid logo
+    }));
 
     return (
-        <Animated.View style={style}>
+        <Animated.View
+            style={style}
+            entering={ZoomIn.delay(delay).duration(600).springify()}
+        >
             <Image source={source} style={{ width: '100%', height: '100%' }} contentFit="contain" />
         </Animated.View>
     );
 };
 
 export default function SplashAnimation({ onComplete }: SplashAnimationProps) {
-    const scale = useSharedValue(1);
+    const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+    const scale = useSharedValue(0);
     const opacity = useSharedValue(1);
-    const bgOpacity = useSharedValue(1);
 
     useEffect(() => {
-        // Main sequence
+        // Logo entrance
+        scale.value = withSequence(
+            withTiming(1, { duration: 800, easing: Easing.elastic(1) }),
+            withRepeat(
+                withSequence(
+                    withTiming(1.1, { duration: 1000 }),
+                    withTiming(1, { duration: 1000 })
+                ),
+                -1, true
+            )
+        );
+
+        // Exit sequence
         const timeout = setTimeout(() => {
-            // Trigger exit animation
-            scale.value = withTiming(50, { duration: 800, easing: Easing.cubic }, () => {
+            scale.value = withTiming(80, { duration: 600, easing: Easing.in(Easing.exp) }, () => {
                 runOnJS(onComplete)();
             });
-            bgOpacity.value = withTiming(0, { duration: 300 });
-        }, 3000); // Show splash for 3 seconds
+            opacity.value = withTiming(0, { duration: 200 });
+        }, 3500);
 
         return () => clearTimeout(timeout);
     }, []);
 
-    const logoStyle = useAnimatedStyle(() => {
-        return {
-            transform: [{ scale: scale.value }],
-        };
-    });
+    const logoStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: scale.value }],
+        zIndex: 10,
+    }));
 
-    const containerStyle = useAnimatedStyle(() => {
-        return {
-            opacity: bgOpacity.value,
-        };
-    });
+    const containerStyle = useAnimatedStyle(() => ({
+        opacity: opacity.value,
+    }));
+
+    const handleLayout = (e: LayoutChangeEvent) => {
+        const { width, height } = e.nativeEvent.layout;
+        setDimensions({ width, height });
+    };
 
     return (
-        <Animated.View style={[styles.container, containerStyle]}>
-            {/* Background elements */}
-            <FloatingItem source={ASSETS.burger} delay={0} initialX={width * 0.1} initialY={height * 0.15} size={100} />
-            <FloatingItem source={ASSETS.pizza} delay={500} initialX={width * 0.7} initialY={height * 0.2} size={110} />
-            <FloatingItem source={ASSETS.taco} delay={1000} initialX={width * 0.1} initialY={height * 0.6} size={90} />
-            <FloatingItem source={ASSETS.sushi} delay={200} initialX={width * 0.75} initialY={height * 0.7} size={80} />
-            <FloatingItem source={ASSETS.soda} delay={800} initialX={width * 0.4} initialY={height * 0.8} size={90} />
+        <Animated.View style={[styles.container, containerStyle]} onLayout={handleLayout}>
+            {/* Gradient Background */}
+            <LinearGradient
+                colors={['#1c1c1c', '#000000']}
+                locations={[0, 0.8]}
+                style={StyleSheet.absoluteFill}
+            />
 
-            {/* Center Logo */}
+            {/* Render items only after we know dimensions to keep them in bounds */}
+            {dimensions.width > 0 && FOOD_ITEMS.map((source, i) => (
+                <FloatingItem
+                    key={i}
+                    index={i}
+                    source={source}
+                    containerWidth={dimensions.width}
+                    containerHeight={dimensions.height}
+                />
+            ))}
+
             <Animated.View style={[styles.logoContainer, logoStyle]}>
                 <Image
                     source={ASSETS.logo}
@@ -145,14 +180,14 @@ export default function SplashAnimation({ onComplete }: SplashAnimationProps) {
 const styles = StyleSheet.create({
     container: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: '#000000',
         zIndex: 99999,
         justifyContent: 'center',
         alignItems: 'center',
+        overflow: 'hidden', // Ensure items don't fly out on web
     },
     logoContainer: {
-        width: 200,
-        height: 100,
+        width: 250,
+        height: 120,
         justifyContent: 'center',
         alignItems: 'center',
     },
