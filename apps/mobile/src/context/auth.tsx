@@ -80,29 +80,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (user && !auth0Loading) {
                 try {
                     const credentials = await getCredentials('openid profile email offline_access');
-                    // console.log('Credentials obtained:', Object.keys(credentials || {}));
 
                     if (credentials?.idToken) {
                         setAccessToken(credentials.accessToken);
-
-                        // Exchange Auth0 ID Token for Supabase Session
-                        // requires Auth0 Provider to be configured in Supabase
-                        const { data, error } = await publicSupabase.auth.signInWithIdToken({
-                            provider: 'auth0',
-                            token: credentials.idToken,
-                        });
-
-                        if (error) {
-                            console.error('Supabase auth error:', error);
-                            // Fallback to manual token if exchange fails (legacy)
-                            const tokenToUse = credentials.idToken || credentials.accessToken;
-                            const authenticatedClient = createSupabaseClient(tokenToUse);
-                            setSupabaseClient(authenticatedClient);
-                        } else if (data.session) {
-                            console.log('Supabase session established');
-                            // publicSupabase now holds the session
-                            setSupabaseClient(publicSupabase);
-                        }
+                        // Pass ID Token directly in Authorization header
+                        // Supabase will decode the JWT and RLS policies can access claims
+                        const authenticatedClient = createSupabaseClient(credentials.idToken);
+                        setSupabaseClient(authenticatedClient);
+                        console.log('Supabase client initialized with Auth0 token');
                     }
                 } catch (error) {
                     console.error('Failed to get credentials', error);
