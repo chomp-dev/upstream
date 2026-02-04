@@ -20,6 +20,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 // Local Assets (User verified transparent)
 const ASSETS = {
     logo: require('../assets/images/chomp_logo.png'),
+    bg: require('../assets/images/splash_assets/splash_bg.jpg'),
     burger: require('../assets/images/splash_assets/burger.png'),
     pizza: require('../assets/images/splash_assets/pizza.png'),
     taco: require('../assets/images/splash_assets/taco.png'),
@@ -182,10 +183,16 @@ export default function SplashAnimation({ onComplete }: SplashAnimationProps) {
 
     return (
         <Animated.View style={[styles.container, containerStyle]} onLayout={handleLayout}>
-            {/* Soft Cream Background for Food App */}
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: '#FFFBF2' }]} />
+            {/* Background Image with Blur */}
+            <Image
+                source={ASSETS.bg}
+                style={StyleSheet.absoluteFill}
+                contentFit="cover"
+                blurRadius={10} // Significant blur to reduce noise
+            />
+            {/* Dark Overlay for Contrast */}
             <LinearGradient
-                colors={['rgba(255,255,255,0)', 'rgba(255,237,213,0.4)']} // Subtle warmth
+                colors={['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.7)']}
                 style={StyleSheet.absoluteFill}
             />
 
