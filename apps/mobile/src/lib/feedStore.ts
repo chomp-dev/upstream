@@ -117,6 +117,12 @@ export const feedStore = {
             return true;
         }
 
+        // For small feeds (<=3 items), don't auto-refetch based on view position
+        // This prevents the cache from constantly invalidating with limited content
+        if (memoryCache.feed.length <= 3) {
+            return false;
+        }
+
         // Check if user has viewed all items (within 3 items of end)
         const hasViewedAll = memoryCache.highestViewedIndex >= memoryCache.feed.length - 3;
         return hasViewedAll;

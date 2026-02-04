@@ -44,13 +44,26 @@ APP_VERSION = "chomp-search-api-dev-2026-01-08"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler for startup/shutdown."""
+    import asyncio
+    
     logger.info("Starting Search MVP API...")
     
-    # Startup: cleanup expired cache
+    # Startup: cleanup expired cache (with retry for cold start DB connections)
     cache = get_cache()
-    deleted = await cache.cleanup_expired()
-    if deleted:
-        logger.info(f"Cleaned up {deleted} expired cache entries")
+    for attempt in range(3):
+        try:
+            deleted = await asyncio.wait_for(cache.cleanup_expired(), timeout=10.0)
+            if deleted:
+                logger.info(f"Cleaned up {deleted} expired cache entries")
+            break
+        except asyncio.TimeoutError:
+            logger.warning(f"Cache cleanup timeout (attempt {attempt + 1}/3)")
+            if attempt < 2:
+                await asyncio.sleep(2)
+        except Exception as e:
+            logger.warning(f"Cache cleanup failed (attempt {attempt + 1}/3): {e}")
+            if attempt < 2:
+                await asyncio.sleep(2)
     
     logger.info(f"Cache backend: {settings.cache_backend}")
     
