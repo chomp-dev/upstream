@@ -178,10 +178,9 @@ export default function HomeScreen() {
       console.log(`[Feed] Nearby feed has ${uniqueFeed.length} items (from ${validFeed.length} raw)`);
 
       if (uniqueFeed.length === 0) {
-        console.log('[Feed] No local content, staying in nearby mode with empty state');
-        setFeed([]);
-        setFeedMode('nearby');
-        setLoading(false);
+        console.log('[Feed] No local content, automatically falling back to demo reels');
+        // Auto-fallback to demo for better UX
+        await loadDemoFeed();
         return;
       }
 
