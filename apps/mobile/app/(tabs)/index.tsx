@@ -111,20 +111,52 @@ export default function HomeScreen() {
       setLoadingProgress(60);
       setLoadingStatus(`Found ${placeIds.length} spots. Getting videos...`);
 
-      // Fetch nearby feed
-      const nearbyFeedResponse = await mediaApi.fetchNearbyFeed(placeIds);
+      // Chunk place IDs to show real progress
+      const CHUNK_SIZE = 5;
+      const chunks = [];
+      for (let i = 0; i < placeIds.length; i += CHUNK_SIZE) {
+        chunks.push(placeIds.slice(i, i + CHUNK_SIZE));
+      }
 
-      // Filter out invalid videos
-      const validFeed = (nearbyFeedResponse.feed || []).filter(item => {
+      let allFeedItems: any[] = [];
+      let processedCount = 0;
+
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+
+        try {
+          // Update status
+          const percentComplete = 60 + Math.floor((i / chunks.length) * 30); // 60% -> 90%
+          setLoadingProgress(percentComplete);
+          setLoadingStatus(`Checking ${chunk.length} spots (${i + 1}/${chunks.length})...`);
+
+          const response = await mediaApi.fetchNearbyFeed(chunk, 10); // Limit 10 per chunk to avoid huge payload
+          if (response.feed && response.feed.length > 0) {
+            allFeedItems = [...allFeedItems, ...response.feed];
+          }
+        } catch (err) {
+          console.warn(`[Feed] Failed to fetch chunk ${i}:`, err);
+        }
+      }
+
+      // Validating and deduplicating
+      const validFeed = allFeedItems.filter(item => {
         if (item.type === 'video') {
           return item.status !== 'error' && item.playback_url;
         }
         return true;
       });
 
-      console.log(`[Feed] Nearby feed has ${validFeed.length} items`);
+      // Simple deduplication by ID
+      const uniqueFeed = validFeed.filter((item, index, self) =>
+        index === self.findIndex((t) => (
+          t.id === item.id && t.type === item.type
+        ))
+      );
 
-      if (validFeed.length === 0) {
+      console.log(`[Feed] Nearby feed has ${uniqueFeed.length} items (from ${validFeed.length} raw)`);
+
+      if (uniqueFeed.length === 0) {
         console.log('[Feed] No local content, staying in nearby mode with empty state');
         setFeed([]);
         setFeedMode('nearby');
@@ -132,14 +164,17 @@ export default function HomeScreen() {
         return;
       }
 
-      setLoadingProgress(90);
+      setLoadingProgress(100);
       setLoadingStatus('Preparing your feed...');
 
-      setFeed(validFeed);
+      // Give it a moment to show 100%
+      await new Promise(r => setTimeout(r, 500));
+
+      setFeed(uniqueFeed);
       setFeedMode('nearby');
 
       // Prefetch restaurant data
-      const feedPlaceIds = validFeed
+      const feedPlaceIds = uniqueFeed
         .filter(item => item.google_place_id)
         .map(item => item.google_place_id!)
         .filter((id, idx, arr) => arr.indexOf(id) === idx);
