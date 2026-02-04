@@ -11,12 +11,13 @@ import Animated, {
     Easing,
     runOnJS,
     ZoomIn,
-    FadeOut
+    interpolate,
+    Extrapolate
 } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 
-// Local Assets
+// Local Assets (User verified transparent)
 const ASSETS = {
     logo: require('../assets/images/chomp_logo.png'),
     burger: require('../assets/images/splash_assets/burger.png'),
@@ -28,75 +29,118 @@ const ASSETS = {
 
 const FOOD_ITEMS = [
     ASSETS.burger, ASSETS.pizza, ASSETS.taco, ASSETS.sushi, ASSETS.soda,
-    ASSETS.burger, ASSETS.pizza, ASSETS.taco, ASSETS.sushi, ASSETS.soda,
-    ASSETS.burger, ASSETS.pizza, ASSETS.taco, ASSETS.sushi // ~14 items
+    ASSETS.burger, ASSETS.pizza, ASSETS.taco, ASSETS.sushi, ASSETS.soda
 ];
 
 interface SplashAnimationProps {
     onComplete: () => void;
 }
 
+// Particle for "Crumbs" Effect
+const Crumb = ({ index, total }: { index: number, total: number }) => {
+    const angle = (index / total) * 2 * Math.PI;
+    const progress = useSharedValue(0);
+    const scale = useSharedValue(0);
+
+    useEffect(() => {
+        // Explode after 2.8s (synced with logo zoom)
+        const delay = 2800;
+        scale.value = withDelay(delay, withSequence(
+            withTiming(1, { duration: 100 }), // Appear
+            withTiming(0, { duration: 600 }) // Fade out
+        ));
+        progress.value = withDelay(delay, withTiming(1, { duration: 800, easing: Easing.out(Easing.exp) }));
+    }, []);
+
+    const style = useAnimatedStyle(() => {
+        // Fly outward 300-600px
+        const distance = interpolate(progress.value, [0, 1], [0, 400 + (index % 5) * 50]);
+        const translateX = Math.cos(angle) * distance;
+        const translateY = Math.sin(angle) * distance;
+
+        return {
+            position: 'absolute',
+            width: 8 + (index % 3) * 4,
+            height: 8 + (index % 3) * 4,
+            backgroundColor: index % 2 === 0 ? '#F97316' : '#FDE047', // Orange/Yellow crumbs
+            borderRadius: 50,
+            transform: [
+                { translateX },
+                { translateY },
+                { scale: scale.value }
+            ],
+            zIndex: 20
+        };
+    });
+
+    return <Animated.View style={style} />;
+};
+
 interface FloatingItemProps {
     source: any;
     containerWidth: number;
     containerHeight: number;
     index: number;
+    total: number;
 }
 
-const FloatingItem = ({ source, containerWidth, containerHeight, index }: FloatingItemProps) => {
-    // Deterministic pseudo-random based on index to ensure consistent spread
-    const random = (seed: number) => {
-        const x = Math.sin(seed) * 10000;
-        return x - Math.floor(x);
-    };
+const FloatingItem = ({ source, containerWidth, containerHeight, index, total }: FloatingItemProps) => {
+    // Symmetrical Layout: Circular Orbit
+    const radius = Math.min(containerWidth, containerHeight) * 0.35; // 35% of screen
+    const angle = (index / total) * 2 * Math.PI;
 
-    const size = 60 + random(index) * 60; // 60-120px
-    const initialX = random(index * 13) * (containerWidth - size);
-    const initialY = random(index * 7) * (containerHeight - size);
-    const delay = random(index * 3) * 800;
-    const durationX = 2000 + random(index) * 1000;
-    const durationRotate = 3000 + random(index * 2) * 2000;
+    // Position on circle center
+    const centerX = containerWidth / 2;
+    const centerY = containerHeight / 2;
+    const initialX = centerX + Math.cos(angle) * radius - 40; // -40 for half width
+    const initialY = centerY + Math.sin(angle) * radius - 40;
 
+    const scale = useSharedValue(1);
     const translateY = useSharedValue(0);
     const rotate = useSharedValue(0);
 
     useEffect(() => {
-        translateY.value = withDelay(
-            delay,
-            withRepeat(
-                withSequence(
-                    withTiming(-30, { duration: durationX, easing: Easing.inOut(Easing.quad) }),
-                    withTiming(0, { duration: durationX, easing: Easing.inOut(Easing.quad) })
-                ),
-                -1,
-                true
-            )
+        // Breathing Effect
+        scale.value = withRepeat(
+            withSequence(
+                withTiming(1.1, { duration: 2000 + index * 100, easing: Easing.inOut(Easing.sin) }),
+                withTiming(1, { duration: 2000 + index * 100, easing: Easing.inOut(Easing.sin) })
+            ), -1, true
         );
 
+        // Slow Drift
+        translateY.value = withRepeat(
+            withSequence(
+                withTiming(-10, { duration: 3000, easing: Easing.inOut(Easing.quad) }),
+                withTiming(10, { duration: 3000, easing: Easing.inOut(Easing.quad) })
+            ), -1, true
+        );
+
+        // Gentle Rocking
         rotate.value = withRepeat(
-            withTiming(15, { duration: durationRotate, easing: Easing.inOut(Easing.sin) }),
-            -1,
-            true
+            withTiming(index % 2 === 0 ? 10 : -10, { duration: 4000, easing: Easing.inOut(Easing.sin) }),
+            -1, true
         );
     }, []);
 
     const style = useAnimatedStyle(() => ({
         transform: [
             { translateY: translateY.value },
+            { scale: scale.value },
             { rotate: `${rotate.value}deg` }
         ],
         position: 'absolute',
         left: initialX,
         top: initialY,
-        width: size,
-        height: size,
-        zIndex: 1, // Behinid logo
+        width: 80,
+        height: 80,
+        zIndex: 1,
     }));
 
     return (
         <Animated.View
             style={style}
-            entering={ZoomIn.delay(delay).duration(600).springify()}
+            entering={ZoomIn.delay(index * 100).duration(800).springify()}
         >
             <Image source={source} style={{ width: '100%', height: '100%' }} contentFit="contain" />
         </Animated.View>
@@ -109,27 +153,18 @@ export default function SplashAnimation({ onComplete }: SplashAnimationProps) {
     const opacity = useSharedValue(1);
 
     useEffect(() => {
-        // Logo entrance
+        // Logo Sequence
         scale.value = withSequence(
-            withTiming(1, { duration: 800, easing: Easing.elastic(1) }),
-            withRepeat(
-                withSequence(
-                    withTiming(1.1, { duration: 1000 }),
-                    withTiming(1, { duration: 1000 })
-                ),
-                -1, true
+            withTiming(1, { duration: 800, easing: Easing.elastic(1.2) }), // Pop in
+            withDelay(2000,
+                withTiming(50, { duration: 600, easing: Easing.in(Easing.cubic) }, () => { // SUPER ZOOM
+                    runOnJS(onComplete)();
+                })
             )
         );
 
-        // Exit sequence
-        const timeout = setTimeout(() => {
-            scale.value = withTiming(80, { duration: 600, easing: Easing.in(Easing.exp) }, () => {
-                runOnJS(onComplete)();
-            });
-            opacity.value = withTiming(0, { duration: 200 });
-        }, 3500);
-
-        return () => clearTimeout(timeout);
+        // Fade background out near end of zoom
+        opacity.value = withDelay(2900, withTiming(0, { duration: 200 }));
     }, []);
 
     const logoStyle = useAnimatedStyle(() => ({
@@ -142,28 +177,32 @@ export default function SplashAnimation({ onComplete }: SplashAnimationProps) {
     }));
 
     const handleLayout = (e: LayoutChangeEvent) => {
-        const { width, height } = e.nativeEvent.layout;
-        setDimensions({ width, height });
+        setDimensions(e.nativeEvent.layout);
     };
 
     return (
         <Animated.View style={[styles.container, containerStyle]} onLayout={handleLayout}>
-            {/* Gradient Background */}
+            {/* Soft Cream Background for Food App */}
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: '#FFFBF2' }]} />
             <LinearGradient
-                colors={['#1c1c1c', '#000000']}
-                locations={[0, 0.8]}
+                colors={['rgba(255,255,255,0)', 'rgba(255,237,213,0.4)']} // Subtle warmth
                 style={StyleSheet.absoluteFill}
             />
 
-            {/* Render items only after we know dimensions to keep them in bounds */}
             {dimensions.width > 0 && FOOD_ITEMS.map((source, i) => (
                 <FloatingItem
                     key={i}
                     index={i}
+                    total={FOOD_ITEMS.length}
                     source={source}
                     containerWidth={dimensions.width}
                     containerHeight={dimensions.height}
                 />
+            ))}
+
+            {/* Crumbs Explosion */}
+            {Array.from({ length: 12 }).map((_, i) => (
+                <Crumb key={`crumb-${i}`} index={i} total={12} />
             ))}
 
             <Animated.View style={[styles.logoContainer, logoStyle]}>
@@ -183,11 +222,11 @@ const styles = StyleSheet.create({
         zIndex: 99999,
         justifyContent: 'center',
         alignItems: 'center',
-        overflow: 'hidden', // Ensure items don't fly out on web
+        overflow: 'hidden',
     },
     logoContainer: {
-        width: 250,
-        height: 120,
+        width: 300, // Bigger Logo
+        height: 150,
         justifyContent: 'center',
         alignItems: 'center',
     },
