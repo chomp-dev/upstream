@@ -1,19 +1,42 @@
 /**
- * Social Tab - Profile/Friends/Inbox hub (UI shell)
+ * Social Tab - Profile/Messages hub
  */
 
-import { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
+import { useState, useEffect, useCallback } from 'react';
+import { View, StyleSheet, ScrollView, FlatList, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen, Text, Segmented, Card } from '../../src/ui';
 import { colors, spacing, radius } from '../../src/theme';
-
-type SocialSection = 'profile' | 'friends' | 'inbox';
-
 import { useAuth } from '../../src/context/auth';
 import { Image } from 'expo-image';
-import { Pressable, TouchableOpacity } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Pressable } from 'react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
+
+type SocialSection = 'profile' | 'messages';
+
+interface PostItem {
+  id: number;
+  type: 'video' | 'image';
+  thumbnail_url?: string;
+  images?: string[];
+  title: string;
+  created_at: string;
+}
+
+interface Conversation {
+  id: string;
+  other_user: {
+    auth0_id: string;
+    name: string;
+    avatar: string;
+  };
+  last_message?: {
+    content: string;
+    created_at: string;
+    sender_id: string;
+  };
+  unread_count: number;
+}
 
 export default function SocialScreen() {
   const [activeSection, setActiveSection] = useState<SocialSection>('profile');
@@ -42,8 +65,7 @@ export default function SocialScreen() {
         <Segmented
           options={[
             { key: 'profile', label: 'Profile' },
-            { key: 'friends', label: 'Friends' },
-            { key: 'inbox', label: 'Inbox' },
+            { key: 'messages', label: 'Messages' },
           ]}
           selected={activeSection}
           onSelect={(key) => setActiveSection(key as SocialSection)}
@@ -51,15 +73,8 @@ export default function SocialScreen() {
         />
       </View>
 
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        {activeSection === 'profile' && <ProfileSection />}
-        {activeSection === 'friends' && <FriendsSection />}
-        {activeSection === 'inbox' && <InboxSection />}
-      </ScrollView>
+      {activeSection === 'profile' && <ProfileSection />}
+      {activeSection === 'messages' && <MessagesSection />}
     </Screen>
   );
 }
@@ -68,221 +83,365 @@ function ProfileSection() {
   const { user, logout, supabase } = useAuth();
   const router = useRouter();
   const [profile, setProfile] = useState<any>(null);
+  const [posts, setPosts] = useState<PostItem[]>([]);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (user?.sub) {
-      supabase
-        .from('users')
-        .select('*')
-        .eq('auth0_id', user.sub)
-        .single()
-        .then(({ data }) => {
-          if (data) setProfile(data);
-        });
-    }
-  }, [user, supabase]);
+  useFocusEffect(
+    useCallback(() => {
+      if (!user?.sub) {
+        setLoading(false);
+        return;
+      }
+
+      const fetchData = async () => {
+        try {
+          // Fetch profile
+          const { data: profileData } = await supabase
+            .from('users')
+            .select('*')
+            .eq('auth0_id', user.sub)
+            .single();
+
+          if (profileData) setProfile(profileData);
+
+          // Fetch posts
+          const { data: videoData } = await supabase
+            .from('videos')
+            .select('id, thumbnail_url, title, created_at')
+            .eq('user_id', user.sub)
+            .neq('status', 'error')
+            .order('created_at', { ascending: false });
+
+          const { data: imageData } = await supabase
+            .from('image_posts')
+            .select('id, images, title, created_at')
+            .eq('user_id', user.sub)
+            .order('created_at', { ascending: false });
+
+          const combined: PostItem[] = [];
+          if (videoData) combined.push(...videoData.map((v: any) => ({ ...v, type: 'video' as const })));
+          if (imageData) combined.push(...imageData.map((i: any) => ({ ...i, type: 'image' as const })));
+          combined.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+          setPosts(combined);
+
+          // Fetch follower/following counts
+          const { count: followerCount } = await supabase
+            .from('follows')
+            .select('id', { count: 'exact', head: true })
+            .eq('following_id', user.sub);
+          setFollowersCount(followerCount || 0);
+
+          const { count: followingCountResult } = await supabase
+            .from('follows')
+            .select('id', { count: 'exact', head: true })
+            .eq('follower_id', user.sub);
+          setFollowingCount(followingCountResult || 0);
+
+        } catch (err) {
+          console.error('Error fetching profile data:', err);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchData();
+    }, [user, supabase])
+  );
 
   if (!user) return null;
 
-  // Use Supabase profile if available, fallback to Auth0 user
   const displayName = profile?.name || user.name || user.email;
   const displayAvatar = profile?.avatar || user.picture;
 
-  return (
-    <View style={styles.section}>
-      {/* Profile header */}
-      <View style={styles.profileHeader}>
-        <View style={styles.avatar}>
-          {displayAvatar ? (
-            <Image
-              source={{ uri: displayAvatar }}
-              style={{ width: 94, height: 94, borderRadius: 47 }}
-            />
-          ) : (
-            <Ionicons name="person" size={48} color={colors.primary} />
-          )}
-        </View>
-        <Text variant="title" style={styles.username}>
-          {displayName}
-        </Text>
-        {profile?.bio ? (
-          <Text variant="bodySmall" color={colors.muted} style={{ marginBottom: spacing.xs, paddingHorizontal: spacing.xl }} center>
-            {profile.bio}
-          </Text>
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  const renderPostItem = ({ item }: { item: PostItem }) => {
+    const thumbnail = item.type === 'video' ? item.thumbnail_url : item.images?.[0];
+    return (
+      <TouchableOpacity
+        style={styles.postItem}
+        onPress={() => router.push({ pathname: '/', params: { itemId: item.id.toString() } })}
+        activeOpacity={0.8}
+      >
+        {thumbnail ? (
+          <Image source={{ uri: thumbnail }} style={styles.postThumbnail} />
         ) : (
-          <Text variant="bodySmall" color={colors.muted}>
-            {user.email}
-          </Text>
+          <View style={styles.postPlaceholder}>
+            <Ionicons name={item.type === 'image' ? 'images' : 'play'} size={20} color="white" />
+          </View>
         )}
+        {item.type === 'video' && (
+          <View style={styles.playBadge}>
+            <Ionicons name="play" size={8} color="white" />
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
-        {/* Action Buttons Row */}
-        <View style={styles.actionButtonsRow}>
-          <TouchableOpacity
-            style={styles.editProfileButton}
-            onPress={() => router.push('/edit_profile')}
-          >
-            <Text variant="caption" color={colors.bg}>Edit Profile</Text>
-          </TouchableOpacity>
+  return (
+    <FlatList
+      data={posts}
+      keyExtractor={(item) => `${item.type}-${item.id}`}
+      renderItem={renderPostItem}
+      numColumns={3}
+      ListHeaderComponent={
+        <View style={styles.profileContainer}>
+          {/* Profile header */}
+          <View style={styles.profileHeader}>
+            <View style={styles.avatar}>
+              {displayAvatar ? (
+                <Image
+                  source={{ uri: displayAvatar }}
+                  style={{ width: 94, height: 94, borderRadius: 47 }}
+                />
+              ) : (
+                <Ionicons name="person" size={48} color={colors.primary} />
+              )}
+            </View>
+            <Text variant="title" style={styles.username}>
+              {displayName}
+            </Text>
+            {profile?.bio ? (
+              <Text variant="bodySmall" color={colors.muted} style={{ marginBottom: spacing.xs, paddingHorizontal: spacing.xl }} center>
+                {profile.bio}
+              </Text>
+            ) : (
+              <Text variant="bodySmall" color={colors.muted}>
+                {user.email}
+              </Text>
+            )}
 
-          <Pressable style={styles.logoutButton} onPress={logout}>
-            <Text variant="caption" color={colors.muted}>Log Out</Text>
-          </Pressable>
-        </View>
-      </View>
+            {/* Action Buttons Row */}
+            <View style={styles.actionButtonsRow}>
+              <TouchableOpacity
+                style={styles.editProfileButton}
+                onPress={() => router.push('/edit_profile')}
+              >
+                <Text variant="caption" color={colors.bg}>Edit Profile</Text>
+              </TouchableOpacity>
 
-      {/* Stats */}
-      <View style={styles.statsRow}>
-        <View style={styles.stat}>
-          <Text variant="title">0</Text>
-          <Text variant="caption" color={colors.muted}>
-            Posts
-          </Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.stat}>
-          <Text variant="title">0</Text>
-          <Text variant="caption" color={colors.muted}>
-            Followers
-          </Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.stat}>
-          <Text variant="title">0</Text>
-          <Text variant="caption" color={colors.muted}>
-            Following
-          </Text>
-        </View>
-      </View>
+              <Pressable style={styles.logoutButton} onPress={logout}>
+                <Text variant="caption" color={colors.muted}>Log Out</Text>
+              </Pressable>
+            </View>
+          </View>
 
-      {/* Favorites */}
-      <Card style={styles.card}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md }}>
-          <Ionicons name="trophy-outline" size={18} color={colors.lime} />
-          <Text variant="label">Top Spots</Text>
-        </View>
-        <View style={styles.topSpots}>
-          <Text variant="bodySmall" color={colors.muted}>
-            No favorites yet
-          </Text>
-        </View>
-      </Card>
+          {/* Stats */}
+          <View style={styles.statsRow}>
+            <View style={styles.stat}>
+              <Text variant="title">{posts.length}</Text>
+              <Text variant="caption" color={colors.muted}>
+                Posts
+              </Text>
+            </View>
+            <View style={styles.statDivider} />
+            <TouchableOpacity
+              style={styles.stat}
+              onPress={() => router.push({ pathname: '/followers', params: { userId: user.sub, tab: 'followers' } })}
+            >
+              <Text variant="title">{followersCount}</Text>
+              <Text variant="caption" color={colors.muted}>
+                Followers
+              </Text>
+            </TouchableOpacity>
+            <View style={styles.statDivider} />
+            <TouchableOpacity
+              style={styles.stat}
+              onPress={() => router.push({ pathname: '/followers', params: { userId: user.sub, tab: 'following' } })}
+            >
+              <Text variant="title">{followingCount}</Text>
+              <Text variant="caption" color={colors.muted}>
+                Following
+              </Text>
+            </TouchableOpacity>
+          </View>
 
-      {/* Recent activity placeholder */}
-      <Card style={styles.card}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md }}>
-          <Ionicons name="stats-chart-outline" size={18} color={colors.blue} />
-          <Text variant="label">Recent Activity</Text>
+          {/* Posts Header */}
+          <View style={styles.postsHeader}>
+            <Ionicons name="grid-outline" size={18} color={colors.text} />
+            <Text variant="label">Your Posts</Text>
+          </View>
         </View>
-        <Text variant="bodySmall" color={colors.muted}>
-          Your activity stats will appear here
-        </Text>
-      </Card>
-    </View>
+      }
+      ListEmptyComponent={
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyEmoji}>📷</Text>
+          <Text variant="body" color={colors.muted} center>No posts yet</Text>
+          <Text variant="caption" color={colors.muted} center>Share your first food discovery!</Text>
+        </View>
+      }
+      contentContainerStyle={styles.postsGrid}
+      showsVerticalScrollIndicator={false}
+    />
   );
 }
 
-function FriendsSection() {
-  const friends = [
-    { id: '1', name: 'Alex', username: '@alexeats', posts: 42 },
-    { id: '2', name: 'Sam', username: '@samcooks', posts: 18 },
-    { id: '3', name: 'Jordan', username: '@jordanfoodie', posts: 76 },
-  ];
+function MessagesSection() {
+  const { user, supabase } = useAuth();
+  const router = useRouter();
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  return (
-    <View style={styles.section}>
-      <Text variant="label" color={colors.muted} style={styles.sectionLabel}>
-        Your Friends
-      </Text>
+  useFocusEffect(
+    useCallback(() => {
+      if (!user?.sub) {
+        setLoading(false);
+        return;
+      }
 
-      {friends.map((friend) => (
-        <Card key={friend.id} style={styles.friendCard}>
-          <View style={styles.friendAvatar}>
-            <Text style={styles.friendAvatarText}>
-              {friend.name[0].toUpperCase()}
-            </Text>
-          </View>
-          <View style={styles.friendInfo}>
-            <Text variant="body">{friend.name}</Text>
-            <Text variant="caption" color={colors.muted}>
-              {friend.username} • {friend.posts} posts
-            </Text>
-          </View>
-        </Card>
-      ))}
+      const fetchConversations = async () => {
+        try {
+          // Get all conversations for this user
+          const { data: convData } = await supabase
+            .from('conversations')
+            .select('*')
+            .or(`participant_1.eq.${user.sub},participant_2.eq.${user.sub}`)
+            .order('updated_at', { ascending: false });
 
-      <Card style={[styles.card, styles.addFriendsCard]}>
-        <Ionicons name="people-outline" size={40} color={colors.muted} style={{ marginBottom: spacing.sm }} />
-        <Text variant="body" center>
-          Find Friends
-        </Text>
-        <Text variant="bodySmall" color={colors.muted} center>
-          Coming soon
-        </Text>
-      </Card>
-    </View>
+          if (!convData || convData.length === 0) {
+            setConversations([]);
+            setLoading(false);
+            return;
+          }
+
+          // Get other user IDs
+          const otherUserIds = convData.map(c =>
+            c.participant_1 === user.sub ? c.participant_2 : c.participant_1
+          );
+
+          // Fetch other users
+          const { data: usersData } = await supabase
+            .from('users')
+            .select('auth0_id, name, avatar')
+            .in('auth0_id', otherUserIds);
+
+          const userMap: Record<string, any> = {};
+          usersData?.forEach(u => { userMap[u.auth0_id] = u; });
+
+          // Build conversation list
+          const convList: Conversation[] = await Promise.all(convData.map(async (c) => {
+            const otherId = c.participant_1 === user.sub ? c.participant_2 : c.participant_1;
+
+            // Get last message
+            const { data: lastMsgData } = await supabase
+              .from('messages')
+              .select('content, created_at, sender_id')
+              .eq('conversation_id', c.id)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .single();
+
+            // Get unread count
+            const { count: unread } = await supabase
+              .from('messages')
+              .select('id', { count: 'exact', head: true })
+              .eq('conversation_id', c.id)
+              .neq('sender_id', user.sub)
+              .is('read_at', null);
+
+            return {
+              id: c.id,
+              other_user: userMap[otherId] || { auth0_id: otherId, name: 'User', avatar: '' },
+              last_message: lastMsgData || undefined,
+              unread_count: unread || 0,
+            };
+          }));
+
+          setConversations(convList);
+        } catch (err) {
+          console.error('Error fetching conversations:', err);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchConversations();
+    }, [user, supabase])
   );
-}
 
-function InboxSection() {
-  return (
-    <View style={styles.section}>
-      <View style={styles.emptyInbox}>
-        <Ionicons name="mail-open-outline" size={64} color={colors.muted} style={{ marginBottom: spacing.md }} />
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(hours / 24);
+
+    if (days > 0) return `${days}d`;
+    if (hours > 0) return `${hours}h`;
+    return 'now';
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (conversations.length === 0) {
+    return (
+      <View style={styles.emptyMessages}>
+        <Ionicons name="chatbubbles-outline" size={64} color={colors.muted} style={{ marginBottom: spacing.md }} />
         <Text variant="subtitle" center>
           No messages yet
         </Text>
         <Text variant="bodySmall" color={colors.muted} center>
-          Start conversations with friends
+          Start a conversation from someone's profile
         </Text>
       </View>
+    );
+  }
 
-      {/* Placeholder notifications */}
-      <Text variant="label" color={colors.muted} style={styles.sectionLabel}>
-        Notifications
-      </Text>
-
-      <Card style={styles.notificationCard}>
-        <View style={styles.notificationIconCircle}>
-          <Ionicons name="heart" size={18} color={colors.coral} />
-        </View>
-        <View style={styles.notificationContent}>
-          <Text variant="bodySmall">
-            <Text bold>@alexeats</Text> liked your post
-          </Text>
-          <Text variant="caption" color={colors.muted}>
-            2 hours ago
-          </Text>
-        </View>
-      </Card>
-
-      <Card style={styles.notificationCard}>
-        <View style={styles.notificationIconCircle}>
-          <Ionicons name="chatbubble" size={16} color={colors.blue} />
-        </View>
-        <View style={styles.notificationContent}>
-          <Text variant="bodySmall">
-            <Text bold>@samcooks</Text> commented on your video
-          </Text>
-          <Text variant="caption" color={colors.muted}>
-            5 hours ago
-          </Text>
-        </View>
-      </Card>
-
-      <Card style={styles.notificationCard}>
-        <View style={styles.notificationIconCircle}>
-          <Ionicons name="person-add" size={16} color={colors.purple} />
-        </View>
-        <View style={styles.notificationContent}>
-          <Text variant="bodySmall">
-            <Text bold>@jordanfoodie</Text> started following you
-          </Text>
-          <Text variant="caption" color={colors.muted}>
-            1 day ago
-          </Text>
-        </View>
-      </Card>
-    </View>
+  return (
+    <FlatList
+      data={conversations}
+      keyExtractor={(item) => item.id}
+      renderItem={({ item }) => (
+        <TouchableOpacity
+          style={styles.conversationItem}
+          onPress={() => router.push({ pathname: '/conversation', params: { userId: item.other_user.auth0_id } })}
+          activeOpacity={0.7}
+        >
+          {item.other_user.avatar ? (
+            <Image source={{ uri: item.other_user.avatar }} style={styles.conversationAvatar} />
+          ) : (
+            <View style={[styles.conversationAvatar, styles.avatarPlaceholder]}>
+              <Text style={styles.avatarInitial}>{item.other_user.name?.[0]?.toUpperCase() || 'U'}</Text>
+            </View>
+          )}
+          <View style={styles.conversationInfo}>
+            <View style={styles.conversationHeader}>
+              <Text variant="subtitle" numberOfLines={1} style={{ flex: 1 }}>{item.other_user.name}</Text>
+              {item.last_message && (
+                <Text variant="caption" color={colors.muted}>{formatTime(item.last_message.created_at)}</Text>
+              )}
+            </View>
+            {item.last_message && (
+              <Text variant="caption" color={colors.muted} numberOfLines={1}>
+                {item.last_message.sender_id === user?.sub ? 'You: ' : ''}{item.last_message.content}
+              </Text>
+            )}
+          </View>
+          {item.unread_count > 0 && (
+            <View style={styles.unreadBadge}>
+              <Text style={styles.unreadCount}>{item.unread_count}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      )}
+      contentContainerStyle={styles.messagesList}
+      showsVerticalScrollIndicator={false}
+    />
   );
 }
 
@@ -297,19 +456,13 @@ const styles = StyleSheet.create({
   segmented: {
     marginTop: spacing.md,
   },
-  container: {
+  loadingContainer: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  content: {
+  profileContainer: {
     padding: spacing.lg,
-    paddingBottom: 120,
-  },
-  section: {
-    flex: 1,
-  },
-  sectionLabel: {
-    marginBottom: spacing.md,
-    marginTop: spacing.lg,
   },
   profileHeader: {
     alignItems: 'center',
@@ -345,78 +498,50 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
     marginHorizontal: spacing.md,
   },
-  card: {
+  postsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
     marginBottom: spacing.md,
   },
-  topSpots: {
-    gap: spacing.sm,
+  postsGrid: {
+    paddingBottom: 100,
   },
-  topSpotItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
+  postItem: {
+    flex: 1 / 3,
+    aspectRatio: 1,
+    margin: 1,
+    position: 'relative',
   },
-  friendCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
+  postThumbnail: {
+    width: '100%',
+    height: '100%',
   },
-  friendAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.purple,
+  postPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#333',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.md,
   },
-  friendAvatarText: {
-    color: colors.text,
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  friendInfo: {
-    flex: 1,
-  },
-  addFriendsCard: {
+  playBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: spacing.xl,
-    marginTop: spacing.md,
-    borderStyle: 'dashed',
   },
-  emptyInbox: {
+  emptyContainer: {
     alignItems: 'center',
     paddingVertical: spacing.xxl,
   },
-  notificationCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  notificationIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.md,
-  },
-  notificationContent: {
-    flex: 1,
-  },
-  loginContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.xl,
-    paddingTop: 100,
-  },
-  loginButton: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    borderRadius: radius.pill,
+  emptyEmoji: {
+    fontSize: 48,
+    marginBottom: spacing.md,
   },
   actionButtonsRow: {
     flexDirection: 'row',
@@ -439,5 +564,73 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  loginContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+    paddingTop: 100,
+  },
+  loginButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: radius.pill,
+  },
+  // Messages Section
+  messagesList: {
+    padding: spacing.lg,
+  },
+  emptyMessages: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+  },
+  conversationItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  conversationAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  avatarPlaceholder: {
+    backgroundColor: colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarInitial: {
+    color: colors.text,
+    fontWeight: '600',
+    fontSize: 18,
+  },
+  conversationInfo: {
+    flex: 1,
+    marginLeft: spacing.md,
+  },
+  conversationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  unreadBadge: {
+    backgroundColor: colors.primary,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+  },
+  unreadCount: {
+    color: colors.bg,
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

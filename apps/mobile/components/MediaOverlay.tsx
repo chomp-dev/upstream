@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Image, TouchableOpacity, Platform } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, StyleSheet, Image, TouchableOpacity, Platform, Share, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { Restaurant } from '../src/lib/api/types';
 import { colors, spacing, radius } from '../src/theme';
-import { ratingColor, priceDisplay } from '../src/theme/styles';
 import { Text } from '../src/ui';
+import { useAuth } from '../src/context/auth';
 
 interface MediaOverlayProps {
     height: number;
@@ -18,6 +18,9 @@ interface MediaOverlayProps {
     };
     caption?: string;
     restaurant?: Restaurant | null;
+    videoUrl?: string;
+    imagePostId?: number;
+    title?: string;
 }
 
 export function MediaOverlay({
@@ -25,9 +28,20 @@ export function MediaOverlay({
     user,
     caption,
     restaurant,
+    videoUrl,
+    imagePostId,
+    title,
 }: MediaOverlayProps) {
     const router = useRouter();
+    const { user: authUser, supabase } = useAuth();
     const [distance, setDistance] = useState<string | null>(null);
+
+    // Social state
+    const [likesCount, setLikesCount] = useState(0);
+    const [commentsCount, setCommentsCount] = useState(0);
+    const [savesCount, setSavesCount] = useState(0);
+    const [isLiked, setIsLiked] = useState(false);
+    const [isSaved, setIsSaved] = useState(false);
 
     // Calculate distance on mount
     useEffect(() => {
@@ -35,7 +49,6 @@ export function MediaOverlay({
 
         (async () => {
             try {
-                // Use last known position for speed, falling back to current
                 const location = await Location.getLastKnownPositionAsync({});
                 if (location) {
                     const distMeters = getDistanceMeters(
@@ -45,12 +58,9 @@ export function MediaOverlay({
                         restaurant.lng!
                     );
 
-                    // Convert to imperial units
                     const distMiles = distMeters * 0.000621371;
 
                     if (distMiles < 0.1) {
-                        // Less than 0.1 miles (~500ft), show feet
-                        // 1 meter = 3.28084 feet
                         const distFeet = Math.round(distMeters * 3.28084);
                         setDistance(`${distFeet} ft`);
                     } else {
@@ -58,10 +68,72 @@ export function MediaOverlay({
                     }
                 }
             } catch (e) {
-                // Ignore location errors for UI overlay
+                // Ignore location errors
             }
         })();
     }, [restaurant]);
+
+    // Fetch social data
+    useEffect(() => {
+        if (!videoUrl) return;
+
+        const fetchSocialData = async () => {
+            try {
+                // Fetch like count
+                const { data: videoData } = await supabase
+                    .from('videos')
+                    .select('likes_count')
+                    .eq('video_url', videoUrl)
+                    .single();
+
+                if (videoData) {
+                    setLikesCount(videoData.likes_count || 0);
+                }
+
+                // Fetch comment count
+                const { count: commentCount } = await supabase
+                    .from('comments')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('video_url', videoUrl);
+
+                setCommentsCount(commentCount || 0);
+
+                // Check if current user liked
+                if (authUser) {
+                    const { data: likeData } = await supabase
+                        .from('video_likes')
+                        .select('*')
+                        .eq('video_url', videoUrl)
+                        .eq('user_id', authUser.sub)
+                        .single();
+
+                    setIsLiked(!!likeData);
+
+                    // Check if saved
+                    const { data: saveData } = await supabase
+                        .from('saves')
+                        .select('*')
+                        .eq('video_url', videoUrl)
+                        .eq('user_id', authUser.sub)
+                        .single();
+
+                    setIsSaved(!!saveData);
+                }
+
+                // Fetch saves count
+                const { count: saveCount } = await supabase
+                    .from('saves')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('video_url', videoUrl);
+
+                setSavesCount(saveCount || 0);
+            } catch (err) {
+                // Silently handle errors - data will show defaults
+            }
+        };
+
+        fetchSocialData();
+    }, [videoUrl, authUser, supabase]);
 
     const handleProfilePress = () => {
         if (user?.userId) {
@@ -70,6 +142,106 @@ export function MediaOverlay({
                 params: { userId: user.userId }
             });
         }
+    };
+
+    const handleLike = async () => {
+        if (!authUser) {
+            Alert.alert('Sign In Required', 'Please sign in to like posts.');
+            return;
+        }
+        if (!videoUrl) return;
+
+        const previousLiked = isLiked;
+        const previousCount = likesCount;
+
+        // Optimistic update
+        setIsLiked(!previousLiked);
+        setLikesCount(previousLiked ? previousCount - 1 : previousCount + 1);
+
+        try {
+            if (previousLiked) {
+                await supabase
+                    .from('video_likes')
+                    .delete()
+                    .eq('video_url', videoUrl)
+                    .eq('user_id', authUser.sub);
+            } else {
+                await supabase
+                    .from('video_likes')
+                    .insert({
+                        video_url: videoUrl,
+                        user_id: authUser.sub
+                    });
+            }
+        } catch (err) {
+            // Revert on error
+            setIsLiked(previousLiked);
+            setLikesCount(previousCount);
+        }
+    };
+
+    const handleSave = async () => {
+        if (!authUser) {
+            Alert.alert('Sign In Required', 'Please sign in to save posts.');
+            return;
+        }
+        if (!videoUrl) return;
+
+        const previousSaved = isSaved;
+        const previousCount = savesCount;
+
+        setIsSaved(!previousSaved);
+        setSavesCount(previousSaved ? previousCount - 1 : previousCount + 1);
+
+        try {
+            if (previousSaved) {
+                await supabase
+                    .from('saves')
+                    .delete()
+                    .eq('video_url', videoUrl)
+                    .eq('user_id', authUser.sub);
+            } else {
+                await supabase
+                    .from('saves')
+                    .insert({
+                        video_url: videoUrl,
+                        user_id: authUser.sub
+                    });
+            }
+        } catch (err) {
+            setIsSaved(previousSaved);
+            setSavesCount(previousCount);
+        }
+    };
+
+    const handleComment = () => {
+        // For now, navigate to a comments view or show inline
+        // This could be enhanced with a bottom sheet modal
+        if (!videoUrl) return;
+
+        // Simple approach: Could show bottom sheet here
+        // For now we'll just log - full implementation would use a modal
+        console.log('Open comments for:', videoUrl);
+    };
+
+    const handleShare = async () => {
+        try {
+            const shareContent = {
+                message: `Check out this spot on Chomp! ${restaurant?.name || title || 'Amazing food find!'}\n\nhttps://usechomp.com`,
+            };
+            await Share.share(shareContent);
+        } catch (error) {
+            console.error('Error sharing:', error);
+        }
+    };
+
+    const formatCount = (count: number): string => {
+        if (count >= 1000000) {
+            return `${(count / 1000000).toFixed(1)}M`;
+        } else if (count >= 1000) {
+            return `${(count / 1000).toFixed(1)}K`;
+        }
+        return count.toString();
     };
 
     return (
@@ -103,7 +275,25 @@ export function MediaOverlay({
 
                     {/* Restaurant Location Pill */}
                     {restaurant && (
-                        <TouchableOpacity style={styles.locationPill} activeOpacity={0.9}>
+                        <TouchableOpacity
+                            style={styles.locationPill}
+                            activeOpacity={0.9}
+                            onPress={() => {
+                                router.push({
+                                    pathname: '/restaurant/[id]',
+                                    params: {
+                                        id: restaurant.google_place_id,
+                                        name: restaurant.name || '',
+                                        rating: restaurant.rating?.toString() || '',
+                                        price_level: restaurant.price_level?.toString() || '',
+                                        address: restaurant.formatted_address || '',
+                                        type: restaurant.primary_type || '',
+                                        lat: restaurant.lat?.toString() || '',
+                                        lng: restaurant.lng?.toString() || '',
+                                    },
+                                });
+                            }}
+                        >
                             <View style={styles.pillContent}>
                                 <Ionicons name="location-sharp" size={14} color="#4ADE80" style={{ marginRight: 4 }} />
                                 <Text style={styles.locationText} numberOfLines={1}>
@@ -123,28 +313,36 @@ export function MediaOverlay({
 
                 {/* Right Column: Actions */}
                 <View style={styles.rightColumn}>
-                    {/* Profile Follow Button (Optional, keeping simple for now) */}
-
                     {/* Like */}
-                    <TouchableOpacity style={styles.actionButton} activeOpacity={0.7}>
-                        <Ionicons name="heart" size={35} color="white" style={styles.shadowIcon} />
-                        <Text style={styles.actionCount}>87.4K</Text>
+                    <TouchableOpacity style={styles.actionButton} activeOpacity={0.7} onPress={handleLike}>
+                        <Ionicons
+                            name={isLiked ? "heart" : "heart-outline"}
+                            size={35}
+                            color={isLiked ? "#FF4444" : "white"}
+                            style={styles.shadowIcon}
+                        />
+                        <Text style={styles.actionCount}>{formatCount(likesCount)}</Text>
                     </TouchableOpacity>
 
                     {/* Comment */}
-                    <TouchableOpacity style={styles.actionButton} activeOpacity={0.7}>
+                    <TouchableOpacity style={styles.actionButton} activeOpacity={0.7} onPress={handleComment}>
                         <Ionicons name="chatbubble-ellipses" size={32} color="white" style={styles.shadowIcon} />
-                        <Text style={styles.actionCount}>402</Text>
+                        <Text style={styles.actionCount}>{formatCount(commentsCount)}</Text>
                     </TouchableOpacity>
 
                     {/* Bookmark */}
-                    <TouchableOpacity style={styles.actionButton} activeOpacity={0.7}>
-                        <Ionicons name="bookmark" size={32} color="white" style={styles.shadowIcon} />
-                        <Text style={styles.actionCount}>3.2K</Text>
+                    <TouchableOpacity style={styles.actionButton} activeOpacity={0.7} onPress={handleSave}>
+                        <Ionicons
+                            name={isSaved ? "bookmark" : "bookmark-outline"}
+                            size={32}
+                            color={isSaved ? "#FBBF24" : "white"}
+                            style={styles.shadowIcon}
+                        />
+                        <Text style={styles.actionCount}>{formatCount(savesCount)}</Text>
                     </TouchableOpacity>
 
                     {/* Share */}
-                    <TouchableOpacity style={styles.actionButton} activeOpacity={0.7}>
+                    <TouchableOpacity style={styles.actionButton} activeOpacity={0.7} onPress={handleShare}>
                         <Ionicons name="arrow-redo" size={32} color="white" style={styles.shadowIcon} />
                         <Text style={styles.actionCount}>Share</Text>
                     </TouchableOpacity>
@@ -157,7 +355,7 @@ export function MediaOverlay({
 
 // Haversine Helper
 function getDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
-    const R = 6371e3; // metres
+    const R = 6371e3;
     const φ1 = lat1 * Math.PI / 180;
     const φ2 = lat2 * Math.PI / 180;
     const Δφ = (lat2 - lat1) * Math.PI / 180;
@@ -187,13 +385,11 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'flex-end',
         paddingHorizontal: 12,
-        paddingBottom: Platform.select({ web: 20, ios: 90, android: 80 }), // Safe area for tab bar
+        paddingBottom: Platform.select({ web: 20, ios: 90, android: 80 }),
     },
-
-    // Left Column
     leftColumn: {
         flex: 1,
-        marginRight: 60, // Avoid overlapping right actions
+        marginRight: 60,
         justifyContent: 'flex-end',
         gap: 8,
         paddingBottom: 12,
@@ -236,7 +432,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
         alignSelf: 'flex-start',
         borderLeftWidth: 3,
-        borderLeftColor: '#4ADE80', // Green accent
+        borderLeftColor: '#4ADE80',
     },
     pillContent: {
         flexDirection: 'row',
@@ -257,8 +453,6 @@ const styles = StyleSheet.create({
         color: 'rgba(255,255,255,0.9)',
         fontSize: 13,
     },
-
-    // Right Column
     rightColumn: {
         alignItems: 'center',
         gap: 20,
@@ -274,6 +468,7 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.5,
         shadowRadius: 4,
+        elevation: 4, // Android shadow
     },
     actionCount: {
         color: '#fff',
@@ -283,23 +478,4 @@ const styles = StyleSheet.create({
         textShadowOffset: { width: 1, height: 1 },
         textShadowRadius: 2,
     },
-    discContainer: {
-        marginTop: 20,
-        width: 48,
-        height: 48,
-    },
-    disc: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 8,
-        borderColor: '#111',
-    },
-    discImage: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-    }
 });

@@ -300,6 +300,22 @@ export default function MapScreen() {
     }
   }, []);
 
+  const handleNavigateToRestaurant = (item: Restaurant) => {
+    router.push({
+      pathname: '/restaurant/[id]',
+      params: {
+        id: item.google_place_id,
+        name: item.name || '',
+        rating: item.rating?.toString() || '',
+        price_level: item.price_level?.toString() || '',
+        address: item.formatted_address || '',
+        type: item.primary_type || '',
+        lat: item.lat?.toString() || '',
+        lng: item.lng?.toString() || '',
+      },
+    });
+  };
+
   const renderRestaurantCard = ({ item }: { item: Restaurant }) => {
     const media = mediaSummary[item.google_place_id];
     const totalPosts = media ? media.video_count + media.image_count : 0;
@@ -307,7 +323,7 @@ export default function MapScreen() {
     return (
       <TouchableOpacity
         style={styles.listItem}
-        onPress={() => handleOpenMaps(item)}
+        onPress={() => handleNavigateToRestaurant(item)}
         activeOpacity={0.7}
       >
         <View style={styles.listItemContent}>
@@ -359,10 +375,19 @@ export default function MapScreen() {
               </View>
             )}
             <View style={{ flex: 1 }} />
-            <Text variant="caption" color={colors.blue} style={styles.directionsText}>
-              Directions
-              <Ionicons name="chevron-forward" size={12} color={colors.blue} />
-            </Text>
+            <TouchableOpacity
+              style={styles.directionsButton}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleOpenMaps(item);
+              }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="navigate-outline" size={14} color={colors.blue} />
+              <Text variant="caption" color={colors.blue} style={{ marginLeft: 4 }}>
+                Directions
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </TouchableOpacity>
@@ -416,11 +441,6 @@ export default function MapScreen() {
     <Screen edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <Text variant="title">Nearby</Text>
-          {cached && !isSearching && <Badge label="⚡ Cached" variant="cached" />}
-        </View>
-
         {/* Search Bar */}
         <View style={styles.searchContainer}>
           <Ionicons name="search" size={20} color={colors.muted} />
@@ -658,10 +678,13 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: radius.pill,
   },
-  directionsText: {
-    fontWeight: '500',
+  directionsButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    borderRadius: radius.sm,
   },
   centered: {
     flex: 1,

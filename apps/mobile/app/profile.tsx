@@ -37,6 +37,12 @@ export default function ProfileScreen() {
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [posts, setPosts] = useState<PostItem[]>([]);
     const [loading, setLoading] = useState(true);
+    const [followersCount, setFollowersCount] = useState(0);
+    const [followingCount, setFollowingCount] = useState(0);
+    const [isFollowing, setIsFollowing] = useState(false);
+    const [followLoading, setFollowLoading] = useState(false);
+
+    const isOwnProfile = user?.sub === targetUserId;
 
     useFocusEffect(
         useCallback(() => {
@@ -94,6 +100,31 @@ export default function ProfileScreen() {
 
                     setPosts(combinedPosts);
 
+                    // 4. Fetch Follower Count
+                    const { count: followerCount } = await supabase
+                        .from('follows')
+                        .select('id', { count: 'exact', head: true })
+                        .eq('following_id', targetUserId);
+                    setFollowersCount(followerCount || 0);
+
+                    // 5. Fetch Following Count
+                    const { count: followingCountResult } = await supabase
+                        .from('follows')
+                        .select('id', { count: 'exact', head: true })
+                        .eq('follower_id', targetUserId);
+                    setFollowingCount(followingCountResult || 0);
+
+                    // 6. Check if current user follows this profile
+                    if (user && user.sub !== targetUserId) {
+                        const { data: followData } = await supabase
+                            .from('follows')
+                            .select('id')
+                            .eq('follower_id', user.sub)
+                            .eq('following_id', targetUserId)
+                            .single();
+                        setIsFollowing(!!followData);
+                    }
+
                 } catch (err) {
                     console.error(err);
                 } finally {
@@ -104,6 +135,44 @@ export default function ProfileScreen() {
             fetchData();
         }, [user, targetUserId])
     );
+
+    const handleFollowToggle = async () => {
+        if (!user || !targetUserId || followLoading) return;
+
+        const previousFollowing = isFollowing;
+        const previousCount = followersCount;
+
+        // Optimistic update
+        setIsFollowing(!previousFollowing);
+        setFollowersCount(previousFollowing ? previousCount - 1 : previousCount + 1);
+        setFollowLoading(true);
+
+        try {
+            if (previousFollowing) {
+                // Unfollow
+                await supabase
+                    .from('follows')
+                    .delete()
+                    .eq('follower_id', user.sub)
+                    .eq('following_id', targetUserId);
+            } else {
+                // Follow
+                await supabase
+                    .from('follows')
+                    .insert({
+                        follower_id: user.sub,
+                        following_id: targetUserId,
+                    });
+            }
+        } catch (err) {
+            // Revert on error
+            setIsFollowing(previousFollowing);
+            setFollowersCount(previousCount);
+            console.error('Follow toggle error:', err);
+        } finally {
+            setFollowLoading(false);
+        }
+    };
 
     const renderProfileHeader = () => (
         <View style={styles.section}>
@@ -135,13 +204,31 @@ export default function ProfileScreen() {
                     </Text>
                 )}
 
-                {user && user.sub === targetUserId && (
+                {isOwnProfile ? (
                     <View style={styles.actionButtonsRow}>
                         <TouchableOpacity style={styles.editProfileButton} onPress={() => router.push('/edit_profile')}>
                             <Text variant="caption" color={colors.bg}>Edit Profile</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.logoutButton} onPress={() => { logout(); router.replace('/'); }}>
                             <Text variant="caption" color={colors.muted}>Log Out</Text>
+                        </TouchableOpacity>
+                    </View>
+                ) : user && (
+                    <View style={styles.actionButtonsRow}>
+                        <TouchableOpacity
+                            style={[styles.followButton, isFollowing && styles.followingButton]}
+                            onPress={handleFollowToggle}
+                            disabled={followLoading}
+                        >
+                            <Text variant="caption" color={isFollowing ? colors.text : colors.bg}>
+                                {isFollowing ? 'Following' : 'Follow'}
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.messageButton}
+                            onPress={() => router.push({ pathname: '/conversation', params: { userId: targetUserId } })}
+                        >
+                            <Ionicons name="chatbubble-outline" size={18} color={colors.text} />
                         </TouchableOpacity>
                     </View>
                 )}
@@ -156,19 +243,25 @@ export default function ProfileScreen() {
                     </Text>
                 </View>
                 <View style={styles.statDivider} />
-                <View style={styles.stat}>
-                    <Text variant="title">0</Text>
+                <TouchableOpacity
+                    style={styles.stat}
+                    onPress={() => router.push({ pathname: '/followers', params: { userId: targetUserId, tab: 'followers' } })}
+                >
+                    <Text variant="title">{followersCount}</Text>
                     <Text variant="caption" color={colors.muted}>
                         Followers
                     </Text>
-                </View>
+                </TouchableOpacity>
                 <View style={styles.statDivider} />
-                <View style={styles.stat}>
-                    <Text variant="title">0</Text>
+                <TouchableOpacity
+                    style={styles.stat}
+                    onPress={() => router.push({ pathname: '/followers', params: { userId: targetUserId, tab: 'following' } })}
+                >
+                    <Text variant="title">{followingCount}</Text>
                     <Text variant="caption" color={colors.muted}>
                         Following
                     </Text>
-                </View>
+                </TouchableOpacity>
             </View>
 
             {/* Videos Header */}
@@ -346,6 +439,26 @@ const styles = StyleSheet.create({
     logoutButton: {
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.xs,
+        borderRadius: radius.pill,
+        backgroundColor: colors.surface,
+        borderWidth: 1,
+        borderColor: colors.border,
+    },
+    followButton: {
+        paddingHorizontal: spacing.xl,
+        paddingVertical: spacing.sm,
+        borderRadius: radius.pill,
+        backgroundColor: colors.primary,
+        borderWidth: 1,
+        borderColor: colors.primary,
+    },
+    followingButton: {
+        backgroundColor: colors.surface,
+        borderColor: colors.border,
+    },
+    messageButton: {
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
         borderRadius: radius.pill,
         backgroundColor: colors.surface,
         borderWidth: 1,
