@@ -27,6 +27,7 @@ import { searchApi, mediaApi } from '../../src/lib/api';
 import type { Restaurant, MediaSummaryResponse } from '../../src/lib/api/types';
 import MapImpl from '../../components/Map';
 import { useAuth } from '../../src/context/auth';
+import { mapStore } from '../../src/lib/mapStore';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -130,6 +131,19 @@ export default function MapScreen() {
     async (loc: Location.LocationObject | null, radius: number, isRefresh = false, skipCache = false) => {
       if (!loc) return;
 
+      // Check local cache first (unless force refresh)
+      if (!isRefresh && !skipCache) {
+        const cached = mapStore.getRestaurants();
+        if (cached && !mapStore.hasLocationChanged(loc.coords.latitude, loc.coords.longitude, radiusIndex)) {
+          console.log('[Map] Using cached restaurants:', cached.restaurants.length, 'items');
+          setRestaurants(cached.restaurants);
+          setMediaSummary(cached.mediaSummary);
+          setCached(true);
+          setLoading(false);
+          return;
+        }
+      }
+
       try {
         if (isRefresh) {
           setRefreshing(true);
@@ -183,6 +197,15 @@ export default function MapScreen() {
         if (placeIds.length > 0) {
           const summary = await mediaApi.getMediaSummary(placeIds);
           setMediaSummary(summary);
+
+          // Cache for instant loading next time
+          mapStore.setRestaurants(
+            response.restaurants,
+            summary,
+            loc.coords.latitude,
+            loc.coords.longitude,
+            radiusIndex
+          );
         }
       } catch (err) {
         setError('Could not load restaurants. Check your connection.');

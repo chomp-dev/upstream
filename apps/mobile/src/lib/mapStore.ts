@@ -1,0 +1,126 @@
+/**
+ * Map Store - In-memory cache for restaurant/map data
+ * Prevents unnecessary refetches when navigating within the app
+ */
+
+import type { Restaurant, MediaSummaryResponse } from './api/types';
+
+interface MapCache {
+    restaurants: Restaurant[];
+    mediaSummary: MediaSummaryResponse;
+    lastLocation: { lat: number; lng: number };
+    lastRadiusIndex: number;
+    lastFetchedAt: number;
+}
+
+let cache: MapCache | null = null;
+
+// Cache expires after 10 minutes
+const CACHE_TTL_MS = 10 * 60 * 1000;
+
+// Location deviation threshold in meters (~500m)
+const LOCATION_THRESHOLD_M = 500;
+
+/**
+ * Calculate distance between two coordinates in meters (Haversine formula)
+ */
+function getDistanceMeters(
+    lat1: number,
+    lng1: number,
+    lat2: number,
+    lng2: number
+): number {
+    const R = 6371000; // Earth's radius in meters
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLng = ((lng2 - lng1) * Math.PI) / 180;
+    const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLng / 2) *
+        Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+}
+
+export const mapStore = {
+    /**
+     * Get cached restaurant data if available and not expired
+     */
+    getRestaurants: (): MapCache | null => {
+        if (!cache) return null;
+
+        // Check if cache is expired
+        const now = Date.now();
+        if (now - cache.lastFetchedAt > CACHE_TTL_MS) {
+            console.log('[MapStore] Cache expired');
+            cache = null;
+            return null;
+        }
+
+        return cache;
+    },
+
+    /**
+     * Store restaurant data in cache
+     */
+    setRestaurants: (
+        restaurants: Restaurant[],
+        mediaSummary: MediaSummaryResponse,
+        lat: number,
+        lng: number,
+        radiusIndex: number
+    ) => {
+        cache = {
+            restaurants,
+            mediaSummary,
+            lastLocation: { lat, lng },
+            lastRadiusIndex: radiusIndex,
+            lastFetchedAt: Date.now(),
+        };
+        console.log(`[MapStore] Cached ${restaurants.length} restaurants`);
+    },
+
+    /**
+     * Check if location has changed significantly
+     */
+    hasLocationChanged: (newLat: number, newLng: number, newRadiusIndex: number): boolean => {
+        if (!cache) return true;
+
+        // Check if radius changed
+        if (cache.lastRadiusIndex !== newRadiusIndex) {
+            console.log('[MapStore] Radius changed, need refetch');
+            return true;
+        }
+
+        // Check if expired
+        const now = Date.now();
+        if (now - cache.lastFetchedAt > CACHE_TTL_MS) {
+            console.log('[MapStore] Cache expired');
+            return true;
+        }
+
+        // Check location deviation
+        const distance = getDistanceMeters(
+            cache.lastLocation.lat,
+            cache.lastLocation.lng,
+            newLat,
+            newLng
+        );
+
+        if (distance > LOCATION_THRESHOLD_M) {
+            console.log(`[MapStore] Location changed by ${Math.round(distance)}m, need refetch`);
+            return true;
+        }
+
+        return false;
+    },
+
+    /**
+     * Clear the cache (force refetch on next load)
+     */
+    clear: () => {
+        cache = null;
+        console.log('[MapStore] Cache cleared');
+    },
+};

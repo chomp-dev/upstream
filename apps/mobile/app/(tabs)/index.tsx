@@ -27,6 +27,7 @@ import { mediaApi, searchApi } from '../../src/lib/api';
 import type { FeedItem, Restaurant } from '../../src/lib/api/types';
 
 import { useContentDimensions } from '../../src/hooks/useContentDimensions';
+import { feedStore } from '../../src/lib/feedStore';
 
 // Feed mode types
 type FeedMode = 'loading' | 'nearby' | 'demo';
@@ -60,7 +61,20 @@ export default function HomeScreen() {
   // Location & Nearby Feed Logic
   // ============================================================================
 
-  const loadNearbyFeed = useCallback(async () => {
+  const loadNearbyFeed = useCallback(async (forceRefresh = false) => {
+    // Check cache first (unless force refresh)
+    if (!forceRefresh) {
+      const cached = feedStore.getFeed();
+      if (cached && !feedStore.shouldRefetch()) {
+        console.log('[Feed] Using cached feed:', cached.feed.length, 'items');
+        setFeed(cached.feed);
+        setNearbyPlaceIds(cached.nearbyPlaceIds);
+        setFeedMode(cached.feedMode);
+        setLoading(false);
+        return;
+      }
+    }
+
     try {
       setLoading(true);
       setLoadingProgress(10);
@@ -172,6 +186,9 @@ export default function HomeScreen() {
 
       setFeed(uniqueFeed);
       setFeedMode('nearby');
+
+      // Cache the feed for instant loading next time
+      feedStore.setFeed(uniqueFeed, placeIds, 'nearby');
 
       // Prefetch restaurant data
       const feedPlaceIds = uniqueFeed
@@ -363,7 +380,10 @@ export default function HomeScreen() {
 
   const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
     if (viewableItems.length > 0) {
-      setCurrentIndex(viewableItems[0].index || 0);
+      const index = viewableItems[0].index || 0;
+      setCurrentIndex(index);
+      // Track viewed items for cache refetch logic
+      feedStore.markViewed(index);
     }
   }).current;
 
@@ -437,7 +457,7 @@ export default function HomeScreen() {
         data={feed}
         keyExtractor={(item) => `${item.type}-${item.id}`}
         refreshing={loading}
-        onRefresh={() => feedMode === 'nearby' ? loadNearbyFeed() : loadDemoFeed()}
+        onRefresh={() => feedMode === 'nearby' ? loadNearbyFeed(true) : loadDemoFeed()}
         pagingEnabled={true} // Native: Handles strict paging
         bounces={Platform.OS !== 'web'} // Web: Disable bounce to prevent overscroll issues
         showsVerticalScrollIndicator={false}
