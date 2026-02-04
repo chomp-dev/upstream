@@ -27,20 +27,53 @@ interface PreloadResult {
     durationMs: number;
 }
 
+// Track if preload is in progress (prevents race conditions with tab mounts)
+let isPreloading = false;
+let preloadComplete = false;
+
 export const preloadService = {
     /**
+     * Check if preload is currently running
+     */
+    isLoading: () => isPreloading,
+
+    /**
+     * Check if preload has completed
+     */
+    isComplete: () => preloadComplete,
+
+    /**
      * Main preload function - loads all data during splash
-     * Calls onProgress with 0-100 as loading progresses
+     * Calls onProgress with 0-100 and onStatus with text description
      */
     preload: async (
-        onProgress: (progress: number) => void
+        onProgress: (progress: number) => void,
+        onStatus?: (status: string) => void
     ): Promise<PreloadResult> => {
+        if (isPreloading) {
+            console.log('[Preload] Already in progress, waiting...');
+            // Wait for existing preload to complete
+            while (isPreloading) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            return {
+                success: preloadComplete,
+                feedLoaded: preloadComplete,
+                mapLoaded: preloadComplete,
+                fromCache: true,
+                durationMs: 0,
+            };
+        }
+
+        isPreloading = true;
+        preloadComplete = false;
+        const setStatus = onStatus || (() => { });
         const startTime = Date.now();
         let feedLoaded = false;
         let mapLoaded = false;
-        let fromCache = false;
 
         console.log('[Preload] Starting parallel load...');
+        setStatus('Initializing...');
         onProgress(5);
 
         try {
@@ -68,10 +101,14 @@ export const preloadService = {
             }
 
             // Step 2: Get location permission and coords
+            setStatus('Getting location permission...');
             onProgress(15);
             const { status } = await Location.requestForegroundPermissionsAsync();
             if (status !== 'granted') {
                 console.log('[Preload] Location denied - will use demo/cached data');
+                setStatus('Location denied');
+                isPreloading = false;
+                preloadComplete = true;
                 onProgress(100);
                 return {
                     success: true,
@@ -82,6 +119,7 @@ export const preloadService = {
                 };
             }
 
+            setStatus('Getting your location...');
             onProgress(20);
             const location = await Location.getCurrentPositionAsync({
                 accuracy: Location.Accuracy.Balanced,
@@ -89,6 +127,7 @@ export const preloadService = {
             const { latitude, longitude } = location.coords;
             console.log(`[Preload] Got location: ${latitude}, ${longitude}`);
 
+            setStatus('Finding nearby restaurants...');
             onProgress(30);
 
             // Step 3: Fetch nearby restaurants (shared between feed and map)
@@ -100,6 +139,7 @@ export const preloadService = {
             );
 
             console.log(`[Preload] Found ${nearbyResponse.restaurants.length} nearby restaurants`);
+            setStatus('Loading content...');
             onProgress(50);
 
             // Step 4: Load feed and map data in parallel
@@ -180,9 +220,13 @@ export const preloadService = {
                 console.log(`[Preload] Map ready: ${nearbyResponse.restaurants.length} restaurants`);
             }
 
+            setStatus('Ready!');
             onProgress(100);
             const duration = Date.now() - startTime;
             console.log(`[Preload] Complete in ${duration}ms`);
+
+            isPreloading = false;
+            preloadComplete = true;
 
             return {
                 success: true,
@@ -194,6 +238,9 @@ export const preloadService = {
 
         } catch (error) {
             console.error('[Preload] Error:', error);
+            setStatus('Error loading data');
+            isPreloading = false;
+            preloadComplete = true;
             onProgress(100); // Still complete the splash
             return {
                 success: false,
@@ -202,6 +249,8 @@ export const preloadService = {
                 fromCache: false,
                 durationMs: Date.now() - startTime,
             };
+        } finally {
+            isPreloading = false;
         }
     },
 };

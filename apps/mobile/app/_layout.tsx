@@ -12,13 +12,15 @@ export default function RootLayout() {
   const [isSplashComplete, setIsSplashComplete] = useState(false);
   const [preloadProgress, setPreloadProgress] = useState(0);
   const [dataReady, setDataReady] = useState(false);
+  const [statusText, setStatusText] = useState('Initializing...');
 
   // Start preload immediately on mount
   useEffect(() => {
     console.log('[Layout] Starting preload...');
-    preloadService.preload((progress) => {
-      setPreloadProgress(progress);
-    }).then((result) => {
+    preloadService.preload(
+      (progress) => setPreloadProgress(progress),
+      (status) => setStatusText(status)
+    ).then((result) => {
       console.log('[Layout] Preload complete:', result);
       setDataReady(true);
     }).catch((error) => {
@@ -62,6 +64,7 @@ export default function RootLayout() {
           progress={preloadProgress}
           dataReady={dataReady}
           minDisplayMs={2000}
+          statusText={statusText}
         />
       )}
     </View>

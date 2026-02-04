@@ -1,6 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, LayoutChangeEvent } from 'react-native';
+import { Text } from '../src/ui';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -38,6 +39,7 @@ interface SplashAnimationProps {
     progress?: number; // 0-100 external loading progress
     dataReady?: boolean; // Signal that data loading is complete
     minDisplayMs?: number; // Minimum time to show splash (default 2000)
+    statusText?: string; // Status text to display below progress bar
 }
 
 // Particle for "Crumbs" Effect
@@ -155,7 +157,8 @@ export default function SplashAnimation({
     onComplete,
     progress = 100,
     dataReady = true,
-    minDisplayMs = 2000
+    minDisplayMs = 2000,
+    statusText = ''
 }: SplashAnimationProps) {
     const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
     const [minTimeElapsed, setMinTimeElapsed] = useState(false);
@@ -258,6 +261,11 @@ export default function SplashAnimation({
                 <View style={styles.progressTrack}>
                     <Animated.View style={[styles.progressFill, progressBarStyle]} />
                 </View>
+                {statusText ? (
+                    <Text variant="caption" color="rgba(255,255,255,0.8)" style={styles.statusText}>
+                        {statusText}
+                    </Text>
+                ) : null}
             </View>
         </Animated.View>
     );
@@ -298,5 +306,10 @@ const styles = StyleSheet.create({
         height: '100%',
         backgroundColor: '#F97316', // Orange to match crumbs
         borderRadius: 2,
+    },
+    statusText: {
+        marginTop: 8,
+        fontWeight: '500',
+        letterSpacing: 0.5,
     },
 });
