@@ -68,13 +68,13 @@ export default function HomeScreen() {
       // If preload is still running (race condition), wait for it
       const { preloadService } = require('../../src/lib/preloadService');
       if (preloadService.isLoading()) {
-        console.log('[Feed] Waiting for background preload to complete...');
+        if (__DEV__) console.log('[Feed] Waiting for background preload to complete...');
         await preloadService.waitForCompletion();
       }
 
       const cached = await feedStore.getFeed();
       if (cached && cached.feed.length > 0) {
-        console.log('[Feed] Using preloaded/cached feed:', cached.feed.length, 'items');
+        if (__DEV__) console.log('[Feed] Using preloaded/cached feed:', cached.feed.length, 'items');
         setFeed(cached.feed);
         setNearbyPlaceIds(cached.nearbyPlaceIds);
         setFeedMode(cached.feedMode);
@@ -91,7 +91,7 @@ export default function HomeScreen() {
       // Request location permission
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        console.log('[Feed] Location permission denied, falling back to demo');
+        if (__DEV__) console.log('[Feed] Location permission denied, falling back to demo');
         setLocationAvailable(false);
         await loadDemoFeed();
         return;
@@ -103,7 +103,7 @@ export default function HomeScreen() {
       });
       setLocationAvailable(true);
 
-      console.log(`[Feed] Got location: ${loc.coords.latitude}, ${loc.coords.longitude}`);
+      if (__DEV__) console.log(`[Feed] Got location: ${loc.coords.latitude}, ${loc.coords.longitude}`);
 
       setLoadingProgress(30);
       setLoadingStatus('Finding nearby restaurants...');
@@ -120,17 +120,17 @@ export default function HomeScreen() {
 
       // Limit to top 50 closest to avoid massive wait times/timeouts
       if (placeIds.length > 50) {
-        console.log(`[Feed] Limiting processing to top 50 of ${placeIds.length} restaurants`);
+        if (__DEV__) console.log(`[Feed] Limiting processing to top 50 of ${placeIds.length} restaurants`);
         placeIds = placeIds.slice(0, 50);
       }
 
       setNearbyPlaceIds(placeIds);
       setNearbyRestaurantCount(nearbyResponse.restaurants.length);
 
-      console.log(`[Feed] Found ${nearbyResponse.restaurants.length} nearby restaurants, checking ${placeIds.length}`);
+      if (__DEV__) console.log(`[Feed] Found ${nearbyResponse.restaurants.length} nearby restaurants, checking ${placeIds.length}`);
 
       if (placeIds.length === 0) {
-        console.log('[Feed] No nearby restaurants, staying in nearby mode with empty state');
+        if (__DEV__) console.log('[Feed] No nearby restaurants, staying in nearby mode with empty state');
         setFeed([]);
         setFeedMode('nearby');
         setLoading(false);
@@ -183,10 +183,10 @@ export default function HomeScreen() {
         ))
       );
 
-      console.log(`[Feed] Nearby feed has ${uniqueFeed.length} items (from ${validFeed.length} raw)`);
+      if (__DEV__) console.log(`[Feed] Nearby feed has ${uniqueFeed.length} items (from ${validFeed.length} raw)`);
 
       if (uniqueFeed.length === 0) {
-        console.log('[Feed] No local content, staying in nearby mode with empty state');
+        if (__DEV__) console.log('[Feed] No local content, staying in nearby mode with empty state');
         setFeed([]);
         setFeedMode('nearby');
         setLoading(false);

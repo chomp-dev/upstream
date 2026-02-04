@@ -32,9 +32,7 @@ import { useAuth } from '../../src/context/auth';
 export default function CreateScreen() {
   const { user, login, supabase } = useAuth();
 
-  useEffect(() => {
-    console.log('[CreateScreen] Mounted - Version: Fix-Image-Upload-V2');
-  }, []);
+
 
   if (!user) {
     return (
@@ -73,9 +71,9 @@ export default function CreateScreen() {
       try {
         const restaurantData = JSON.parse(params.restaurant as string);
         setSelectedRestaurant(restaurantData);
-        console.log('[CreateScreen] Pre-selected restaurant:', restaurantData.name);
+        if (__DEV__) console.log('[CreateScreen] Pre-selected restaurant:', restaurantData.name);
       } catch (e) {
-        console.error('Failed to parse restaurant param:', e);
+        if (__DEV__) console.error('Failed to parse restaurant param:', e);
       }
     }
   }, [params.restaurant]);

@@ -44,13 +44,17 @@ export default function RootLayout() {
     </>
   );
 
+  // Web-specific Auth0 props for token persistence (not supported on native)
+  const auth0Props = Platform.OS === 'web' ? {
+    cacheLocation: 'localstorage' as const,
+    useRefreshTokens: true,
+  } : {};
+
   const wrappedContent = (
-    // @ts-ignore - Web-only props for persistence
     <Auth0Provider
       domain={process.env.EXPO_PUBLIC_AUTH0_DOMAIN!}
       clientId={process.env.EXPO_PUBLIC_AUTH0_CLIENT_ID!}
-      cacheLocation="localstorage"
-      useRefreshTokens={true}
+      {...auth0Props}
     >
       <AuthProvider>
         {content}

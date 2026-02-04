@@ -136,7 +136,7 @@ export default function MapScreen() {
       if (!isRefresh && !skipCache) {
         const cached = await mapStore.getRestaurants();
         if (cached && cached.restaurants.length > 0) {
-          console.log('[Map] Using preloaded/cached restaurants:', cached.restaurants.length, 'items');
+          if (__DEV__) console.log('[Map] Using preloaded/cached restaurants:', cached.restaurants.length, 'items');
           setRestaurants(cached.restaurants);
           setMediaSummary(cached.mediaSummary);
           setCached(true);
@@ -156,7 +156,7 @@ export default function MapScreen() {
         setError(null);
         setFetchMeta(null);
 
-        console.log(`[Map] Loading restaurants: radius=${radius}m, skipCache=${skipCache}`);
+        if (__DEV__) console.log(`[Map] Loading restaurants: radius=${radius}m, skipCache=${skipCache}`);
 
         // Simulate progress animation (15 API calls, ~200ms each)
         const progressInterval = setInterval(() => {
@@ -181,7 +181,7 @@ export default function MapScreen() {
         clearInterval(progressInterval);
         setLoadingProgress(100);
 
-        console.log(`[Map] Got ${response.restaurants.length} restaurants, cached=${response.cached}`);
+        if (__DEV__) console.log(`[Map] Got ${response.restaurants.length} restaurants, cached=${response.cached}`);
 
         setRestaurants(response.restaurants);
         setCached(response.cached);
