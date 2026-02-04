@@ -301,11 +301,24 @@ function MessagesSection() {
       const fetchConversations = async () => {
         try {
           // Get all conversations for this user
-          const { data: convData } = await supabase
-            .from('conversations')
-            .select('*')
-            .or(`participant_1.eq.${user.sub},participant_2.eq.${user.sub}`)
-            .order('updated_at', { ascending: false });
+          // Use two separate queries to avoid .or() issues with special chars in auth0 IDs
+          const [{ data: conv1 }, { data: conv2 }] = await Promise.all([
+            supabase
+              .from('conversations')
+              .select('*')
+              .eq('participant_1', user.sub),
+            supabase
+              .from('conversations')
+              .select('*')
+              .eq('participant_2', user.sub)
+          ]);
+
+          // Merge and deduplicate by id
+          const allConvs = [...(conv1 || []), ...(conv2 || [])];
+          const convMap = new Map();
+          allConvs.forEach(c => convMap.set(c.id, c));
+          const convData = Array.from(convMap.values())
+            .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
 
           if (!convData || convData.length === 0) {
             setConversations([]);
