@@ -44,9 +44,18 @@ export function MediaOverlay({
                         restaurant.lat!,
                         restaurant.lng!
                     );
-                    // Convert meters to miles
-                    const distMiles = (distMeters * 0.000621371).toFixed(1);
-                    setDistance(distMiles);
+
+                    // Convert to imperial units
+                    const distMiles = distMeters * 0.000621371;
+
+                    if (distMiles < 0.1) {
+                        // Less than 0.1 miles (~500ft), show feet
+                        // 1 meter = 3.28084 feet
+                        const distFeet = Math.round(distMeters * 3.28084);
+                        setDistance(`${distFeet} ft`);
+                    } else {
+                        setDistance(`${distMiles.toFixed(1)} mi`);
+                    }
                 }
             } catch (e) {
                 // Ignore location errors for UI overlay
