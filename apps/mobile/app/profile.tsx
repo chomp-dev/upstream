@@ -28,6 +28,8 @@ interface PostItem {
     created_at: string;
 }
 
+import { navigationStore } from '../src/lib/navigationStore';
+
 export default function ProfileScreen() {
     const { user, logout, supabase } = useAuth();
     const { userId } = useLocalSearchParams();
@@ -211,25 +213,48 @@ export default function ProfileScreen() {
             <FlatList
                 data={posts}
                 keyExtractor={(item) => `${item.type}-${item.id}`}
-                renderItem={({ item }) => (
-                    <View style={styles.videoItem}>
-                        {item.type === 'video' && item.thumbnail_url ? (
-                            <Image source={{ uri: item.thumbnail_url }} style={styles.videoThumbnail} />
-                        ) : item.type === 'image' && item.images && item.images.length > 0 ? (
-                            <Image source={{ uri: item.images[0] }} style={styles.videoThumbnail} />
-                        ) : (
-                            <View style={styles.videoPlaceholder}>
-                                <Ionicons name={item.type === 'image' ? "images" : "play"} size={24} color="white" />
-                            </View>
-                        )}
-                        <Text numberOfLines={1} style={styles.videoTitle}>{item.title || 'Untitled'}</Text>
-                        {item.type === 'image' && (
-                            <View style={{ position: 'absolute', top: 4, right: 4 }}>
-                                <Ionicons name="images" size={12} color="white" />
-                            </View>
-                        )}
-                    </View>
-                )}
+                renderItem={({ item, index }) => {
+                    const handlePress = () => {
+                        // Navigation similar to explore.tsx
+                        const dataId = `video-${Date.now()}`;
+                        // We need to map PostItem to FeedItem (they are similar enough for this)
+                        // @ts-ignore
+                        navigationStore.set(dataId, item);
+
+                        router.push({
+                            pathname: '/',
+                            params: {
+                                scrollToIndex: index.toString(),
+                                itemId: item.id.toString(),
+                                videoDataId: dataId
+                            },
+                        });
+                    };
+
+                    return (
+                        <TouchableOpacity
+                            style={styles.videoItem}
+                            onPress={handlePress}
+                            activeOpacity={0.8}
+                        >
+                            {item.type === 'video' && item.thumbnail_url ? (
+                                <Image source={{ uri: item.thumbnail_url }} style={styles.videoThumbnail} />
+                            ) : item.type === 'image' && item.images && item.images.length > 0 ? (
+                                <Image source={{ uri: item.images[0] }} style={styles.videoThumbnail} />
+                            ) : (
+                                <View style={styles.videoPlaceholder}>
+                                    <Ionicons name={item.type === 'image' ? "images" : "play"} size={24} color="white" />
+                                </View>
+                            )}
+                            <Text numberOfLines={1} style={styles.videoTitle}>{item.title || 'Untitled'}</Text>
+                            {item.type === 'image' && (
+                                <View style={{ position: 'absolute', top: 4, right: 4 }}>
+                                    <Ionicons name="images" size={12} color="white" />
+                                </View>
+                            )}
+                        </TouchableOpacity>
+                    );
+                }}
                 ListHeaderComponent={renderProfileHeader}
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
@@ -238,8 +263,9 @@ export default function ProfileScreen() {
                 }
                 contentContainerStyle={styles.content}
                 numColumns={3}
+                showsVerticalScrollIndicator={false}
             />
-        </Screen>
+        </Screen >
     );
 }
 

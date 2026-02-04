@@ -100,6 +100,9 @@ export default function ExploreScreen() {
     if (item.type === 'video') {
       return item.thumbnail_url;
     }
+    if (item.type === 'tiktok_embed') {
+      return item.thumbnail_url;
+    }
     // For image posts, use first image
     return item.images?.[0];
   };
@@ -242,6 +245,7 @@ export default function ExploreScreen() {
           keyExtractor={(item) => item.id}
           renderItem={renderRestaurantItem}
           contentContainerStyle={styles.searchListContainer}
+          showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text variant="body" color={colors.muted}>No restaurants found</Text>

@@ -46,6 +46,10 @@ export default function HomeScreen() {
   const lastScrolledRef = useRef<string | null>(null);
   const { width, height: SCREEN_HEIGHT } = useContentDimensions();
 
+  // Loading state
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [loadingStatus, setLoadingStatus] = useState('Initializing...');
+
   // Location-based feed state
   const [feedMode, setFeedMode] = useState<FeedMode>('loading');
   const [nearbyPlaceIds, setNearbyPlaceIds] = useState<string[]>([]);
@@ -59,6 +63,8 @@ export default function HomeScreen() {
   const loadNearbyFeed = useCallback(async () => {
     try {
       setLoading(true);
+      setLoadingProgress(10);
+      setLoadingStatus('Checking permissions...');
 
       // Request location permission
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -76,6 +82,9 @@ export default function HomeScreen() {
       setLocationAvailable(true);
 
       console.log(`[Feed] Got location: ${loc.coords.latitude}, ${loc.coords.longitude}`);
+
+      setLoadingProgress(30);
+      setLoadingStatus('Finding nearby restaurants...');
 
       // Search for nearby restaurants
       const nearbyResponse = await searchApi.searchNearby(
@@ -99,6 +108,9 @@ export default function HomeScreen() {
         return;
       }
 
+      setLoadingProgress(60);
+      setLoadingStatus(`Found ${placeIds.length} spots. Getting videos...`);
+
       // Fetch nearby feed
       const nearbyFeedResponse = await mediaApi.fetchNearbyFeed(placeIds);
 
@@ -119,6 +131,9 @@ export default function HomeScreen() {
         setLoading(false);
         return;
       }
+
+      setLoadingProgress(90);
+      setLoadingStatus('Preparing your feed...');
 
       setFeed(validFeed);
       setFeedMode('nearby');
@@ -329,10 +344,19 @@ export default function HomeScreen() {
     return (
       <Screen safe={false}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text variant="bodySmall" style={styles.loadingText}>
-            {feedMode === 'loading' ? 'Finding nearby content...' : 'Loading feed...'}
-          </Text>
+          <View style={styles.loadingContent}>
+            <Text variant="title" style={styles.loadingTitle}>
+              Finding nearby content...
+            </Text>
+
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressBar, { width: `${loadingProgress}%` }]} />
+            </View>
+
+            <Text variant="bodySmall" color={colors.muted} style={styles.loadingText}>
+              {loadingStatus}
+            </Text>
+          </View>
         </View>
       </Screen>
     );
@@ -491,8 +515,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.bg,
   },
+  loadingContent: {
+    width: '70%',
+    alignItems: 'center',
+  },
+  loadingTitle: {
+    marginBottom: spacing.xl,
+    textAlign: 'center',
+  },
+  progressTrack: {
+    width: '100%',
+    height: 4,
+    backgroundColor: colors.surface,
+    borderRadius: radius.pill,
+    overflow: 'hidden',
+    marginBottom: spacing.md,
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: colors.primary,
+    borderRadius: radius.pill,
+  },
   loadingText: {
-    marginTop: spacing.md,
+    textAlign: 'center',
   },
   emptyIcon: {
     fontSize: 64,

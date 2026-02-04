@@ -281,58 +281,67 @@ export default function MapScreen() {
     const totalPosts = media ? media.video_count + media.image_count : 0;
 
     return (
-      <Card
-        style={styles.card}
-        showAccent
-        accentColor={ratingColor(item.rating)}
+      <TouchableOpacity
+        style={styles.listItem}
         onPress={() => handleOpenMaps(item)}
+        activeOpacity={0.7}
       >
-        <View style={styles.cardHeader}>
-          <Text variant="subtitle" numberOfLines={1} style={styles.cardName}>
-            {item.name || 'Unknown Restaurant'}
-          </Text>
-          {item.price_level !== null && (
-            <Badge label={priceDisplay(item.price_level)} variant="price" />
-          )}
-        </View>
-
-        {item.rating !== null && (
-          <View style={styles.ratingRow}>
-            <Text style={[styles.star, { color: ratingColor(item.rating) }]}>★</Text>
-            <Text variant="body" color={ratingColor(item.rating)}>
-              {item.rating.toFixed(1)}
+        <View style={styles.listItemContent}>
+          <View style={styles.listItemHeader}>
+            <Text variant="subtitle" numberOfLines={1} style={styles.listItemName}>
+              {item.name || 'Unknown Restaurant'}
             </Text>
-            {item.user_rating_count !== null && (
-              <Text variant="bodySmall" color={colors.muted}>
-                ({item.user_rating_count.toLocaleString()})
+            {item.rating !== null && (
+              <View style={styles.ratingBadge}>
+                <Text style={styles.starText}>★</Text>
+                <Text variant="caption" style={styles.ratingText}>
+                  {item.rating.toFixed(1)}
+                </Text>
+                {item.user_rating_count !== null && (
+                  <Text variant="caption" color={colors.muted} style={{ marginLeft: 2 }}>
+                    ({item.user_rating_count})
+                  </Text>
+                )}
+              </View>
+            )}
+          </View>
+
+          <View style={styles.listItemRow}>
+            {item.price_level !== null && (
+              <Text variant="caption" color={colors.text} style={{ marginRight: spacing.sm }}>
+                {priceDisplay(item.price_level)}
+              </Text>
+            )}
+            {item.primary_type && (
+              <Text variant="caption" color={colors.muted} numberOfLines={1} style={{ flex: 1 }}>
+                {item.primary_type.replace(/_/g, ' ')}
               </Text>
             )}
           </View>
-        )}
 
-        {item.primary_type && (
-          <View style={styles.typeTag}>
-            <Text variant="caption" color={colors.muted}>
-              {item.primary_type.replace(/_/g, ' ')}
+          {item.formatted_address && (
+            <Text variant="caption" color={colors.muted} numberOfLines={1} style={styles.listAddress}>
+              {item.formatted_address}
+            </Text>
+          )}
+
+          <View style={styles.listItemFooter}>
+            {totalPosts > 0 && (
+              <View style={styles.postCountBadge}>
+                <Ionicons name="play-circle-outline" size={14} color={colors.primary} />
+                <Text variant="caption" color={colors.primary} style={{ marginLeft: 4 }}>
+                  {totalPosts} {totalPosts === 1 ? 'post' : 'posts'}
+                </Text>
+              </View>
+            )}
+            <View style={{ flex: 1 }} />
+            <Text variant="caption" color={colors.blue} style={styles.directionsText}>
+              Directions
+              <Ionicons name="chevron-forward" size={12} color={colors.blue} />
             </Text>
           </View>
-        )}
-
-        {item.formatted_address && (
-          <Text variant="bodySmall" numberOfLines={2} style={styles.address}>
-            {item.formatted_address}
-          </Text>
-        )}
-
-        <View style={styles.cardFooter}>
-          {totalPosts > 0 && (
-            <Badge label={`${totalPosts} ${totalPosts === 1 ? 'post' : 'posts'}`} variant="default" />
-          )}
-          <Text variant="caption" color={colors.blue}>
-            🗺️ Directions
-          </Text>
         </View>
-      </Card>
+      </TouchableOpacity>
     );
   };
 
@@ -561,47 +570,74 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     paddingBottom: 120,
   },
-  card: {
-    marginBottom: spacing.md,
+  listItem: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    marginBottom: spacing.sm,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  cardHeader: {
+  listItemContent: {
+    gap: 4,
+  },
+  listItemHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.sm,
+    marginBottom: 2,
   },
-  cardName: {
+  listItemName: {
     flex: 1,
     marginRight: spacing.sm,
+    fontSize: 16,
+    fontWeight: '600',
   },
-  ratingRow: {
+  listItemRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
-    marginBottom: spacing.sm,
+    marginBottom: 2,
   },
-  star: {
-    fontSize: 14,
-  },
-  typeTag: {
-    alignSelf: 'flex-start',
-    backgroundColor: colors.surface,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xxs,
+  ratingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.overlay,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
     borderRadius: radius.sm,
-    marginBottom: spacing.sm,
   },
-  address: {
-    marginBottom: spacing.sm,
+  starText: {
+    fontSize: 12,
+    color: '#FFD700',
+    marginRight: 2,
   },
-  cardFooter: {
+  ratingText: {
+    fontWeight: '600',
+    color: colors.text,
+  },
+  listAddress: {
+    marginBottom: spacing.xs,
+  },
+  listItemFooter: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingTop: spacing.sm,
     marginTop: spacing.xs,
+    paddingTop: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.05)',
+  },
+  postCountBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 68, 68, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+  },
+  directionsText: {
+    fontWeight: '500',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   centered: {
     flex: 1,
