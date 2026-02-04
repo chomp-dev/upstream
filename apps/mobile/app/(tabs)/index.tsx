@@ -63,10 +63,11 @@ export default function HomeScreen() {
 
   const loadNearbyFeed = useCallback(async (forceRefresh = false) => {
     // Check cache first (unless force refresh)
+    // Preload service should have already populated this during splash
     if (!forceRefresh) {
       const cached = await feedStore.getFeed();
-      if (cached && !feedStore.shouldRefetch()) {
-        console.log('[Feed] Using cached feed:', cached.feed.length, 'items');
+      if (cached && cached.feed.length > 0) {
+        console.log('[Feed] Using preloaded/cached feed:', cached.feed.length, 'items');
         setFeed(cached.feed);
         setNearbyPlaceIds(cached.nearbyPlaceIds);
         setFeedMode(cached.feedMode);

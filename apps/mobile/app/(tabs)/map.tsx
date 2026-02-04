@@ -132,10 +132,11 @@ export default function MapScreen() {
       if (!loc) return;
 
       // Check local cache first (unless force refresh)
+      // Preload service should have already populated this during splash
       if (!isRefresh && !skipCache) {
         const cached = await mapStore.getRestaurants();
-        if (cached && !mapStore.hasLocationChanged(loc.coords.latitude, loc.coords.longitude, radiusIndex)) {
-          console.log('[Map] Using cached restaurants:', cached.restaurants.length, 'items');
+        if (cached && cached.restaurants.length > 0) {
+          console.log('[Map] Using preloaded/cached restaurants:', cached.restaurants.length, 'items');
           setRestaurants(cached.restaurants);
           setMediaSummary(cached.mediaSummary);
           setCached(true);

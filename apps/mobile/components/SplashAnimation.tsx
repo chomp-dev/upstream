@@ -35,6 +35,9 @@ const FOOD_ITEMS = [
 
 interface SplashAnimationProps {
     onComplete: () => void;
+    progress?: number; // 0-100 external loading progress
+    dataReady?: boolean; // Signal that data loading is complete
+    minDisplayMs?: number; // Minimum time to show splash (default 2000)
 }
 
 // Particle for "Crumbs" Effect
@@ -148,29 +151,59 @@ const FloatingItem = ({ source, containerWidth, containerHeight, index, total }:
     );
 };
 
-export default function SplashAnimation({ onComplete }: SplashAnimationProps) {
+export default function SplashAnimation({
+    onComplete,
+    progress = 100,
+    dataReady = true,
+    minDisplayMs = 2000
+}: SplashAnimationProps) {
     const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+    const [minTimeElapsed, setMinTimeElapsed] = useState(false);
+    const [hasTriggeredZoom, setHasTriggeredZoom] = useState(false);
     const scale = useSharedValue(0);
     const opacity = useSharedValue(1);
+    const progressAnim = useSharedValue(0);
 
+    // Update progress animation
     useEffect(() => {
-        // Logo Sequence
-        scale.value = withSequence(
-            withTiming(1, { duration: 800, easing: Easing.elastic(1.2) }), // Pop in
-            withDelay(2000,
-                withTiming(50, { duration: 600, easing: Easing.in(Easing.cubic) }, () => { // SUPER ZOOM
-                    runOnJS(onComplete)();
-                })
-            )
-        );
+        progressAnim.value = withTiming(progress / 100, { duration: 200 });
+    }, [progress]);
 
-        // Fade background out near end of zoom
-        opacity.value = withDelay(2900, withTiming(0, { duration: 200 }));
+    // Initial logo pop-in
+    useEffect(() => {
+        scale.value = withTiming(1, { duration: 800, easing: Easing.elastic(1.2) });
+
+        // Set minimum display timer
+        const timer = setTimeout(() => {
+            setMinTimeElapsed(true);
+        }, minDisplayMs);
+
+        return () => clearTimeout(timer);
     }, []);
+
+    // Trigger zoom-out when BOTH conditions are met
+    useEffect(() => {
+        if (dataReady && minTimeElapsed && !hasTriggeredZoom) {
+            setHasTriggeredZoom(true);
+
+            // Trigger the zoom-out sequence
+            scale.value = withTiming(50, { duration: 600, easing: Easing.in(Easing.cubic) }, () => {
+                runOnJS(onComplete)();
+            });
+
+            // Fade background
+            opacity.value = withDelay(400, withTiming(0, { duration: 200 }));
+        }
+    }, [dataReady, minTimeElapsed, hasTriggeredZoom]);
 
     const logoStyle = useAnimatedStyle(() => ({
         transform: [{ scale: scale.value }],
         zIndex: 10,
+    }));
+
+    // Progress bar width animation
+    const progressBarStyle = useAnimatedStyle(() => ({
+        width: `${progressAnim.value * 100}%`,
     }));
 
     const containerStyle = useAnimatedStyle(() => ({
@@ -219,6 +252,13 @@ export default function SplashAnimation({ onComplete }: SplashAnimationProps) {
                     contentFit="contain"
                 />
             </Animated.View>
+
+            {/* Progress Bar */}
+            <View style={styles.progressContainer}>
+                <View style={styles.progressTrack}>
+                    <Animated.View style={[styles.progressFill, progressBarStyle]} />
+                </View>
+            </View>
         </Animated.View>
     );
 }
@@ -240,5 +280,23 @@ const styles = StyleSheet.create({
     logo: {
         width: '100%',
         height: '100%',
-    }
+    },
+    progressContainer: {
+        position: 'absolute',
+        bottom: 120,
+        width: '60%',
+        alignItems: 'center',
+    },
+    progressTrack: {
+        width: '100%',
+        height: 4,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        borderRadius: 2,
+        overflow: 'hidden',
+    },
+    progressFill: {
+        height: '100%',
+        backgroundColor: '#F97316', // Orange to match crumbs
+        borderRadius: 2,
+    },
 });

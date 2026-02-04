@@ -1,14 +1,31 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, StyleSheet, Platform } from 'react-native';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import SplashAnimation from '../components/SplashAnimation';
 import { Auth0Provider } from 'react-native-auth0';
 import { colors } from '../src/theme';
 import { AuthProvider } from '../src/context/auth';
+import { preloadService } from '../src/lib/preloadService';
 
 export default function RootLayout() {
   const [isSplashComplete, setIsSplashComplete] = useState(false);
+  const [preloadProgress, setPreloadProgress] = useState(0);
+  const [dataReady, setDataReady] = useState(false);
+
+  // Start preload immediately on mount
+  useEffect(() => {
+    console.log('[Layout] Starting preload...');
+    preloadService.preload((progress) => {
+      setPreloadProgress(progress);
+    }).then((result) => {
+      console.log('[Layout] Preload complete:', result);
+      setDataReady(true);
+    }).catch((error) => {
+      console.error('[Layout] Preload error:', error);
+      setDataReady(true); // Continue even on error
+    });
+  }, []);
 
   const content = (
     <>
@@ -40,7 +57,12 @@ export default function RootLayout() {
     <View style={{ flex: 1 }}>
       {wrappedContent}
       {!isSplashComplete && (
-        <SplashAnimation onComplete={() => setIsSplashComplete(true)} />
+        <SplashAnimation
+          onComplete={() => setIsSplashComplete(true)}
+          progress={preloadProgress}
+          dataReady={dataReady}
+          minDisplayMs={2000}
+        />
       )}
     </View>
   );
