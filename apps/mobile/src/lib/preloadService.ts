@@ -43,6 +43,16 @@ export const preloadService = {
     isComplete: () => preloadComplete,
 
     /**
+     * Wait for any active preload to complete
+     */
+    waitForCompletion: async () => {
+        while (isPreloading) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        return preloadComplete;
+    },
+
+    /**
      * Main preload function - loads all data during splash
      * Calls onProgress with 0-100 and onStatus with text description
      */

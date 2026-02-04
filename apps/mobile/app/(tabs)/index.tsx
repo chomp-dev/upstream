@@ -65,6 +65,13 @@ export default function HomeScreen() {
     // Check cache first (unless force refresh)
     // Preload service should have already populated this during splash
     if (!forceRefresh) {
+      // If preload is still running (race condition), wait for it
+      const { preloadService } = require('../../src/lib/preloadService');
+      if (preloadService.isLoading()) {
+        console.log('[Feed] Waiting for background preload to complete...');
+        await preloadService.waitForCompletion();
+      }
+
       const cached = await feedStore.getFeed();
       if (cached && cached.feed.length > 0) {
         console.log('[Feed] Using preloaded/cached feed:', cached.feed.length, 'items');
