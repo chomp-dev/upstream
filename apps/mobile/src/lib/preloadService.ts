@@ -131,9 +131,20 @@ export const preloadService = {
 
             setStatus('Getting your location...');
             onProgress(20);
-            const location = await Location.getCurrentPositionAsync({
-                accuracy: Location.Accuracy.Balanced,
-            });
+
+            // Optimization: Try to get last known position first (much faster)
+            let location = await Location.getLastKnownPositionAsync({});
+
+            // If no last known position or it's too old (>5 mins), get fresh
+            if (!location || (Date.now() - location.timestamp) > 5 * 60 * 1000) {
+                console.log('[Preload] Last known location missing or stale, getting fresh...');
+                location = await Location.getCurrentPositionAsync({
+                    accuracy: Location.Accuracy.Balanced,
+                });
+            } else {
+                console.log('[Preload] Using last known location (fast)');
+            }
+
             const { latitude, longitude } = location.coords;
             console.log(`[Preload] Got location: ${latitude}, ${longitude}`);
 
