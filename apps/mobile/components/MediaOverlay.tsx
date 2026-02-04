@@ -139,16 +139,6 @@ export function MediaOverlay({
                         <Ionicons name="arrow-redo" size={32} color="white" style={styles.shadowIcon} />
                         <Text style={styles.actionCount}>Share</Text>
                     </TouchableOpacity>
-
-                    {/* Music/Disc (Static for now) */}
-                    <View style={styles.discContainer}>
-                        <LinearGradient
-                            colors={['#222', '#111']}
-                            style={styles.disc}
-                        >
-                            {user?.avatarUrl && <Image source={{ uri: user.avatarUrl }} style={styles.discImage} />}
-                        </LinearGradient>
-                    </View>
                 </View>
 
             </View>
