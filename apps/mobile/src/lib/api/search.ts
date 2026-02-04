@@ -92,8 +92,14 @@ export async function searchNearby(
       const errorData = await response.json();
       if (errorData.detail) errorMessage += ` - ${errorData.detail}`;
       if (errorData.error_type) errorMessage += ` (${errorData.error_type})`;
-    } catch {
-      // ignore JSON parse error
+    } catch (e) {
+      // If JSON parse fails, try to get raw text (might be HTML 500 from proxy)
+      try {
+        const rawText = await response.text();
+        errorMessage += ` - Raw: ${rawText.substring(0, 100)}`;
+      } catch {
+        // failed to read text
+      }
     }
     throw new Error(errorMessage);
   }

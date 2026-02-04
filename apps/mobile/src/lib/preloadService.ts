@@ -156,7 +156,7 @@ export const preloadService = {
                 latitude,
                 longitude,
                 NEARBY_RADIUS,
-                200 // Reverted to 200 to debug 500 error
+                60 // Optimized to 60 (matches feed max + small buffer) for speed
             );
 
             console.log(`[Preload] Found ${nearbyResponse.restaurants.length} nearby restaurants`);
