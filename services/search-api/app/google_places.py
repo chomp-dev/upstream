@@ -137,7 +137,16 @@ class GooglePlacesClient:
         if included_types and len(included_types) > 0:
             type_groups = [included_types[:10]]  # Limit types per request
         else:
-            type_groups = DEFAULT_TYPE_GROUPS[:15]  # Limit to 15 requests max
+            # Optimization: Calculate how many groups we need to cover max_results
+            # Each group yields ~10-20 results. We use a 2.0 multiplier for safety buffer.
+            # Example: 60 results -> (60 * 2.0) / 20 = 6 groups (instead of all 15)
+            import math
+            estimated_groups = math.ceil((max_results * 2.0) / 20)
+            num_groups = max(2, min(15, estimated_groups)) # Minimum 2 groups for variety
+            
+            type_groups = DEFAULT_TYPE_GROUPS[:num_groups]
+            
+            logger.info(f"Optimization: Selected {num_groups} type groups for max_results={max_results}")
         
         logger.info(f"Starting {len(type_groups)} parallel Google Places requests for ({lat}, {lng})")
         
