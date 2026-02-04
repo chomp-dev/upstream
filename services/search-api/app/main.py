@@ -98,7 +98,7 @@ app.add_middleware(
 async def unhandled_exception_handler(request: Request, exc: Exception):
     """
     Ensure we always log unhandled exceptions and return JSON instead of a plain-text 500.
-    (This makes debugging mobile errors dramatically faster.)
+    Include CORS headers so browser doesn't report CORS error when the real issue is 500.
     """
     logger.exception("Unhandled error on %s %s", request.method, request.url.path)
     return JSONResponse(
@@ -106,6 +106,11 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
         content={
             "detail": "Internal server error",
             "error_type": type(exc).__name__,
+        },
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "*",
+            "Access-Control-Allow-Headers": "*",
         },
     )
 
