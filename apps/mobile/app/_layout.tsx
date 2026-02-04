@@ -1,6 +1,8 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, StyleSheet, Platform } from 'react-native';
+import { useState } from 'react';
+import SplashAnimation from '../components/SplashAnimation';
 import { Auth0Provider } from 'react-native-auth0';
 import { colors } from '../src/theme';
 import { AuthProvider } from '../src/context/auth';
@@ -38,6 +40,21 @@ export default function RootLayout() {
         <View style={styles.mobileWrapper}>
           {wrappedContent}
         </View>
+      </View>
+    );
+  }
+
+  const [isSplashComplete, setIsSplashComplete] = useState(false);
+
+  // Mobile layout with splash screen overlay
+  if (Platform.OS !== 'web') {
+    return (
+      <View style={{ flex: 1 }}>
+        {wrappedContent}
+        {/* Splash Animation Overlay */}
+        {!isSplashComplete && (
+          <SplashAnimation onComplete={() => setIsSplashComplete(true)} />
+        )}
       </View>
     );
   }
