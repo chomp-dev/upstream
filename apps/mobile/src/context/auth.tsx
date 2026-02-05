@@ -83,13 +83,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         try {
             // Force refresh to get new token
-            const credentials = await getCredentials('openid profile email offline_access');
+            try {
+                const credentials = await getCredentials('openid profile email offline_access');
 
-            if (credentials?.idToken) {
-                setAccessToken(credentials.accessToken);
-                const authenticatedClient = createSupabaseClient(credentials.idToken);
-                setSupabaseClient(authenticatedClient);
-                console.log('Token refreshed successfully');
+                if (credentials?.idToken) {
+                    setAccessToken(credentials.accessToken);
+                    const authenticatedClient = createSupabaseClient(credentials.idToken);
+                    setSupabaseClient(authenticatedClient);
+                    console.log('Token refreshed successfully');
+                }
+            } catch (credError: any) {
+                // Handle login_required gracefully
+                if (credError?.message?.includes('login_required') || credError?.error === 'login_required') {
+                    console.warn('[Auth] User not logged in, skipping token refresh');
+                    return;
+                }
+                throw credError;
             }
         } catch (error) {
             console.error('Failed to refresh token:', error);
@@ -101,43 +110,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const initSession = async () => {
             if (user && !auth0Loading) {
                 try {
-                    const credentials = await getCredentials('openid profile email offline_access');
+                    try {
+                        const credentials = await getCredentials('openid profile email offline_access');
 
-                    if (credentials?.idToken) {
-                        setAccessToken(credentials.accessToken);
-                        const authenticatedClient = createSupabaseClient(credentials.idToken);
-                        setSupabaseClient(authenticatedClient);
-                        console.log('Supabase client initialized with Auth0 token');
+                        if (credentials?.idToken) {
+                            setAccessToken(credentials.accessToken);
+                            const authenticatedClient = createSupabaseClient(credentials.idToken);
+                            setSupabaseClient(authenticatedClient);
+                            console.log('Supabase client initialized with Auth0 token');
 
-                        // Refresh token every 5 minutes to prevent expiry
-                        if (refreshIntervalRef.current) {
-                            clearInterval(refreshIntervalRef.current);
+                            // Refresh token every 5 minutes to prevent expiry
+                            if (refreshIntervalRef.current) {
+                                clearInterval(refreshIntervalRef.current);
+                            }
+                            refreshIntervalRef.current = setInterval(() => {
+                                refreshToken();
+                            }, 5 * 60 * 1000); // 5 minutes
                         }
-                        refreshIntervalRef.current = setInterval(() => {
-                            refreshToken();
-                        }, 5 * 60 * 1000); // 5 minutes
+                    } catch (error) {
+                        console.error('Failed to get credentials', error);
                     }
-                } catch (error) {
-                    console.error('Failed to get credentials', error);
+                } else if (!user && !auth0Loading) {
+                    setAccessToken(null);
+                    setSupabaseClient(publicSupabase);
+                    if (refreshIntervalRef.current) {
+                        clearInterval(refreshIntervalRef.current);
+                        refreshIntervalRef.current = null;
+                    }
                 }
-            } else if (!user && !auth0Loading) {
-                setAccessToken(null);
-                setSupabaseClient(publicSupabase);
+            };
+
+            initSession();
+
+            return () => {
                 if (refreshIntervalRef.current) {
                     clearInterval(refreshIntervalRef.current);
-                    refreshIntervalRef.current = null;
                 }
-            }
-        };
-
-        initSession();
-
-        return () => {
-            if (refreshIntervalRef.current) {
-                clearInterval(refreshIntervalRef.current);
-            }
-        };
-    }, [user, auth0Loading, getCredentials, refreshToken]);
+            };
+        }, [user, auth0Loading, getCredentials, refreshToken]);
 
     // Sync user to backend
     useEffect(() => {
