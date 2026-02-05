@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { View, StyleSheet, Image, TouchableOpacity, ActivityIndicator, Platform, AppState } from 'react-native';
+import { View, StyleSheet, Image, TouchableOpacity, ActivityIndicator, Platform, AppState, Text as RNText } from 'react-native';
 import { useContentDimensions } from '../../src/hooks/useContentDimensions';
 import { Restaurant } from '../../src/lib/api/types';
 import { MediaOverlay } from '../MediaOverlay';
@@ -112,17 +112,17 @@ export function VideoPlayer({
                     <>
                         {/* Processing Badge */}
                         <View style={styles.processingBadge}>
-                            <Text style={styles.processingText}>⏳ Processing...</Text>
+                            <RNText style={styles.processingText}>⏳ Processing...</RNText>
                         </View>
                         {/* Processing Placeholder */}
                         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a1a1a' }}>
-                            <Text style={{ fontSize: 48 }}>🎬</Text>
-                            <Text style={{ color: '#fff', fontSize: 18, marginTop: 12, fontWeight: '600' }}>
+                            <RNText style={{ fontSize: 48 }}>🎬</RNText>
+                            <RNText style={{ color: '#fff', fontSize: 18, marginTop: 12, fontWeight: '600' }}>
                                 Video is processing
-                            </Text>
-                            <Text style={{ color: '#888', fontSize: 14, marginTop: 8, textAlign: 'center', paddingHorizontal: 40 }}>
+                            </RNText>
+                            <RNText style={{ color: '#888', fontSize: 14, marginTop: 8, textAlign: 'center', paddingHorizontal: 40 }}>
                                 This usually takes a few minutes
-                            </Text>
+                            </RNText>
                         </View>
                     </>
                 ) : thumbnailUrl ? (
