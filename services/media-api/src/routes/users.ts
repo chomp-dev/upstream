@@ -18,14 +18,15 @@ usersRouter.post('/', async (req, res) => {
         const userData = UserSchema.parse(req.body);
 
         // Upsert user based on auth0_id
+        // IMPORTANT: Preserve existing name/avatar (user edits) - only use Auth0 values as fallback for new users
         const query = `
       INSERT INTO users (auth0_id, email, name, avatar, email_verified)
       VALUES ($1, $2, $3, $4, $5)
       ON CONFLICT (auth0_id) 
       DO UPDATE SET 
         email = EXCLUDED.email,
-        name = COALESCE(EXCLUDED.name, users.name),
-        avatar = COALESCE(EXCLUDED.avatar, users.avatar),
+        name = COALESCE(users.name, EXCLUDED.name),
+        avatar = COALESCE(users.avatar, EXCLUDED.avatar),
         email_verified = EXCLUDED.email_verified,
         updated_at = NOW()
       RETURNING *;
