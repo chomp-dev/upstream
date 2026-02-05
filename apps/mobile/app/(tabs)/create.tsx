@@ -445,7 +445,7 @@ export default function CreateScreen() {
           fullUser: JSON.stringify(user)
         });
 
-        const { error } = await supabase
+        const { data: insertedPost, error } = await supabase
           .from('image_posts')
           .insert({
             images: imageUrls,
@@ -455,22 +455,40 @@ export default function CreateScreen() {
             tags: tagArray,
             user_id: user?.sub  // Use sub which maps to JWT claim
           })
-          .select();
+          .select()
+          .single();
 
         if (error) {
           console.error('[Create] Supabase insert failed:', error);
           console.error('[Create] Full error details:', JSON.stringify(error, null, 2));
           throw new Error(error.message || 'Failed to create post record');
         }
+
+        // Store image post in navigationStore for feed to display
+        if (insertedPost) {
+          const imageDataId = `image-${Date.now()}`;
+          const { navigationStore } = require('../../src/lib/navigationStore');
+          navigationStore.set(imageDataId, {
+            ...insertedPost,
+            type: 'image',
+            username: user?.user_metadata?.username || user?.name || 'You',
+            user_avatar: user?.user_metadata?.avatar_url || user?.picture,
+          });
+          console.log('[Create] Stored image post in navigationStore:', imageDataId);
+          // Store for navigation (declared in outer scope)
+          savedImageDataId = imageDataId;
+        }
       }
 
       console.log('[Create] Upload flow complete. Resetting form and navigating home.');
       resetForm();
 
-      // Navigate to feed with pending video ID (stored earlier)
+      // Navigate to feed with the uploaded content
       setTimeout(() => {
         if (mediaType === 'video' && savedPendingId) {
           router.push({ pathname: '/', params: { videoDataId: savedPendingId } });
+        } else if (mediaType === 'image' && savedImageDataId) {
+          router.push({ pathname: '/', params: { videoDataId: savedImageDataId } });
         } else {
           router.push('/');
         }
