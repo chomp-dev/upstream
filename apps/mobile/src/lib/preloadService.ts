@@ -138,11 +138,35 @@ export const preloadService = {
             // If no last known position or it's too old (>5 mins), get fresh
             if (!location || (Date.now() - location.timestamp) > 5 * 60 * 1000) {
                 console.log('[Preload] Last known location missing or stale, getting fresh...');
-                location = await Location.getCurrentPositionAsync({
-                    accuracy: Location.Accuracy.Balanced,
-                });
+                // Optimization: Add timeout to prevent hanging indefinitely
+                try {
+                    location = await Promise.race([
+                        Location.getCurrentPositionAsync({
+                            accuracy: Location.Accuracy.Balanced,
+                        }),
+                        new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000))
+                    ]) as Location.LocationObject;
+                } catch (e) {
+                    console.log('[Preload] Location fetch failed/timed out');
+                    location = null;
+                }
             } else {
                 console.log('[Preload] Using last known location (fast)');
+            }
+
+            if (!location) {
+                console.log('[Preload] Could not determine location');
+                setStatus('Location unavailable');
+                isPreloading = false;
+                preloadComplete = true;
+                onProgress(100);
+                return {
+                    success: true,
+                    feedLoaded: false,
+                    mapLoaded: false,
+                    fromCache: false,
+                    durationMs: Date.now() - startTime,
+                };
             }
 
             const { latitude, longitude } = location.coords;

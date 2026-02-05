@@ -73,7 +73,7 @@ export default function RootLayout() {
           onComplete={() => setIsSplashComplete(true)}
           progress={preloadProgress}
           dataReady={dataReady}
-          minDisplayMs={2000}
+          minDisplayMs={1000}
           statusText={statusText}
         />
       )}
