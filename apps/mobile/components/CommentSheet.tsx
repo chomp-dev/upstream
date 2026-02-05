@@ -358,8 +358,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     listContent: {
-        paddingVertical: 12,
-        paddingHorizontal: 16,
+        paddingVertical: 16,
+        paddingHorizontal: 20,
     },
     commentItem: {
         flexDirection: 'row',

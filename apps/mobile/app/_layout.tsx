@@ -6,6 +6,7 @@ import SplashAnimation from '../components/SplashAnimation';
 import { Auth0Provider } from 'react-native-auth0';
 import { colors } from '../src/theme';
 import { AuthProvider } from '../src/context/auth';
+import { CommentSheetProvider } from '../src/context/commentSheet';
 import { preloadService } from '../src/lib/preloadService';
 
 export default function RootLayout() {
@@ -57,7 +58,9 @@ export default function RootLayout() {
       {...auth0Props}
     >
       <AuthProvider>
-        {content}
+        <CommentSheetProvider>
+          {content}
+        </CommentSheetProvider>
       </AuthProvider>
     </Auth0Provider>
   );

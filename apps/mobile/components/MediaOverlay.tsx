@@ -8,7 +8,7 @@ import { Restaurant } from '../src/lib/api/types';
 import { colors, spacing, radius } from '../src/theme';
 import { Text } from '../src/ui';
 import { useAuth } from '../src/context/auth';
-import { CommentSheet } from './CommentSheet';
+import { useCommentSheet } from '../src/context/commentSheet';
 
 interface MediaOverlayProps {
     height: number;
@@ -35,6 +35,7 @@ export function MediaOverlay({
 }: MediaOverlayProps) {
     const router = useRouter();
     const { user: authUser, supabase, login } = useAuth();
+    const { openCommentSheet } = useCommentSheet();
     const [distance, setDistance] = useState<string | null>(null);
 
     // Social state
@@ -43,7 +44,6 @@ export function MediaOverlay({
     const [savesCount, setSavesCount] = useState(0);
     const [isLiked, setIsLiked] = useState(false);
     const [isSaved, setIsSaved] = useState(false);
-    const [showComments, setShowComments] = useState(false);
 
     // Calculate distance on mount
     useEffect(() => {
@@ -218,7 +218,7 @@ export function MediaOverlay({
 
     const handleComment = () => {
         if (!videoUrl) return;
-        setShowComments(true);
+        openCommentSheet(videoUrl);
     };
 
     const handleShare = async () => {
@@ -346,15 +346,6 @@ export function MediaOverlay({
                 </View>
 
             </View>
-
-            {/* Comment Sheet */}
-            {videoUrl && (
-                <CommentSheet
-                    videoUrl={videoUrl}
-                    visible={showComments}
-                    onClose={() => setShowComments(false)}
-                />
-            )}
         </>
     );
 }
