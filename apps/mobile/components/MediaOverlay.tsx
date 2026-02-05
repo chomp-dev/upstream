@@ -40,6 +40,16 @@ export function MediaOverlay({
     const { openCommentSheet } = useCommentSheet();
     const [distance, setDistance] = useState<string | null>(null);
 
+    // DEBUG: Log what props we receive
+    useEffect(() => {
+        console.log('[MediaOverlay] Props received:', {
+            hasRestaurant: !!restaurant,
+            restaurantName: restaurant?.name,
+            hasUserLocation: !!userLocation,
+            userLocationCoords: userLocation ? `${userLocation.lat},${userLocation.lng}` : 'none'
+        });
+    }, [restaurant, userLocation]);
+
     // Social state
     const [likesCount, setLikesCount] = useState(0);
     const [commentsCount, setCommentsCount] = useState(0);
