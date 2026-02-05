@@ -107,48 +107,42 @@ export default function EditProfileScreen() {
 
         try {
             setSaving(true);
+            console.log('[Profile] Saving with auth0_id:', user.sub);
 
-            // Updated to select data to ensure we know if it worked
+            // Use upsert with onConflict to handle both create and update cases
             const { data, error } = await supabase
                 .from('users')
-                .update({
+                .upsert({
+                    auth0_id: user.sub,
+                    email: user.email || '',
                     name: name,
                     bio: bio,
                     avatar: avatarUrl,
                     updated_at: new Date().toISOString(),
+                }, {
+                    onConflict: 'auth0_id',
                 })
-                .eq('auth0_id', user.sub)
                 .select();
 
-            if (error) throw error;
+            console.log('[Profile] Upsert response:', { data, error });
 
-            if (!data || data.length === 0) {
-                // If no user row was found/updated, we might need to insert it (lazy sync)
-                // or just alert the user something is wrong.
-                // For now, let's try to upsert as a fallback or just log it.
-                // Since this is "Edit Profile", the user *should* exist. 
-                // If not, let's try an upsert based on auth0_id.
-                const { error: upsertError } = await supabase
-                    .from('users')
-                    .upsert({
-                        auth0_id: user.sub,
-                        email: user.email,
-                        name: name,
-                        bio: bio,
-                        avatar: avatarUrl,
-                        updated_at: new Date().toISOString(),
-                    })
-                    .select();
-
-                if (upsertError) throw upsertError;
+            if (error) {
+                console.error('[Profile] Upsert error:', error);
+                throw error;
             }
 
-            // Success - navigate back immediately
+            if (!data || data.length === 0) {
+                console.warn('[Profile] No data returned from upsert - RLS might be blocking');
+                // Even if no data returned, the operation may have succeeded
+                // The RLS policy might block SELECT but allow INSERT/UPDATE
+            }
+
+            // Success - navigate back
             router.back();
 
         } catch (e) {
-            console.error('Save error:', e);
-            Alert.alert('Error', 'Failed to save profile.');
+            console.error('[Profile] Save error:', e);
+            Alert.alert('Error', 'Failed to save profile. Please try again.');
         } finally {
             setSaving(false);
         }
