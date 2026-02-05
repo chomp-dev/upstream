@@ -462,12 +462,12 @@ export default function HomeScreen() {
         }
       }
 
-      if (feed.length > 0 && lastScrolledRef.current !== scrollKey) {
-        const targetIndex = parseInt(params.scrollToIndex, 10);
+      // Scroll to specific item if requested
+      if (params.scrollToIndex && params.itemId && feed.length > 0 && lastScrolledRef.current !== scrollKey) {
+        // const targetIndex = parseInt(params.scrollToIndex, 10);
         const itemIndex = feed.findIndex(item => item.id.toString() === params.itemId);
 
         // FIX: Do NOT fall back to targetIndex (from Explore grid) if item not found.
-        // Explore grid index does not match Home feed index.
         const finalIndex = itemIndex;
 
         if (finalIndex >= 0 && finalIndex < feed.length) {
@@ -478,242 +478,255 @@ export default function HomeScreen() {
             });
             setCurrentIndex(finalIndex);
           }, 100);
-
           lastScrolledRef.current = scrollKey;
+        } else if (params.videoDataId) {
+          // If not found in feed but we have explicit video data, let the logic below handle it
+          if (__DEV__) console.log('[Feed] Deep link item not in current feed, relaying on injection logic');
         }
       }
+      setTimeout(() => {
+        flatListRef.current?.scrollToIndex({
+          index: finalIndex,
+          animated: false,
+        });
+        setCurrentIndex(finalIndex);
+      }, 100);
+
+      lastScrolledRef.current = scrollKey;
+    }
+  }
     }
   }, [params.scrollToIndex, params.itemId, params.videoDataId, feed, loading]);
 
-  // Smart polling
-  useEffect(() => {
-    const hasPendingVideos = feed.some(
-      item => item.type === 'video' && item.status !== 'ready'
-    );
-    const interval = hasPendingVideos ? 2000 : 15000;
+// Smart polling
+useEffect(() => {
+  const hasPendingVideos = feed.some(
+    item => item.type === 'video' && item.status !== 'ready'
+  );
+  const interval = hasPendingVideos ? 2000 : 15000;
 
-    const pollInterval = setInterval(() => {
-      if (feedMode === 'nearby' && nearbyPlaceIds.length > 0) {
-        loadNearbyFeed();
-      } else if (feedMode === 'demo') {
-        loadDemoFeed();
-      }
-    }, interval);
-
-    return () => clearInterval(pollInterval);
-  }, [feed, feedMode, nearbyPlaceIds, loadNearbyFeed, loadDemoFeed]);
-
-  const fetchRestaurants = useCallback(async (placeIds: string[]) => {
-    const promises = placeIds.map(async (placeId) => {
-      const restaurant = await searchApi.getRestaurant(placeId);
-      return { placeId, restaurant };
-    });
-
-    const results = await Promise.all(promises);
-
-    setRestaurantCache(prevCache => {
-      const newCache = { ...prevCache };
-      for (const { placeId, restaurant } of results) {
-        if (restaurant && !newCache[placeId]) {
-          newCache[placeId] = restaurant;
-        }
-      }
-      return newCache;
-    });
-  }, []);
-
-  const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
-    if (viewableItems.length > 0) {
-      const index = viewableItems[0].index || 0;
-      setCurrentIndex(index);
-      // Track viewed items for cache refetch logic
-      feedStore.markViewed(index);
+  const pollInterval = setInterval(() => {
+    if (feedMode === 'nearby' && nearbyPlaceIds.length > 0) {
+      loadNearbyFeed();
+    } else if (feedMode === 'demo') {
+      loadDemoFeed();
     }
-  }).current;
+  }, interval);
 
-  const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 50,
-  }).current;
+  return () => clearInterval(pollInterval);
+}, [feed, feedMode, nearbyPlaceIds, loadNearbyFeed, loadDemoFeed]);
 
-  // ============================================================================
-  // Render States
-  // ============================================================================
+const fetchRestaurants = useCallback(async (placeIds: string[]) => {
+  const promises = placeIds.map(async (placeId) => {
+    const restaurant = await searchApi.getRestaurant(placeId);
+    return { placeId, restaurant };
+  });
 
-  if (loading && feed.length === 0) {
-    return (
-      <Screen safe={false}>
-        <View style={styles.loadingContainer}>
-          <View style={styles.loadingContent}>
-            <Text variant="title" style={styles.loadingTitle}>
-              Finding nearby content...
-            </Text>
+  const results = await Promise.all(promises);
 
-            <View style={styles.progressTrack}>
-              <View style={[styles.progressBar, { width: `${loadingProgress}%` }]} />
-            </View>
+  setRestaurantCache(prevCache => {
+    const newCache = { ...prevCache };
+    for (const { placeId, restaurant } of results) {
+      if (restaurant && !newCache[placeId]) {
+        newCache[placeId] = restaurant;
+      }
+    }
+    return newCache;
+  });
+}, []);
 
-            <Text variant="bodySmall" color={colors.muted} style={styles.loadingText}>
-              {loadingStatus}
-            </Text>
-          </View>
-        </View>
-      </Screen>
-    );
+const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
+  if (viewableItems.length > 0) {
+    const index = viewableItems[0].index || 0;
+    setCurrentIndex(index);
+    // Track viewed items for cache refetch logic
+    feedStore.markViewed(index);
   }
+}).current;
 
-  // Empty state - show toggle to demo
-  if (feed.length === 0) {
-    return (
-      <Screen safe={false}>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.emptyIcon}>
-            {feedMode === 'nearby' ? '📍' : '🎬'}
-          </Text>
-          <Text variant="title" center style={{ marginBottom: spacing.sm }}>
-            {feedMode === 'nearby' ? 'No local content yet' : 'No posts yet'}
-          </Text>
-          <Text variant="bodySmall" center color={colors.muted} style={{ marginBottom: spacing.lg }}>
-            {feedMode === 'nearby'
-              ? `Found ${nearbyRestaurantCount} restaurants nearby, but no videos yet`
-              : 'Be the first to upload!'}
-          </Text>
+const viewabilityConfig = useRef({
+  itemVisiblePercentThreshold: 50,
+}).current;
 
-          {feedMode === 'nearby' ? (
-            <TouchableOpacity style={styles.switchButton} onPress={switchToDemo}>
-              <Text variant="body" color={colors.bg}>🎬 Watch Demo Reels</Text>
-            </TouchableOpacity>
-          ) : locationAvailable && nearbyPlaceIds.length > 0 ? (
-            <TouchableOpacity style={styles.switchButton} onPress={switchToNearby}>
-              <Text variant="body" color={colors.bg}>📍 Try Nearby Feed</Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
-      </Screen>
-    );
-  }
+// ============================================================================
+// Render States
+// ============================================================================
 
+if (loading && feed.length === 0) {
   return (
     <Screen safe={false}>
+      <View style={styles.loadingContainer}>
+        <View style={styles.loadingContent}>
+          <Text variant="title" style={styles.loadingTitle}>
+            Finding nearby content...
+          </Text>
+
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressBar, { width: `${loadingProgress}%` }]} />
+          </View>
+
+          <Text variant="bodySmall" color={colors.muted} style={styles.loadingText}>
+            {loadingStatus}
+          </Text>
+        </View>
+      </View>
+    </Screen>
+  );
+}
+
+// Empty state - show toggle to demo
+if (feed.length === 0) {
+  return (
+    <Screen safe={false}>
+      <View style={styles.loadingContainer}>
+        <Text style={styles.emptyIcon}>
+          {feedMode === 'nearby' ? '📍' : '🎬'}
+        </Text>
+        <Text variant="title" center style={{ marginBottom: spacing.sm }}>
+          {feedMode === 'nearby' ? 'No local content yet' : 'No posts yet'}
+        </Text>
+        <Text variant="bodySmall" center color={colors.muted} style={{ marginBottom: spacing.lg }}>
+          {feedMode === 'nearby'
+            ? `Found ${nearbyRestaurantCount} restaurants nearby, but no videos yet`
+            : 'Be the first to upload!'}
+        </Text>
+
+        {feedMode === 'nearby' ? (
+          <TouchableOpacity style={styles.switchButton} onPress={switchToDemo}>
+            <Text variant="body" color={colors.bg}>🎬 Watch Demo Reels</Text>
+          </TouchableOpacity>
+        ) : locationAvailable && nearbyPlaceIds.length > 0 ? (
+          <TouchableOpacity style={styles.switchButton} onPress={switchToNearby}>
+            <Text variant="body" color={colors.bg}>📍 Try Nearby Feed</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+    </Screen>
+  );
+}
+
+return (
+  <Screen safe={false}>
 
 
-      <FlatList
-        ref={flatListRef}
-        extraData={restaurantCache} // FORCE UPDATE when cache changes
-        data={feed}
-        keyExtractor={(item) => `${item.type}-${item.id}`}
-        refreshing={loading}
-        onRefresh={() => feedMode === 'nearby' ? loadNearbyFeed(true) : loadDemoFeed()}
-        pagingEnabled={true} // Native: Handles strict paging
-        bounces={Platform.OS !== 'web'} // Web: Disable bounce to prevent overscroll issues
-        showsVerticalScrollIndicator={false}
-        snapToInterval={SCREEN_HEIGHT}
-        snapToAlignment="start"
-        decelerationRate="fast"
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={viewabilityConfig}
-        getItemLayout={(_, index) => ({
-          length: SCREEN_HEIGHT,
-          offset: SCREEN_HEIGHT * index,
-          index,
-        })}
-        onScrollToIndexFailed={(info) => {
-          setTimeout(() => {
-            flatListRef.current?.scrollToIndex({
-              index: info.index,
-              animated: false,
-            });
-          }, 200);
-        }}
-        // Web: Force strict CSS snapping via style injection
-        {...(Platform.OS === 'web' ? {
-          style: { height: '100%', scrollSnapType: 'y mandatory', overflowY: 'scroll' } as any
-        } : {})}
-        renderItem={({ item, index }) => {
-          // DEBUG: Check why cache lookup fails
-          if (__DEV__ && item.google_place_id && !restaurantCache[item.google_place_id]) {
-            // console.log('[FeedDebug] Missing restaurant for:', item.google_place_id, 'Cache keys:', Object.keys(restaurantCache).length);
-          }
+    <FlatList
+      ref={flatListRef}
+      extraData={restaurantCache} // FORCE UPDATE when cache changes
+      data={feed}
+      keyExtractor={(item) => `${item.type}-${item.id}`}
+      refreshing={loading}
+      onRefresh={() => feedMode === 'nearby' ? loadNearbyFeed(true) : loadDemoFeed()}
+      pagingEnabled={true} // Native: Handles strict paging
+      bounces={Platform.OS !== 'web'} // Web: Disable bounce to prevent overscroll issues
+      showsVerticalScrollIndicator={false}
+      snapToInterval={SCREEN_HEIGHT}
+      snapToAlignment="start"
+      decelerationRate="fast"
+      onViewableItemsChanged={onViewableItemsChanged}
+      viewabilityConfig={viewabilityConfig}
+      getItemLayout={(_, index) => ({
+        length: SCREEN_HEIGHT,
+        offset: SCREEN_HEIGHT * index,
+        index,
+      })}
+      onScrollToIndexFailed={(info) => {
+        setTimeout(() => {
+          flatListRef.current?.scrollToIndex({
+            index: info.index,
+            animated: false,
+          });
+        }, 200);
+      }}
+      // Web: Force strict CSS snapping via style injection
+      {...(Platform.OS === 'web' ? {
+        style: { height: '100%', scrollSnapType: 'y mandatory', overflowY: 'scroll' } as any
+      } : {})}
+      renderItem={({ item, index }) => {
+        // DEBUG: Check why cache lookup fails
+        if (__DEV__ && item.google_place_id && !restaurantCache[item.google_place_id]) {
+          // console.log('[FeedDebug] Missing restaurant for:', item.google_place_id, 'Cache keys:', Object.keys(restaurantCache).length);
+        }
 
-          const restaurant = item.google_place_id
-            ? restaurantCache[item.google_place_id]
-            : null;
+        const restaurant = item.google_place_id
+          ? restaurantCache[item.google_place_id]
+          : null;
 
-          return (
-            <View style={[
-              { width, height: SCREEN_HEIGHT },
-              // Web: STRICT snapping on children (scrollSnapStop: always = strictly lock to this item)
-              // @ts-ignore
-              Platform.OS === 'web' ? { scrollSnapAlign: 'start', scrollSnapStop: 'always' } : {}
-            ]}>
-              {item.type === 'video' ? (
-                <>
-                  <VideoPlayer
-                    videoId={item.cloudflare_video_id}
-                    playbackUrl={item.playback_url}
-                    thumbnailUrl={item.thumbnail_url}
-                    isActive={isFocused && index === currentIndex && item.status === 'ready'}
-                    restaurant={restaurant}
-                    user={{
-                      userId: item.user_id,
-                      username: item.username || 'User',
-                      avatarUrl: item.user_avatar || undefined
-                    }}
-                    videoUrl={item.video_url}
-                    caption={item.title || item.description}
-                  />
-                  {item.status !== 'ready' && (
-                    <View style={styles.processingOverlay}>
-                      {item.status === 'error' ? (
-                        <>
-                          <Text style={styles.errorIcon}>⚠️</Text>
-                          <Text variant="body" style={styles.processingText}>
-                            Video unavailable
-                          </Text>
-                          <Text variant="bodySmall" style={[styles.processingText, { marginTop: spacing.xs }]}>
-                            This video may have been deleted
-                          </Text>
-                        </>
-                      ) : (
-                        <>
-                          <ActivityIndicator size="large" color={colors.primary} />
-                          <Text variant="body" style={styles.processingText}>
-                            {item.status === 'inprogress' || item.status === 'processing'
-                              ? 'Almost ready...'
-                              : 'Processing video...'}
-                          </Text>
-                        </>
-                      )}
-                    </View>
-                  )}
-                </>
-              ) : item.type === 'tiktok_embed' ? (
-                <TikTokEmbed
-                  embedHtml={item.embed_html || ''}
+        return (
+          <View style={[
+            { width, height: SCREEN_HEIGHT },
+            // Web: STRICT snapping on children (scrollSnapStop: always = strictly lock to this item)
+            // @ts-ignore
+            Platform.OS === 'web' ? { scrollSnapAlign: 'start', scrollSnapStop: 'always' } : {}
+          ]}>
+            {item.type === 'video' ? (
+              <>
+                <VideoPlayer
+                  videoId={item.cloudflare_video_id}
+                  playbackUrl={item.playback_url}
                   thumbnailUrl={item.thumbnail_url}
-                  title={item.title}
-                  authorName={item.author_name}
-                  tiktokUrl={item.tiktok_url}
-                  isActive={isFocused && index === currentIndex}
-                />
-              ) : (
-                <ImagePostViewer
-                  images={item.images || []}
+                  isActive={isFocused && index === currentIndex && item.status === 'ready'}
                   restaurant={restaurant}
                   user={{
                     userId: item.user_id,
                     username: item.username || 'User',
                     avatarUrl: item.user_avatar || undefined
                   }}
-                  caption={item.title || item.description || ''}
-                  imagePostId={item.id}
+                  videoUrl={item.video_url}
+                  caption={item.title || item.description}
                 />
-              )}
-            </View>
-          );
-        }}
-      />
-    </Screen>
-  );
+                {item.status !== 'ready' && (
+                  <View style={styles.processingOverlay}>
+                    {item.status === 'error' ? (
+                      <>
+                        <Text style={styles.errorIcon}>⚠️</Text>
+                        <Text variant="body" style={styles.processingText}>
+                          Video unavailable
+                        </Text>
+                        <Text variant="bodySmall" style={[styles.processingText, { marginTop: spacing.xs }]}>
+                          This video may have been deleted
+                        </Text>
+                      </>
+                    ) : (
+                      <>
+                        <ActivityIndicator size="large" color={colors.primary} />
+                        <Text variant="body" style={styles.processingText}>
+                          {item.status === 'inprogress' || item.status === 'processing'
+                            ? 'Almost ready...'
+                            : 'Processing video...'}
+                        </Text>
+                      </>
+                    )}
+                  </View>
+                )}
+              </>
+            ) : item.type === 'tiktok_embed' ? (
+              <TikTokEmbed
+                embedHtml={item.embed_html || ''}
+                thumbnailUrl={item.thumbnail_url}
+                title={item.title}
+                authorName={item.author_name}
+                tiktokUrl={item.tiktok_url}
+                isActive={isFocused && index === currentIndex}
+              />
+            ) : (
+              <ImagePostViewer
+                images={item.images || []}
+                restaurant={restaurant}
+                user={{
+                  userId: item.user_id,
+                  username: item.username || 'User',
+                  avatarUrl: item.user_avatar || undefined
+                }}
+                caption={item.title || item.description || ''}
+                imagePostId={item.id}
+              />
+            )}
+          </View>
+        );
+      }}
+    />
+  </Screen>
+);
 }
 
 const styles = StyleSheet.create({
