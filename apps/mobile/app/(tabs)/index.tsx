@@ -188,7 +188,12 @@ export default function HomeScreen() {
                 newCache[r.google_place_id] = r;
               }
             });
-            setRestaurantCache(prev => ({ ...prev, ...newCache }));
+            setRestaurantCache(prev => {
+              const updated = { ...prev, ...newCache };
+              console.log('[Feed] setRestaurantCache called - Adding keys:', Object.keys(newCache));
+              console.log('[Feed] setRestaurantCache result will have:', Object.keys(updated).length, 'total keys');
+              return updated;
+            });
 
             // Use cached location for instant distance calculation
             if (mapData.lastLocation) {
@@ -206,6 +211,8 @@ export default function HomeScreen() {
         }
 
         // NOW set feed - cache is already populated
+        console.log('[Feed] About to setFeed with', cached.feed.length, 'items');
+        console.log('[Feed] First feed item google_place_id:', cached.feed[0]?.google_place_id);
         setFeed(cached.feed);
         setNearbyPlaceIds(cached.nearbyPlaceIds);
         setFeedMode(cached.feedMode);
@@ -704,8 +711,10 @@ export default function HomeScreen() {
         } : {})}
         renderItem={({ item, index }) => {
           // DEBUG: Check why cache lookup fails
-          if (__DEV__ && item.google_place_id && !restaurantCache[item.google_place_id]) {
-            // console.log('[FeedDebug] Missing restaurant for:', item.google_place_id, 'Cache keys:', Object.keys(restaurantCache).length);
+          if (item.google_place_id && !restaurantCache[item.google_place_id]) {
+            console.log('[FeedDebug] MISS - Item:', item.google_place_id, '| Cache has', Object.keys(restaurantCache).length, 'keys:', Object.keys(restaurantCache).slice(0, 3));
+          } else if (item.google_place_id) {
+            console.log('[FeedDebug] HIT - Found restaurant for:', item.google_place_id);
           }
 
           const restaurant = item.google_place_id
