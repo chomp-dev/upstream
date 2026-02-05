@@ -368,11 +368,11 @@ export function MediaOverlay({
                     </TouchableOpacity>
                     */}
 
-                    {/* Share */}
-                    <TouchableOpacity style={styles.actionButton} activeOpacity={0.7} onPress={handleShare}>
+                    {/* Share - Hidden until feature is complete */}
+                    {/* <TouchableOpacity style={styles.actionButton} activeOpacity={0.7} onPress={handleShare}>
                         <Ionicons name="arrow-redo" size={32} color="white" style={styles.shadowIcon} />
                         <Text style={styles.actionCount}>Share</Text>
-                    </TouchableOpacity>
+                    </TouchableOpacity> */}
                 </View>
 
             </View>
