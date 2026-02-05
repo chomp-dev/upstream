@@ -172,7 +172,7 @@ const MapComponent = ({
                 alignItems: 'center',
                 justifyContent: 'center',
                 pointerEvents: 'auto', // Ensure clicks register
-                backgroundColor: '#1C1C1E', // Dark background for contrast
+                backgroundColor: '#eeb57e', // Updated to match requested style
                 borderRadius: '50%',
                 width: '36px',
                 height: '36px',
@@ -265,8 +265,8 @@ const MapComponent = ({
         Object.entries(containersRef.current).forEach(([id, container]) => {
             if (id === selectedRestaurantId) {
                 // Selected - orange/coral border highlight
-                container.style.borderColor = '#E85D4C';
-                container.style.boxShadow = '0px 0px 0px 3px rgba(232, 93, 76, 0.4), 0px 4px 8px rgba(0,0,0,0.3)';
+                container.style.borderColor = '#eeb57e';
+                container.style.boxShadow = '0px 0px 0px 3px rgba(238, 181, 126, 0.4), 0px 4px 8px rgba(0,0,0,0.3)';
             } else {
                 // Not selected - default border
                 container.style.borderColor = '#3A3A3C';
