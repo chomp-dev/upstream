@@ -243,8 +243,17 @@ export function MediaOverlay({
 
     const handleShare = async () => {
         try {
+            // Create unique link based on post type
+            let postUrl = 'https://usechomp.com';
+            if (videoUrl) {
+                const videoId = videoUrl.split('/').pop()?.split('.')[0] || 'video';
+                postUrl = `https://usechomp.com/video/${videoId}`;
+            } else if (imagePostId) {
+                postUrl = `https://usechomp.com/post/${imagePostId}`;
+            }
+
             const shareContent = {
-                message: `Check out this spot on Chomp! ${restaurant?.name || title || 'Amazing food find!'}\n\nhttps://usechomp.com`,
+                message: `Check out this spot on Chomp! ${restaurant?.name || title || 'Amazing food find!'}\n\n${postUrl}`,
             };
             await Share.share(shareContent);
         } catch (error) {
