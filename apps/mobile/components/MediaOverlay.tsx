@@ -347,7 +347,7 @@ export function MediaOverlay({
                         <Text style={styles.actionCount}>{formatCount(commentsCount)}</Text>
                     </TouchableOpacity>
 
-                    {/* Bookmark */}
+                    {/* Bookmark - Hidden for now, will implement later
                     <TouchableOpacity style={styles.actionButton} activeOpacity={0.7} onPress={handleSave}>
                         <Ionicons
                             name={isSaved ? "bookmark" : "bookmark-outline"}
@@ -357,6 +357,7 @@ export function MediaOverlay({
                         />
                         <Text style={styles.actionCount}>{formatCount(savesCount)}</Text>
                     </TouchableOpacity>
+                    */}
 
                     {/* Share */}
                     <TouchableOpacity style={styles.actionButton} activeOpacity={0.7} onPress={handleShare}>
