@@ -10,16 +10,13 @@ export const LikeButton = ({ videoUrl }: { videoUrl: string }) => {
     // Fetch initial state
     useEffect(() => {
         const fetchLikes = async () => {
-            // Get count
-            const { data: videoData } = await authSupabase
-                .from('videos')
-                .select('likes_count')
-                .eq('video_url', videoUrl)
-                .maybeSingle();
+            // Count likes from video_likes table (not stale likes_count column)
+            const { count: likeCount } = await authSupabase
+                .from('video_likes')
+                .select('*', { count: 'exact', head: true })
+                .eq('video_url', videoUrl);
 
-            if (videoData) {
-                setLikesCount(videoData.likes_count || 0);
-            }
+            setLikesCount(likeCount || 0);
 
             // Check if user liked
             if (user) {

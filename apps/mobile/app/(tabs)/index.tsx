@@ -28,6 +28,7 @@ import type { FeedItem, Restaurant } from '../../src/lib/api/types';
 
 import { useContentDimensions } from '../../src/hooks/useContentDimensions';
 import { feedStore } from '../../src/lib/feedStore';
+import { navigationStore } from '../../src/lib/navigationStore';
 
 // Feed mode types
 type FeedMode = 'loading' | 'nearby' | 'demo';
@@ -56,6 +57,38 @@ export default function HomeScreen() {
   const [nearbyPlaceIds, setNearbyPlaceIds] = useState<string[]>([]);
   const [locationAvailable, setLocationAvailable] = useState<boolean>(false);
   const [nearbyRestaurantCount, setNearbyRestaurantCount] = useState(0);
+
+  // ============================================================================
+  // Handle videoDataId param (for navigating from profile/explore to specific post)
+  // ============================================================================
+  useEffect(() => {
+    if (params.videoDataId && feed.length > 0) {
+      const passedItem = navigationStore.get(params.videoDataId);
+      if (passedItem) {
+        // Check if this item is already in feed
+        const existingIndex = feed.findIndex(item =>
+          item.id === passedItem.id ||
+          (item.video_url && item.video_url === passedItem.video_url)
+        );
+
+        if (existingIndex === -1) {
+          // Prepend the item to feed
+          setFeed(prev => [passedItem, ...prev]);
+        } else if (existingIndex > 0) {
+          // Move to front if not already there
+          setFeed(prev => {
+            const newFeed = [...prev];
+            const [item] = newFeed.splice(existingIndex, 1);
+            return [item, ...newFeed];
+          });
+        }
+        // Clear from store
+        navigationStore.clear(params.videoDataId);
+        // Scroll to top
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+      }
+    }
+  }, [params.videoDataId, feed.length]);
 
   // ============================================================================
   // Location & Nearby Feed Logic
@@ -295,10 +328,36 @@ export default function HomeScreen() {
     await loadDemoFeed();
   }, [loadDemoFeed]);
 
-  // Initial load
+  // Initial load - only trigger if preload didn't provide data
   useEffect(() => {
-    loadNearbyFeed();
-  }, [loadNearbyFeed]);
+    const init = async () => {
+      // Check if preloadService already completed successfully
+      const { preloadService } = require('../../src/lib/preloadService');
+
+      // If preload is running, wait for it (don't start parallel load)
+      if (preloadService.isLoading()) {
+        if (__DEV__) console.log('[Feed] Waiting for preload to complete...');
+        await preloadService.waitForCompletion();
+      }
+
+      // Check cache first - preload should have set this
+      const cached = await feedStore.getFeed();
+      if (cached && cached.feed.length > 0) {
+        if (__DEV__) console.log('[Feed] Using preloaded/cached feed:', cached.feed.length, 'items');
+        setFeed(cached.feed);
+        setNearbyPlaceIds(cached.nearbyPlaceIds);
+        setFeedMode(cached.feedMode);
+        setLoading(false);
+        return;
+      }
+
+      // Only load fresh if no cached data
+      if (__DEV__) console.log('[Feed] No cached data, loading fresh...');
+      loadNearbyFeed();
+    };
+
+    init();
+  }, []); // Empty deps - only run on mount
 
   // Handle navigation from Explore - scroll to specific item AND inject if needed
   useEffect(() => {

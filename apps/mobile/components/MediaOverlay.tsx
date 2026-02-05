@@ -81,16 +81,13 @@ export function MediaOverlay({
 
         const fetchSocialData = async () => {
             try {
-                // Fetch like count
-                const { data: videoData } = await supabase
-                    .from('videos')
-                    .select('likes_count')
-                    .eq('video_url', videoUrl)
-                    .maybeSingle();
+                // Fetch like count from video_likes table (not stale likes_count column)
+                const { count: likeCount } = await supabase
+                    .from('video_likes')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('video_url', videoUrl);
 
-                if (videoData) {
-                    setLikesCount(videoData.likes_count || 0);
-                }
+                setLikesCount(likeCount || 0);
 
                 // Fetch comment count
                 const { count: commentCount } = await supabase
