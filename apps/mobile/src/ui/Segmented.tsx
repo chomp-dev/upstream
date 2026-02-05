@@ -61,13 +61,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   segmentActive: {
-    backgroundColor: colors.text,
+    backgroundColor: '#eeb57e',
   },
   label: {
     fontWeight: '600',
     color: colors.muted,
   },
   labelActive: {
-    color: colors.bg,
+    color: '#000',
   },
 });

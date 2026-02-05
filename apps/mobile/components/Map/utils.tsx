@@ -3,7 +3,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors } from '../../src/theme';
 
 export const getMarkerIcon = (primaryType: string | null | undefined, isSelected: boolean) => {
-    const color = isSelected ? colors.primary : colors.text;
+    const color = '#000';
     const size = isSelected ? 20 : 18;
 
     if (!primaryType) {
