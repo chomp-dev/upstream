@@ -127,27 +127,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                                 refreshToken();
                             }, 5 * 60 * 1000); // 5 minutes
                         }
-                    } catch (error) {
-                        console.error('Failed to get credentials', error);
+                    } catch (credError: any) {
+                        // Handle login_required gracefully
+                        if (credError?.message?.includes('login_required') || credError?.error === 'login_required') {
+                            console.warn('[Auth] User not fully logged in yet');
+                            return;
+                        }
+                        throw credError;
                     }
-                } else if (!user && !auth0Loading) {
-                    setAccessToken(null);
-                    setSupabaseClient(publicSupabase);
-                    if (refreshIntervalRef.current) {
-                        clearInterval(refreshIntervalRef.current);
-                        refreshIntervalRef.current = null;
-                    }
+                } catch (error) {
+                    console.error('Failed to initialize session:', error);
                 }
-            };
-
-            initSession();
-
-            return () => {
+            } else if (!user && !auth0Loading) {
+                setAccessToken(null);
+                setSupabaseClient(publicSupabase);
                 if (refreshIntervalRef.current) {
                     clearInterval(refreshIntervalRef.current);
+                    refreshIntervalRef.current = null;
                 }
-            };
-        }, [user, auth0Loading, getCredentials, refreshToken]);
+            }
+        };
+
+        initSession();
+
+        return () => {
+            if (refreshIntervalRef.current) {
+                clearInterval(refreshIntervalRef.current);
+            }
+        };
+    }, [user, auth0Loading, getCredentials, refreshToken]);
 
     // Sync user to backend
     useEffect(() => {
