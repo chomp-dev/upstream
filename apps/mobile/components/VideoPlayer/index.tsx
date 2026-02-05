@@ -47,7 +47,10 @@ export function VideoPlayer({
 
         // On web we might want to start paused
         if (isActive) {
-            player.play();
+            const result = player.play() as any;
+            if (result && typeof result.catch === 'function') {
+                result.catch(() => { /* Ignore initial abort */ });
+            }
         }
     });
 

@@ -629,6 +629,11 @@ export default function HomeScreen() {
           style: { height: '100%', scrollSnapType: 'y mandatory', overflowY: 'scroll' } as any
         } : {})}
         renderItem={({ item, index }) => {
+          // DEBUG: Check why cache lookup fails
+          if (__DEV__ && item.google_place_id && !restaurantCache[item.google_place_id]) {
+            // console.log('[FeedDebug] Missing restaurant for:', item.google_place_id, 'Cache keys:', Object.keys(restaurantCache).length);
+          }
+
           const restaurant = item.google_place_id
             ? restaurantCache[item.google_place_id]
             : null;
