@@ -88,7 +88,7 @@ export default function CreateScreen() {
         vicinity: '',
         lat: 0,
         lng: 0
-      } as Restaurant);
+      } as unknown as Restaurant);
       if (__DEV__) console.log('[CreateScreen] Pre-selected restaurant (params):', params.restaurant_name);
     }
   }, [params.restaurant, params.google_place_id, params.restaurant_name]);
