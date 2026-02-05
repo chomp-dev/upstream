@@ -13,7 +13,7 @@ import { getImageUploadUrl, uploadImageToCloudflare } from '../src/lib/api/media
 
 export default function EditProfileScreen() {
     const router = useRouter();
-    const { user, supabase } = useAuth();
+    const { user, supabase, accessToken } = useAuth();
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -108,6 +108,8 @@ export default function EditProfileScreen() {
         try {
             setSaving(true);
             console.log('[Profile] Saving with auth0_id:', user.sub);
+            console.log('[Profile] Has access token:', !!accessToken);
+            console.log('[Profile] Token preview:', accessToken?.substring(0, 20) + '...');
 
             // Use upsert with onConflict to handle both create and update cases
             const { data, error } = await supabase
