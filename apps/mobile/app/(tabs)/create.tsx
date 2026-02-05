@@ -939,4 +939,17 @@ const styles = StyleSheet.create({
     height: 100,
     textAlignVertical: 'top',
   },
+  uploadingOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  uploadingCard: {
+    backgroundColor: colors.card,
+    borderRadius: radius.xl,
+    padding: spacing.xxl,
+    minWidth: 200,
+    alignItems: 'center',
+  },
 });
