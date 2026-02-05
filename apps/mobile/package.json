@@ -65,6 +65,7 @@
     "node-fetch": "^3.3.2",
     "parse-png": "^2.1.0",
     "plist": "^3.1.0",
+    "react-native-is-edge-to-edge": "^1.2.1",
     "resolve-from": "^5.0.0",
     "schema-utils": "^4.3.3",
     "semver": "^7.7.3",
