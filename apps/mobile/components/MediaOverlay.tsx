@@ -34,7 +34,7 @@ export function MediaOverlay({
     title,
 }: MediaOverlayProps) {
     const router = useRouter();
-    const { user: authUser, supabase } = useAuth();
+    const { user: authUser, supabase, login } = useAuth();
     const [distance, setDistance] = useState<string | null>(null);
 
     // Social state
@@ -148,7 +148,7 @@ export function MediaOverlay({
 
     const handleLike = async () => {
         if (!authUser) {
-            Alert.alert('Sign In Required', 'Please sign in to like posts.');
+            login();
             return;
         }
         if (!videoUrl) return;
@@ -184,7 +184,7 @@ export function MediaOverlay({
 
     const handleSave = async () => {
         if (!authUser) {
-            Alert.alert('Sign In Required', 'Please sign in to save posts.');
+            login();
             return;
         }
         if (!videoUrl) return;
@@ -471,11 +471,9 @@ const styles = StyleSheet.create({
         backgroundColor: 'transparent',
     },
     shadowIcon: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.5,
-        shadowRadius: 4,
-        elevation: 4, // Android shadow
+        textShadowColor: 'rgba(0, 0, 0, 0.5)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 4,
     },
     actionCount: {
         color: '#fff',
