@@ -349,7 +349,6 @@ export default function CreateScreen() {
         // Create pending video item to show in feed while processing
         const pendingId = `pending-${Date.now()}`;
         const { navigationStore } = require('../../src/lib/navigationStore');
-        const { feedStore } = require('../../src/lib/feedStore');
         const pendingVideo: any = {
           id: pendingId,
           type: 'video',
