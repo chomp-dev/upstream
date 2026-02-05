@@ -166,6 +166,12 @@ export default function HomeScreen() {
               }
             });
             setRestaurantCache(prev => ({ ...prev, ...newCache }));
+
+            // Use cached location for instant distance calculation
+            if (mapData.lastLocation) {
+              setUserLocation(mapData.lastLocation);
+            }
+
             // UNCONDITIONAL LOG for debugging production issues
             console.log('[Feed] Hydrated restaurant cache from mapStore:', Object.keys(newCache).length, 'items');
             mapHydrationSuccess = true;
