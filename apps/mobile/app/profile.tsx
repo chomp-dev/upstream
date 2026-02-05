@@ -222,14 +222,9 @@ export default function ProfileScreen() {
                 )}
 
                 {isOwnProfile ? (
-                    <View style={styles.actionButtonsRow}>
-                        <TouchableOpacity style={styles.editProfileButton} onPress={() => router.push('/edit_profile')}>
-                            <Text variant="caption" color={'#000'}>Edit Profile</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.logoutButton} onPress={logout}>
-                            <Text variant="caption" color={colors.muted}>Log Out</Text>
-                        </TouchableOpacity>
-                    </View>
+                    <TouchableOpacity style={styles.editProfileButton} onPress={() => router.push('/edit_profile')}>
+                        <Text variant="caption" color={'#000'}>Edit Profile</Text>
+                    </TouchableOpacity>
                 ) : (
                     <View style={styles.actionButtonsRow}>
                         <TouchableOpacity
