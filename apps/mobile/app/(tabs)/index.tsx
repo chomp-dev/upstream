@@ -157,6 +157,8 @@ export default function HomeScreen() {
   // ============================================================================
 
   const loadNearbyFeed = useCallback(async (forceRefresh = false) => {
+    console.log('[Feed] loadNearbyFeed called - forceRefresh:', forceRefresh, 'params.videoDataId:', params.videoDataId);
+
     // If we are deep linking to a pending video, skip loading nearby feed
     if (params.videoDataId) {
       if (__DEV__) console.log('[Feed] Skipping nearby load due to videoDataId param');
@@ -166,9 +168,15 @@ export default function HomeScreen() {
     // Check cache first (unless force refresh)
     // Preload service should have already populated this during splash
     if (!forceRefresh) {
+      console.log('[Feed] Checking cache...');
       // OPTIMIZATION: Check cache FIRST before waiting for any background process
       // This prevents the splash screen/preload from blocking the UI if we already have data on disk
       const cached = await feedStore.getFeed();
+
+      console.log('[Feed] feedStore.getFeed() returned:', {
+        hasCached: !!cached,
+        feedLength: cached?.feed?.length || 0
+      });
 
       // If we have cached data, use it IMMEDIATELY
       if (cached && cached.feed.length > 0) {
