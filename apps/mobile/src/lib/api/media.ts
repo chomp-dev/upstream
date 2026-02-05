@@ -269,7 +269,6 @@ export async function uploadImageToCloudflare(
     throw new Error(`Image upload failed: ${(error as Error).message}`);
   }
 }
-}
 
 /**
  * Upload multiple images and create an image post
