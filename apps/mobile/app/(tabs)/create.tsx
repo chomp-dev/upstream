@@ -495,8 +495,9 @@ export default function CreateScreen() {
 
           // Inject into feed so it appears locally
           const { feedStore } = require('../../src/lib/feedStore');
-          const currentFeed = feedStore.getFeed();
-          feedStore.setFeed([imagePostItem, ...currentFeed]);
+          const cachedFeed = await feedStore.getFeed();
+          const currentFeed = cachedFeed?.feed || [];
+          await feedStore.setFeed([imagePostItem, ...currentFeed], [], 'for-you');
           console.log('[Create] Injected image post into feed');
 
           // Store for navigation (declared in outer scope)
