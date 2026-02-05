@@ -180,26 +180,29 @@ export const CommentSheet = ({ videoUrl, onClose, visible }: CommentSheetProps) 
 
                                 {/* Content */}
                                 <View style={styles.commentContent}>
-                                    <View style={styles.commentHeader}>
+                                    <Text style={styles.commentTextLine}>
                                         <Text style={styles.username}>
-                                            {item.user?.name || 'User'}
+                                            {item.user?.name || 'User'}{'  '}
                                         </Text>
-                                        <Text style={styles.timeText}>
+                                        <Text style={styles.commentText}>
+                                            {item.content}
+                                        </Text>
+                                    </Text>
+
+                                    {/* Meta Row: Time | Reply */}
+                                    <View style={styles.metaContainer}>
+                                        <Text style={styles.metaText}>
                                             {formatTime(item.created_at)}
                                         </Text>
+                                        <TouchableOpacity activeOpacity={0.7}>
+                                            <Text style={styles.metaTextReply}>Reply</Text>
+                                        </TouchableOpacity>
                                     </View>
-                                    <Text style={styles.commentText}>
-                                        {item.content}
-                                    </Text>
-                                    {/* Reply Button (Visual Only) */}
-                                    <TouchableOpacity style={styles.replyButton} activeOpacity={0.7}>
-                                        <Text style={styles.replyText}>Reply</Text>
-                                    </TouchableOpacity>
                                 </View>
 
                                 {/* Like Heart (Visual Only for now) */}
                                 <TouchableOpacity style={styles.likeButton}>
-                                    <Ionicons name="heart-outline" size={16} color="#8E8E93" />
+                                    <Ionicons name="heart-outline" size={14} color="#8E8E93" />
                                 </TouchableOpacity>
                             </View>
                         )}
@@ -313,7 +316,7 @@ const styles = StyleSheet.create({
     },
     commentItem: {
         flexDirection: 'row',
-        marginBottom: 20,
+        marginBottom: 24,
         alignItems: 'flex-start',
     },
     avatar: {
@@ -336,39 +339,39 @@ const styles = StyleSheet.create({
     commentContent: {
         flex: 1,
         marginRight: 8,
+        marginTop: 2, // Slight alignment fix with avatar center
     },
-    commentHeader: {
-        flexDirection: 'row',
-        alignItems: 'baseline',
-        flexWrap: 'wrap',
+    commentTextLine: {
         marginBottom: 4,
+        lineHeight: 18,
     },
     username: {
         fontWeight: '700',
         color: '#fff',
         fontSize: 13,
-        marginRight: 8,
-    },
-    timeText: {
-        color: '#8E8E93', // iOS gray
-        fontSize: 12,
     },
     commentText: {
         color: '#fff',
         fontSize: 14,
-        lineHeight: 18,
     },
-    replyButton: {
-        marginTop: 4,
+    metaContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 16,
+        marginTop: 2,
     },
-    replyText: {
+    metaText: {
+        color: '#8E8E93',
+        fontSize: 12,
+    },
+    metaTextReply: {
         color: '#8E8E93',
         fontSize: 12,
         fontWeight: '600',
     },
     likeButton: {
         padding: 4,
-        alignSelf: 'center',
+        marginTop: 8, // Align with text block roughly
     },
     emptyContainer: {
         paddingVertical: 40,
