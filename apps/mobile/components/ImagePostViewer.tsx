@@ -106,7 +106,7 @@ export function ImagePostViewer({ images, restaurant, user, caption, imagePostId
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#000',
+    backgroundColor: '#f7f6f1',
   },
   placeholder: {
     // backgroundColor: '#222', // Handled by Placeholder component

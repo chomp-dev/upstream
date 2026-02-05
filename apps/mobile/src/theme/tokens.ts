@@ -5,24 +5,24 @@
 
 export const colors = {
   // Background layers - warm charcoal tones
-  bg: '#0D0B0A',
-  surface: '#1A1614',
-  card: '#231E1B',
-  elevated: '#2C2520',
+  bg: '#f7f6f1',
+  surface: '#FFFFFF',
+  card: '#FFFFFF',
+  elevated: '#F0F0F0',
 
   // Text colors - warm cream tones
-  text: '#FAF7F2',
-  textSecondary: '#B8AFA6',
-  muted: '#7A716A',
+  text: '#0D0B0A',
+  textSecondary: '#7A716A',
+  muted: '#9CA3AF',
 
   // Border & dividers
   border: 'rgba(255, 248, 240, 0.12)',
   borderSubtle: 'rgba(255, 248, 240, 0.06)',
 
   // Primary accent - warm coral/tomato (appetizing, food-like)
-  primary: '#E85D4C',
-  primaryLight: '#FF7A6B',
-  primaryMuted: '#C44D3F',
+  primary: '#eeb57e',
+  primaryLight: '#f2c99f', // Lightened #eeb57e
+  primaryMuted: '#d99a60', // Darkened #eeb57e
 
   // Secondary accents
   amber: '#E8A94D',       // Golden - ratings, stars

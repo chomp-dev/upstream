@@ -12,7 +12,7 @@ const GRADIENTS = [
     ['#0093E9', '#80D0C7'], // Blue-Cyan
     ['#8EC5FC', '#E0C3FC'], // Light Blue-Purple
     ['#D9AFD9', '#97D9E1'], // Pink-Blue
-    ['#FBAB7E', '#F7CE68'], // Orange-Yellow
+    ['#eeb57e', '#F7CE68'], // Orange-Yellow
     ['#2c3e50', '#3498db'], // Dark Blue
     ['#1a2a6c', '#b21f1f', '#fdbb2d'], // Navy-Red-Gold
 ] as const;

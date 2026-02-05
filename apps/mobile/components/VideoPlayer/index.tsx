@@ -149,7 +149,7 @@ export function VideoPlayer({
 
 const styles = StyleSheet.create({
     container: {
-        backgroundColor: '#000',
+        backgroundColor: '#f7f6f1',
         justifyContent: 'center',
         alignItems: 'center',
     },

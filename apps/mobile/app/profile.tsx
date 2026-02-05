@@ -212,7 +212,7 @@ export default function ProfileScreen() {
                 {isOwnProfile ? (
                     <View style={styles.actionButtonsRow}>
                         <TouchableOpacity style={styles.editProfileButton} onPress={() => router.push('/edit_profile')}>
-                            <Text variant="caption" color={colors.bg}>Edit Profile</Text>
+                            <Text variant="caption" color={'#000'}>Edit Profile</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.logoutButton} onPress={logout}>
                             <Text variant="caption" color={colors.muted}>Log Out</Text>
@@ -225,7 +225,7 @@ export default function ProfileScreen() {
                             onPress={handleFollowToggle}
                             disabled={followLoading}
                         >
-                            <Text variant="caption" color={isFollowing ? colors.text : colors.bg}>
+                            <Text variant="caption" color={isFollowing ? colors.text : '#000'}>
                                 {isFollowing ? 'Following' : 'Follow'}
                             </Text>
                         </TouchableOpacity>

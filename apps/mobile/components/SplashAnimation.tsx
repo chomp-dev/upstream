@@ -68,7 +68,7 @@ const Crumb = ({ index, total }: { index: number, total: number }) => {
             position: 'absolute',
             width: 8 + (index % 3) * 4,
             height: 8 + (index % 3) * 4,
-            backgroundColor: index % 2 === 0 ? '#F97316' : '#FDE047', // Orange/Yellow crumbs
+            backgroundColor: index % 2 === 0 ? '#eeb57e' : '#FDE047', // Orange/Yellow crumbs
             borderRadius: 50,
             transform: [
                 { translateX },
@@ -263,7 +263,7 @@ export default function SplashAnimation({
                     <Animated.View style={[styles.progressFill, progressBarStyle]} />
                 </View>
                 {statusText ? (
-                    <Text variant="caption" color="rgba(255,255,255,0.8)" style={styles.statusText}>
+                    <Text variant="caption" color="rgba(0,0,0,0.6)" style={styles.statusText}>
                         {statusText}
                     </Text>
                 ) : null}
@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         overflow: 'hidden',
-        backgroundColor: '#000', // Fully opaque black background
+        backgroundColor: '#f7f6f1', // Fully opaque black background
     },
     logoContainer: {
         width: 300, // Bigger Logo
@@ -300,13 +300,13 @@ const styles = StyleSheet.create({
     progressTrack: {
         width: '100%',
         height: 4,
-        backgroundColor: 'rgba(255,255,255,0.2)',
+        backgroundColor: 'rgba(0,0,0,0.1)',
         borderRadius: 2,
         overflow: 'hidden',
     },
     progressFill: {
         height: '100%',
-        backgroundColor: '#F97316', // Orange to match crumbs
+        backgroundColor: '#eeb57e', // Orange to match crumbs
         borderRadius: 2,
     },
     statusText: {

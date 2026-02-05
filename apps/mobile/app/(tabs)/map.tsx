@@ -57,7 +57,7 @@ export default function MapScreen() {
             Explore food spots near you by signing in.
           </Text>
           <TouchableOpacity style={styles.loginButton} onPress={() => login()}>
-            <Text variant="subtitle" color={colors.bg}>Sign In / Sign Up</Text>
+            <Text variant="subtitle" color={'#000'}>Sign In / Sign Up</Text>
           </TouchableOpacity>
         </View>
       </Screen>

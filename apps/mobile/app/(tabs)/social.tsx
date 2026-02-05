@@ -50,7 +50,7 @@ export default function SocialScreen() {
             Login to Chomp
           </Text>
           <Pressable style={styles.loginButton} onPress={login}>
-            <Text variant="subtitle" color={colors.bg}>Sign In / Sign Up</Text>
+            <Text variant="subtitle" color={'#000'}>Sign In / Sign Up</Text>
           </Pressable>
         </View>
       </Screen>

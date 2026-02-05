@@ -46,7 +46,7 @@ const styles = StyleSheet.create({
     logo: {
         fontSize: 20,
         fontWeight: 'bold',
-        color: '#FF6347', // Tomato color or brand color
+        color: '#eeb57e', // Tomato color or brand color
     },
     authContainer: {
         flexDirection: 'row',
@@ -68,13 +68,13 @@ const styles = StyleSheet.create({
         color: '#333',
     },
     loginButton: {
-        backgroundColor: '#333',
+        backgroundColor: '#eeb57e',
         paddingHorizontal: 16,
         paddingVertical: 8,
         borderRadius: 20,
     },
     loginText: {
-        color: '#fff',
+        color: '#000',
         fontWeight: '600',
         fontSize: 14,
     },

@@ -46,7 +46,7 @@ export default function CreateScreen() {
             You need an account to share your food discoveries.
           </Text>
           <TouchableOpacity style={styles.loginButton} onPress={() => login()}>
-            <Text variant="subtitle" color={colors.bg}>Sign In / Sign Up</Text>
+            <Text variant="subtitle" color={'#000'}>Sign In / Sign Up</Text>
           </TouchableOpacity>
         </View>
       </Screen>
@@ -471,12 +471,12 @@ export default function CreateScreen() {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.uploadButton, styles.uploadButtonSecondary, { flex: 1, backgroundColor: '#000', borderColor: '#000' }]}
+                  style={[styles.uploadButton, styles.uploadButtonSecondary, { flex: 1, backgroundColor: '#f7f6f1', borderColor: '#f7f6f1' }]}
                   onPress={() => setShowTikTokInput(true)}
                   disabled={uploading}
                 >
-                  <Ionicons name="logo-tiktok" size={32} color="#fff" style={{ marginBottom: spacing.sm }} />
-                  <Text variant="subtitle" color="#fff">TikTok</Text>
+                  <Ionicons name="logo-tiktok" size={32} color="#000" style={{ marginBottom: spacing.sm }} />
+                  <Text variant="subtitle" color="#000">TikTok</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -622,7 +622,7 @@ export default function CreateScreen() {
             {uploading ? (
               <ActivityIndicator color={colors.bg} />
             ) : (
-              <Text variant="subtitle" color={colors.bg}>Post Review</Text>
+              <Text variant="subtitle" color={'#000'}>Post Review</Text>
             )}
           </TouchableOpacity>
         </View>

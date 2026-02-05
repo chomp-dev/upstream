@@ -45,7 +45,7 @@ export function TikTokEmbed({
           html, body { 
             width: 100%; 
             height: 100%; 
-            background: #000;
+            background: #f7f6f1;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -166,7 +166,7 @@ export function TikTokEmbed({
 
 const styles = StyleSheet.create({
     container: {
-        backgroundColor: '#000',
+        backgroundColor: '#f7f6f1',
         justifyContent: 'center',
         alignItems: 'center',
         position: 'relative',
@@ -215,7 +215,7 @@ const styles = StyleSheet.create({
         marginLeft: 4, // Optical alignment for play icon
     },
     tiktokLogoContainer: {
-        backgroundColor: '#000',
+        backgroundColor: '#f7f6f1',
         paddingHorizontal: spacing.lg,
         paddingVertical: spacing.sm,
         borderRadius: 8,
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
         right: spacing.lg,
     },
     tiktokBadgeSmall: {
-        backgroundColor: '#000',
+        backgroundColor: '#f7f6f1',
         paddingHorizontal: spacing.sm,
         paddingVertical: spacing.xs,
         borderRadius: 4,
