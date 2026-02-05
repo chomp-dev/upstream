@@ -322,20 +322,11 @@ export const CommentSheet = ({ videoUrl, onClose, visible }: CommentSheetProps) 
 
 const styles = StyleSheet.create({
     container: {
-        position: Platform.OS === 'web' ? 'fixed' : 'absolute',
+        position: 'absolute',
         bottom: 0,
-        // On web, center the sheet and constrain to mobile wrapper width
-        ...(Platform.OS === 'web' ? {
-            left: '50%',
-            transform: [{ translateX: '-50%' }],
-            width: '100%',
-            maxWidth: 500,
-        } : {
-            left: 0,
-            right: 0,
-        }),
-        // Web: slightly shorter to avoid browser chrome issues
-        height: Platform.OS === 'web' ? '70vh' : '75%',
+        left: 0,
+        right: 0,
+        height: '75%', // Consistent height percentage for both platforms
         zIndex: 9999,
         backgroundColor: '#1C1C1E', // Darker background
         borderTopLeftRadius: 16,
