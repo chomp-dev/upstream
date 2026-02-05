@@ -173,12 +173,9 @@ export default function HomeScreen() {
       // If we have cached data, use it IMMEDIATELY
       if (cached && cached.feed.length > 0) {
         if (__DEV__) console.log('[Feed] Using preloaded/cached feed:', cached.feed.length, 'items');
-        setFeed(cached.feed);
-        setNearbyPlaceIds(cached.nearbyPlaceIds);
-        setFeedMode(cached.feedMode);
-        setLoading(false);
 
-        // Hydrate map logic (from previous fix)
+        // CRITICAL FIX: Hydrate restaurant cache BEFORE setFeed() to prevent race condition
+        // VideoPlayer renders immediately after setFeed, so cache must be ready
         let mapHydrationSuccess = false;
         try {
           const { mapStore } = require('../../src/lib/mapStore');
@@ -207,6 +204,12 @@ export default function HomeScreen() {
         } catch (err) {
           console.error('[Feed] Failed to hydrate mapStore:', err);
         }
+
+        // NOW set feed - cache is already populated
+        setFeed(cached.feed);
+        setNearbyPlaceIds(cached.nearbyPlaceIds);
+        setFeedMode(cached.feedMode);
+        setLoading(false);
 
         // Only skip network load if we have both feed AND restaurant data
         if (mapHydrationSuccess) {
