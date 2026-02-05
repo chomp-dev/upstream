@@ -7,7 +7,13 @@ import { Auth0Provider } from 'react-native-auth0';
 import { colors } from '../src/theme';
 import { AuthProvider } from '../src/context/auth';
 import { CommentSheetProvider } from '../src/context/commentSheet';
+import * as SplashScreen from 'expo-splash-screen';
 import { preloadService } from '../src/lib/preloadService';
+
+// Prevent the splash screen from auto-hiding before asset loading is complete.
+SplashScreen.preventAutoHideAsync().catch(() => {
+  /* reloading the app might trigger some race conditions, ignore them */
+});
 
 export default function RootLayout() {
   const [isSplashComplete, setIsSplashComplete] = useState(false);
@@ -24,9 +30,12 @@ export default function RootLayout() {
     ).then((result) => {
       console.log('[Layout] Preload complete:', result);
       setDataReady(true);
+      // Hide native splash screen so our custom one can show
+      SplashScreen.hideAsync();
     }).catch((error) => {
       console.error('[Layout] Preload error:', error);
       setDataReady(true); // Continue even on error
+      SplashScreen.hideAsync();
     });
   }, []);
 

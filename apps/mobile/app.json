@@ -26,7 +26,8 @@
         "NSCameraUsageDescription": "Chomp needs camera access to record videos.",
         "NSMicrophoneUsageDescription": "Chomp needs microphone access to record audio.",
         "NSPhotoLibraryUsageDescription": "Chomp needs photo library access to upload media.",
-        "NSLocationWhenInUseUsageDescription": "Chomp needs your location to find nearby restaurants."
+        "NSLocationWhenInUseUsageDescription": "Chomp needs your location to find nearby restaurants.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -66,6 +67,13 @@
     "experiments": {
       "typedRoutes": true,
       "baseUrl": "/demo"
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "0a56de28-7fc3-485a-9649-245db73f4742"
+      }
+    },
+    "owner": "chomps-organization"
   }
 }
