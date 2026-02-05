@@ -151,7 +151,7 @@ export function VideoPlayer({
                 </View>
             )}
 
-            <MediaOverlay height={height} restaurant={restaurant} user={user} videoUrl={videoUrl} caption={caption} />
+            <MediaOverlay height={height} restaurant={restaurant} user={user} videoUrl={videoUrl} caption={caption} userLocation={userLocation} />
         </TouchableOpacity>
     );
 }
