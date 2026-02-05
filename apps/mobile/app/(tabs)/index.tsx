@@ -190,206 +190,184 @@ export default function HomeScreen() {
         // Only wait if we didn't already render cached data
         await preloadService.waitForCompletion();
 
-        // Check cache AGAIN after preload finishes (in case it just populated)
-        const freshCache = await feedStore.getFeed();
-        if (freshCache && freshCache.feed.length > 0) {
-          // ... (This part mirrors the logic above, but simplifed to just recursion or similar? 
-          // simplest is to just let it fall through to 'loadNearbyFeed' actual fetch if preload failed to populate?
-          // actually, if preload finished, we should try to use ITs result.
-          // better: just call loadNearbyFeed(false) again recursively? No, infinite loop risk.
-          // Let's just fall through to the network fetch logic which handles stale-while-revalidate
+        if (preloadService.isComplete()) {
+          // Check cache AGAIN after preload finishes (in case it just populated)
+          const freshCache = await feedStore.getFeed();
+          if (freshCache && freshCache.feed.length > 0) {
+            if (__DEV__) console.log('[Feed] Preload finished, using fresh cache:', freshCache.feed.length, 'items');
+            setFeed(freshCache.feed);
+            setNearbyPlaceIds(freshCache.nearbyPlaceIds);
+            setFeedMode(freshCache.feedMode);
+            setLoading(false);
+
+            // Hydrate map for this new cache
+            try {
+              const { mapStore } = require('../../src/lib/mapStore');
+              const mapData = await mapStore.getRestaurants();
+              if (mapData && mapData.restaurants) {
+                const newCache: Record<string, Restaurant> = {};
+                mapData.restaurants.forEach((r: Restaurant) => {
+                  if (r.google_place_id) newCache[r.google_place_id] = r;
+                });
+                setRestaurantCache(prev => ({ ...prev, ...newCache }));
+                console.log('[Feed] Hydrated fresh map data after preload');
+                return;
+              }
+            } catch (e) { console.error(e); }
+          }
         }
       }
-      if (cached && cached.feed.length > 0) {
-        if (__DEV__) console.log('[Feed] Using preloaded/cached feed:', cached.feed.length, 'items');
-        setFeed(cached.feed);
-        setNearbyPlaceIds(cached.nearbyPlaceIds);
-        setFeedMode(cached.feedMode);
-        setLoading(false);
 
-        // OPTIMIZATION: Also hydrate restaurant cache from mapStore
-        // This ensures overlays appear instantly without waiting for individual fetches
-        let mapHydrationSuccess = false;
-        try {
-          const { mapStore } = require('../../src/lib/mapStore');
-          const mapData = await mapStore.getRestaurants();
+      try {
+        setLoading(true);
+        setLoadingProgress(10);
+        setLoadingStatus('Checking permissions...');
 
-          if (mapData && mapData.restaurants) {
-            const newCache: Record<string, Restaurant> = {};
-            mapData.restaurants.forEach((r: Restaurant) => {
-              if (r.google_place_id) {
-                newCache[r.google_place_id] = r;
-              }
-            });
-            setRestaurantCache(prev => ({ ...prev, ...newCache }));
-            // UNCONDITIONAL LOG for debugging production issues
-            console.log('[Feed] Hydrated restaurant cache from mapStore:', Object.keys(newCache).length, 'items');
-            mapHydrationSuccess = true;
-          } else {
-            console.log('[Feed] mapStore cache miss/expired - will background fetch');
-          }
-        } catch (err) {
-          console.error('[Feed] Failed to hydrate mapStore:', err);
-        }
-
-        // Only skip network load if we have both feed AND restaurant data
-        if (mapHydrationSuccess) {
+        // Request location permission
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          if (__DEV__) console.log('[Feed] Location permission denied, falling back to demo');
+          setLocationAvailable(false);
+          await loadDemoFeed();
           return;
         }
-        console.log('[Feed] Partial cache hit (Feed only) - proceeding to network fetch to repair missing info');
-      }
-    }
 
-    try {
-      setLoading(true);
-      setLoadingProgress(10);
-      setLoadingStatus('Checking permissions...');
+        // Get current location
+        const loc = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        setLocationAvailable(true);
 
-      // Request location permission
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        if (__DEV__) console.log('[Feed] Location permission denied, falling back to demo');
-        setLocationAvailable(false);
-        await loadDemoFeed();
-        return;
-      }
+        if (__DEV__) console.log(`[Feed] Got location: ${loc.coords.latitude}, ${loc.coords.longitude}`);
 
-      // Get current location
-      const loc = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-      setLocationAvailable(true);
+        setLoadingProgress(30);
+        setLoadingStatus('Finding nearby restaurants...');
 
-      if (__DEV__) console.log(`[Feed] Got location: ${loc.coords.latitude}, ${loc.coords.longitude}`);
+        // Search for nearby restaurants
+        const nearbyResponse = await searchApi.searchNearby(
+          loc.coords.latitude,
+          loc.coords.longitude,
+          NEARBY_RADIUS,
+          100 // Limit search to 100 max
+        );
 
-      setLoadingProgress(30);
-      setLoadingStatus('Finding nearby restaurants...');
+        let placeIds = nearbyResponse.restaurants.map(r => r.google_place_id);
 
-      // Search for nearby restaurants
-      const nearbyResponse = await searchApi.searchNearby(
-        loc.coords.latitude,
-        loc.coords.longitude,
-        NEARBY_RADIUS,
-        100 // Limit search to 100 max
-      );
-
-      let placeIds = nearbyResponse.restaurants.map(r => r.google_place_id);
-
-      // Limit to top 50 closest to avoid massive wait times/timeouts
-      if (placeIds.length > 50) {
-        if (__DEV__) console.log(`[Feed] Limiting processing to top 50 of ${placeIds.length} restaurants`);
-        placeIds = placeIds.slice(0, 50);
-      }
-
-      setNearbyPlaceIds(placeIds);
-      setNearbyRestaurantCount(nearbyResponse.restaurants.length);
-
-      // OPTIMIZATION: Seed restaurant cache immediately with the data we just got
-      // This prevents the "missing info" delay by avoiding redundant fetches
-      const newCache: Record<string, Restaurant> = {};
-      nearbyResponse.restaurants.forEach(r => {
-        if (r.google_place_id) {
-          newCache[r.google_place_id] = r;
+        // Limit to top 50 closest to avoid massive wait times/timeouts
+        if (placeIds.length > 50) {
+          if (__DEV__) console.log(`[Feed] Limiting processing to top 50 of ${placeIds.length} restaurants`);
+          placeIds = placeIds.slice(0, 50);
         }
-      });
-      setRestaurantCache(prev => ({ ...prev, ...newCache }));
 
-      if (__DEV__) console.log(`[Feed] Found ${nearbyResponse.restaurants.length} nearby restaurants, checking ${placeIds.length}`);
+        setNearbyPlaceIds(placeIds);
+        setNearbyRestaurantCount(nearbyResponse.restaurants.length);
 
-      if (placeIds.length === 0) {
-        if (__DEV__) console.log('[Feed] No nearby restaurants, staying in nearby mode with empty state');
-        setFeed([]);
-        setFeedMode('nearby');
-        setLoading(false);
-        return;
-      }
-
-      setLoadingProgress(60);
-      setLoadingStatus(`Found ${placeIds.length} spots. Getting videos...`);
-
-      // Chunk place IDs to show real progress
-      const CHUNK_SIZE = 5;
-      const chunks = [];
-      for (let i = 0; i < placeIds.length; i += CHUNK_SIZE) {
-        chunks.push(placeIds.slice(i, i + CHUNK_SIZE));
-      }
-
-      let allFeedItems: any[] = [];
-      let processedCount = 0;
-
-      for (let i = 0; i < chunks.length; i++) {
-        const chunk = chunks[i];
-
-        try {
-          // Update status
-          const percentComplete = 60 + Math.floor((i / chunks.length) * 30); // 60% -> 90%
-          setLoadingProgress(percentComplete);
-          setLoadingStatus(`Checking ${chunk.length} spots (${i + 1}/${chunks.length})...`);
-
-          const response = await mediaApi.fetchNearbyFeed(chunk, 10); // Limit 10 per chunk
-          if (response.feed && response.feed.length > 0) {
-            allFeedItems = [...allFeedItems, ...response.feed];
+        // OPTIMIZATION: Seed restaurant cache immediately with the data we just got
+        // This prevents the "missing info" delay by avoiding redundant fetches
+        const newCache: Record<string, Restaurant> = {};
+        nearbyResponse.restaurants.forEach(r => {
+          if (r.google_place_id) {
+            newCache[r.google_place_id] = r;
           }
-        } catch (err) {
-          console.warn(`[Feed] Failed to fetch chunk ${i}:`, err);
+        });
+        setRestaurantCache(prev => ({ ...prev, ...newCache }));
+
+        if (__DEV__) console.log(`[Feed] Found ${nearbyResponse.restaurants.length} nearby restaurants, checking ${placeIds.length}`);
+
+        if (placeIds.length === 0) {
+          if (__DEV__) console.log('[Feed] No nearby restaurants, staying in nearby mode with empty state');
+          setFeed([]);
+          setFeedMode('nearby');
+          setLoading(false);
+          return;
         }
-      }
 
-      // Validating and deduplicating
-      const validFeed = allFeedItems.filter(item => {
-        if (item.type === 'video') {
-          return item.status !== 'error' && item.playback_url;
+        setLoadingProgress(60);
+        setLoadingStatus(`Found ${placeIds.length} spots. Getting videos...`);
+
+        // Chunk place IDs to show real progress
+        const CHUNK_SIZE = 5;
+        const chunks = [];
+        for (let i = 0; i < placeIds.length; i += CHUNK_SIZE) {
+          chunks.push(placeIds.slice(i, i + CHUNK_SIZE));
         }
-        return true;
-      });
 
-      // Simple deduplication by ID
-      const uniqueFeed = validFeed.filter((item, index, self) =>
-        index === self.findIndex((t) => (
-          t.id === item.id && t.type === item.type
-        ))
-      );
+        let allFeedItems: any[] = [];
+        let processedCount = 0;
 
-      if (__DEV__) console.log(`[Feed] Nearby feed has ${uniqueFeed.length} items (from ${validFeed.length} raw)`);
+        for (let i = 0; i < chunks.length; i++) {
+          const chunk = chunks[i];
 
-      if (uniqueFeed.length === 0) {
-        if (__DEV__) console.log('[Feed] No local content, staying in nearby mode with empty state');
+          try {
+            // Update status
+            const percentComplete = 60 + Math.floor((i / chunks.length) * 30); // 60% -> 90%
+            setLoadingProgress(percentComplete);
+            setLoadingStatus(`Checking ${chunk.length} spots (${i + 1}/${chunks.length})...`);
+
+            const response = await mediaApi.fetchNearbyFeed(chunk, 10); // Limit 10 per chunk
+            if (response.feed && response.feed.length > 0) {
+              allFeedItems = [...allFeedItems, ...response.feed];
+            }
+          } catch (err) {
+            console.warn(`[Feed] Failed to fetch chunk ${i}:`, err);
+          }
+        }
+
+        // Validating and deduplicating
+        const validFeed = allFeedItems.filter(item => {
+          if (item.type === 'video') {
+            return item.status !== 'error' && item.playback_url;
+          }
+          return true;
+        });
+
+        // Simple deduplication by ID
+        const uniqueFeed = validFeed.filter((item, index, self) =>
+          index === self.findIndex((t) => (
+            t.id === item.id && t.type === item.type
+          ))
+        );
+
+        if (__DEV__) console.log(`[Feed] Nearby feed has ${uniqueFeed.length} items (from ${validFeed.length} raw)`);
+
+        if (uniqueFeed.length === 0) {
+          if (__DEV__) console.log('[Feed] No local content, staying in nearby mode with empty state');
+          setFeed([]);
+          setFeedMode('nearby');
+          setLoading(false);
+          return;
+        }
+
+        setLoadingProgress(100);
+        setLoadingStatus('Preparing your feed...');
+
+        // Give it a moment to show 100%
+        await new Promise(r => setTimeout(r, 500));
+
+        setFeed(uniqueFeed);
+        setFeedMode('nearby');
+
+        // Cache the feed for instant loading next time
+        await feedStore.setFeed(uniqueFeed, placeIds, 'nearby');
+
+        // Prefetch restaurant data
+        const feedPlaceIds = uniqueFeed
+          .filter(item => item.google_place_id)
+          .map(item => item.google_place_id!)
+          .filter((id, idx, arr) => arr.indexOf(id) === idx);
+
+        if (feedPlaceIds.length > 0) {
+          fetchRestaurants(feedPlaceIds);
+        }
+      } catch (error: any) {
+        console.error('[Feed] Location/nearby error:', error.message);
+        // On error, stay in nearby mode but show empty - user can choose to switch
         setFeed([]);
         setFeedMode('nearby');
+      } finally {
         setLoading(false);
-        return;
       }
-
-      setLoadingProgress(100);
-      setLoadingStatus('Preparing your feed...');
-
-      // Give it a moment to show 100%
-      await new Promise(r => setTimeout(r, 500));
-
-      setFeed(uniqueFeed);
-      setFeedMode('nearby');
-
-      // Cache the feed for instant loading next time
-      await feedStore.setFeed(uniqueFeed, placeIds, 'nearby');
-
-      // Prefetch restaurant data
-      const feedPlaceIds = uniqueFeed
-        .filter(item => item.google_place_id)
-        .map(item => item.google_place_id!)
-        .filter((id, idx, arr) => arr.indexOf(id) === idx);
-
-      if (feedPlaceIds.length > 0) {
-        fetchRestaurants(feedPlaceIds);
-      }
-    } catch (error: any) {
-      console.error('[Feed] Location/nearby error:', error.message);
-      // On error, stay in nearby mode but show empty - user can choose to switch
-      setFeed([]);
-      setFeedMode('nearby');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    }, []);
 
   const loadDemoFeed = useCallback(async () => {
     try {
