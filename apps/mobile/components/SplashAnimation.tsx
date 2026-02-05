@@ -225,6 +225,7 @@ export default function SplashAnimation({
                 style={StyleSheet.absoluteFill}
                 contentFit="cover"
                 blurRadius={10} // Significant blur to reduce noise
+                priority="high" // Load immediately
             />
             {/* Dark Overlay for Contrast */}
             <LinearGradient
@@ -278,6 +279,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         overflow: 'hidden',
+        backgroundColor: '#000', // Fully opaque black background
     },
     logoContainer: {
         width: 300, // Bigger Logo
