@@ -148,19 +148,18 @@ export const CommentSheet = ({ videoUrl, onClose, visible }: CommentSheetProps) 
             <View style={styles.container} onStartShouldSetResponder={() => true} onMoveShouldSetResponder={() => true} onTouchEnd={(e) => e.stopPropagation()}>
                 {/* Header */}
                 <View style={styles.header}>
-                    <Text variant="subtitle" style={styles.title}>
-                        {comments.length} {comments.length === 1 ? 'comment' : 'comments'}
+                    <Text style={styles.title}>
+                        Comments
                     </Text>
-
                     <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                        <Ionicons name="close" size={24} color={colors.text} />
+                        <Ionicons name="close" size={24} color="#fff" />
                     </TouchableOpacity>
                 </View>
 
                 {/* Comments List */}
                 {loading ? (
                     <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="large" color={colors.primary} />
+                        <ActivityIndicator size="large" color="#fff" />
                     </View>
                 ) : (
                     <FlatList
@@ -168,6 +167,7 @@ export const CommentSheet = ({ videoUrl, onClose, visible }: CommentSheetProps) 
                         keyExtractor={(item) => item.id}
                         renderItem={({ item }) => (
                             <View style={styles.commentItem}>
+                                {/* Avatar */}
                                 {item.user?.avatar ? (
                                     <Image source={{ uri: item.user.avatar }} style={styles.avatar} />
                                 ) : (
@@ -177,19 +177,30 @@ export const CommentSheet = ({ videoUrl, onClose, visible }: CommentSheetProps) 
                                         </Text>
                                     </View>
                                 )}
+
+                                {/* Content */}
                                 <View style={styles.commentContent}>
                                     <View style={styles.commentHeader}>
-                                        <Text variant="caption" style={styles.username}>
+                                        <Text style={styles.username}>
                                             {item.user?.name || 'User'}
                                         </Text>
-                                        <Text variant="caption" color={colors.muted}>
+                                        <Text style={styles.timeText}>
                                             {formatTime(item.created_at)}
                                         </Text>
                                     </View>
-                                    <Text variant="body" style={styles.commentText}>
+                                    <Text style={styles.commentText}>
                                         {item.content}
                                     </Text>
+                                    {/* Reply Button (Visual Only) */}
+                                    <TouchableOpacity style={styles.replyButton} activeOpacity={0.7}>
+                                        <Text style={styles.replyText}>Reply</Text>
+                                    </TouchableOpacity>
                                 </View>
+
+                                {/* Like Heart (Visual Only for now) */}
+                                <TouchableOpacity style={styles.likeButton}>
+                                    <Ionicons name="heart-outline" size={16} color="#8E8E93" />
+                                </TouchableOpacity>
                             </View>
                         )}
                         contentContainerStyle={styles.listContent}
@@ -200,7 +211,7 @@ export const CommentSheet = ({ videoUrl, onClose, visible }: CommentSheetProps) 
                                     No comments yet
                                 </Text>
                                 <Text variant="caption" color={colors.muted} center>
-                                    Be the first to comment!
+                                    Start the conversation.
                                 </Text>
                             </View>
                         }
@@ -210,40 +221,47 @@ export const CommentSheet = ({ videoUrl, onClose, visible }: CommentSheetProps) 
                 {/* Input Area */}
                 <KeyboardAvoidingView
                     behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                    keyboardVerticalOffset={100}
+                    keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
                 >
                     <View style={styles.inputContainer}>
                         {user ? (
                             <>
-                                <TextInput
-                                    style={styles.input}
-                                    value={newComment}
-                                    onChangeText={setNewComment}
-                                    placeholder="Add a comment..."
-                                    placeholderTextColor={colors.muted}
-                                    multiline
-                                    maxLength={500}
+                                {/* Current User Avatar in Input */}
+                                <Image
+                                    source={{ uri: user.picture }}
+                                    style={styles.inputAvatar}
                                 />
-                                <TouchableOpacity
-                                    style={[styles.sendButton, !newComment.trim() && styles.sendButtonDisabled]}
-                                    onPress={postComment}
-                                    disabled={!newComment.trim() || posting}
-                                >
-                                    {posting ? (
-                                        <ActivityIndicator size="small" color={colors.primary} />
-                                    ) : (
-                                        <Ionicons
-                                            name="send"
-                                            size={20}
-                                            color={newComment.trim() ? colors.primary : colors.muted}
-                                        />
-                                    )}
-                                </TouchableOpacity>
+                                <View style={styles.inputWrapper}>
+                                    <TextInput
+                                        style={styles.input}
+                                        value={newComment}
+                                        onChangeText={setNewComment}
+                                        placeholder={`Add a comment for ${user.name?.split(' ')[0] || '...'}`}
+                                        placeholderTextColor="#8E8E93"
+                                        multiline
+                                        maxLength={500}
+                                    />
+                                    <TouchableOpacity
+                                        style={[styles.sendButton, !newComment.trim() && styles.sendButtonDisabled]}
+                                        onPress={postComment}
+                                        disabled={!newComment.trim() || posting}
+                                    >
+                                        {posting ? (
+                                            <ActivityIndicator size="small" color={colors.primary} />
+                                        ) : (
+                                            <Ionicons
+                                                name="arrow-up-circle"
+                                                size={28}
+                                                color={newComment.trim() ? colors.primary : "#555"}
+                                            />
+                                        )}
+                                    </TouchableOpacity>
+                                </View>
                             </>
                         ) : (
                             <TouchableOpacity onPress={login} style={styles.loginHint}>
-                                <Text variant="body" color={colors.muted}>
-                                    Sign in to comment
+                                <Text variant="body" style={{ color: colors.primary }}>
+                                    Log in to comment
                                 </Text>
                             </TouchableOpacity>
                         )}
@@ -260,31 +278,29 @@ const styles = StyleSheet.create({
         bottom: 0,
         left: 0,
         right: 0,
-        height: '60%',
-        backgroundColor: colors.card,
-        borderTopLeftRadius: radius.xl,
-        borderTopRightRadius: radius.xl,
+        height: '75%', // Taller sheet like Instagram
+        backgroundColor: '#1C1C1E', // Darker background
+        borderTopLeftRadius: 16,
+        borderTopRightRadius: 16,
         overflow: 'hidden',
-    },
-    touchTrap: {
-        flex: 1,
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: spacing.md,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
+        paddingVertical: 12,
+        borderBottomWidth: 0.5,
+        borderBottomColor: 'rgba(255,255,255,0.15)',
     },
     title: {
-        flex: 1,
-        textAlign: 'center',
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#fff',
     },
     closeButton: {
         position: 'absolute',
-        right: spacing.md,
-        padding: spacing.xs,
+        right: 16,
+        padding: 4,
     },
     loadingContainer: {
         flex: 1,
@@ -292,69 +308,110 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     listContent: {
-        padding: spacing.md,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
     },
     commentItem: {
         flexDirection: 'row',
-        marginBottom: spacing.md,
+        marginBottom: 20,
+        alignItems: 'flex-start',
     },
     avatar: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        marginRight: spacing.sm,
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        marginRight: 12,
+        backgroundColor: '#333',
     },
     avatarPlaceholder: {
-        backgroundColor: colors.surface,
+        backgroundColor: '#333',
         justifyContent: 'center',
         alignItems: 'center',
     },
     avatarInitial: {
-        color: colors.text,
+        color: '#fff',
         fontWeight: '600',
         fontSize: 14,
     },
     commentContent: {
         flex: 1,
+        marginRight: 8,
     },
     commentHeader: {
         flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.sm,
-        marginBottom: 2,
+        alignItems: 'baseline',
+        flexWrap: 'wrap',
+        marginBottom: 4,
     },
     username: {
-        fontWeight: '600',
-        color: colors.text,
+        fontWeight: '700',
+        color: '#fff',
+        fontSize: 13,
+        marginRight: 8,
+    },
+    timeText: {
+        color: '#8E8E93', // iOS gray
+        fontSize: 12,
     },
     commentText: {
-        color: colors.text,
+        color: '#fff',
+        fontSize: 14,
+        lineHeight: 18,
+    },
+    replyButton: {
+        marginTop: 4,
+    },
+    replyText: {
+        color: '#8E8E93',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    likeButton: {
+        padding: 4,
+        alignSelf: 'center',
     },
     emptyContainer: {
-        paddingVertical: spacing.xxl,
+        paddingVertical: 40,
         alignItems: 'center',
-        gap: spacing.xs,
+        gap: 8,
     },
     inputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: spacing.md,
-        borderTopWidth: 1,
-        borderTopColor: colors.border,
-        backgroundColor: colors.surface,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderTopWidth: 0.5,
+        borderTopColor: 'rgba(255,255,255,0.15)',
+        backgroundColor: '#1C1C1E',
+    },
+    inputAvatar: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        marginRight: 12,
+        backgroundColor: '#333',
+    },
+    inputWrapper: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#2C2C2E',
+        borderRadius: 20,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        minHeight: 40,
+        borderWidth: 1,
+        borderColor: '#3A3A3C',
     },
     input: {
         flex: 1,
-        backgroundColor: colors.bg,
-        borderRadius: radius.pill,
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.sm,
-        color: colors.text,
-        maxHeight: 100,
+        fontSize: 14,
+        color: '#fff',
+        padding: 0,
+        marginRight: 8,
     },
     sendButton: {
-        marginLeft: spacing.sm,
-        padding: spacing.sm,
+        padding: 4,
     },
     sendButtonDisabled: {
         opacity: 0.5,
@@ -362,6 +419,6 @@ const styles = StyleSheet.create({
     loginHint: {
         flex: 1,
         textAlign: 'center',
-        paddingVertical: spacing.sm,
+        paddingVertical: 12,
     },
 });
