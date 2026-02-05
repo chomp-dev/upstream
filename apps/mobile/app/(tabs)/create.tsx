@@ -494,14 +494,20 @@ export default function CreateScreen() {
           console.log('[Create] Stored image post in navigationStore:', imageDataId);
 
           // Inject into feed so it appears locally
-          const { feedStore } = require('../../src/lib/feedStore');
-          const cachedFeed = await feedStore.getFeed();
-          const currentFeed = cachedFeed?.feed || [];
-          await feedStore.setFeed([imagePostItem, ...currentFeed], [], 'for-you');
-          console.log('[Create] Injected image post into feed');
+          try {
+            const { feedStore } = require('../../src/lib/feedStore');
+            const cachedFeed = await feedStore.getFeed();
+            const currentFeed = cachedFeed?.feed || [];
+            await feedStore.setFeed([imagePostItem, ...currentFeed], [], 'for-you');
+            console.log('[Create] Injected image post into feed');
 
-          // Store for navigation (declared in outer scope)
-          savedImageDataId = imageDataId;
+            // Store for navigation (declared in outer scope)
+            savedImageDataId = imageDataId;
+          } catch (feedError) {
+            console.error('[Create] Feed injection failed:', feedError);
+            Alert.alert('Feed Error', `Failed to update feed: ${(feedError as Error).message}`);
+            // Don't throw - post is saved, just feed display failed
+          }
         }
       }
 
