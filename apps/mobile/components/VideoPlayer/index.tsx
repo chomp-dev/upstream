@@ -164,11 +164,30 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
+    videoWrapper: {
+        flex: 1,
+        width: '100%',
+    },
     video: {},
     thumbnail: {
         resizeMode: 'cover',
     },
     placeholder: {
         // backgroundColor: '#222', // Handled by Placeholder component
+    },
+    processingBadge: {
+        position: 'absolute',
+        top: 60,
+        left: 20,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        zIndex: 10,
+    },
+    processingText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '600',
     },
 });
