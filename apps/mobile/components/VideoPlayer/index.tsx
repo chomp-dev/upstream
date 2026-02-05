@@ -101,6 +101,11 @@ export function VideoPlayer({
 
         return () => {
             subscription.remove();
+            // Cleanup: pause and release player on unmount
+            if (player) {
+                player.pause();
+                player.release();
+            }
         };
     }, [isActive, player]);
 
