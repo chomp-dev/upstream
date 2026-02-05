@@ -67,16 +67,31 @@ export default function CreateScreen() {
   const params = useLocalSearchParams();
 
   useEffect(() => {
+    // Handle rich object param (from some flows)
     if (params.restaurant) {
       try {
         const restaurantData = JSON.parse(params.restaurant as string);
         setSelectedRestaurant(restaurantData);
-        if (__DEV__) console.log('[CreateScreen] Pre-selected restaurant:', restaurantData.name);
+        if (__DEV__) console.log('[CreateScreen] Pre-selected restaurant (obj):', restaurantData.name);
       } catch (e) {
         if (__DEV__) console.error('Failed to parse restaurant param:', e);
       }
     }
-  }, [params.restaurant]);
+    // Handle flattened params (from Restaurant Detail page)
+    else if (params.google_place_id && params.restaurant_name) {
+      setSelectedRestaurant({
+        google_place_id: params.google_place_id as string,
+        name: params.restaurant_name as string,
+        // Fill other fields with defaults if needed, or fetched later
+        rating: 0,
+        price_level: null,
+        vicinity: '',
+        lat: 0,
+        lng: 0
+      } as Restaurant);
+      if (__DEV__) console.log('[CreateScreen] Pre-selected restaurant (params):', params.restaurant_name);
+    }
+  }, [params.restaurant, params.google_place_id, params.restaurant_name]);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -111,6 +126,28 @@ export default function CreateScreen() {
   const loadNearbyRestaurants = useCallback(async () => {
     try {
       setLoadingRestaurants(true);
+
+      // UNIVERSAL DATA: Try to get from MapStore cache first
+      try {
+        const { mapStore } = require('../../src/lib/mapStore');
+        const cachedMap = await mapStore.getRestaurants();
+        if (cachedMap && cachedMap.restaurants && cachedMap.restaurants.length > 0) {
+          console.log('[Create] Loaded nearby from MapStore cache:', cachedMap.restaurants.length);
+          setNearbyRestaurants(cachedMap.restaurants);
+          setLoadingRestaurants(false);
+
+          // If data is fresh enough (e.g. < 5 mins), return early?
+          // For now, let's aggressively background refresh if we suspect staleness, 
+          // but showing cache immediately is the goal.
+          // We will just use cache for now to satisfy "Universal Data".
+          const now = Date.now();
+          if (now - cachedMap.lastFetchedAt < 1000 * 60 * 10) { // 10 min trust
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('[Create] Failed to read mapStore:', e);
+      }
 
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
