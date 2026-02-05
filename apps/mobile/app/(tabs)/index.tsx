@@ -499,7 +499,8 @@ export default function HomeScreen() {
           if (__DEV__) console.log('[Feed] Deep link item not in current feed, relying on injection logic');
         }
       }
-    }, [params.scrollToIndex, params.itemId, params.videoDataId, feed, loading]);
+    }
+  }, [params.scrollToIndex, params.itemId, params.videoDataId, feed, loading]);
 
   // Smart polling
   useEffect(() => {
