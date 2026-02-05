@@ -274,9 +274,13 @@ function ProfileSection() {
       }
       ListEmptyComponent={
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyEmoji}>📷</Text>
-          <Text variant="body" color={colors.muted} center>No posts yet</Text>
-          <Text variant="caption" color={colors.muted} center>Share your first food discovery!</Text>
+          <View style={styles.emptyIconContainer}>
+            <Ionicons name="grid-outline" size={40} color={colors.text} />
+          </View>
+          <Text variant="title" style={{ marginTop: spacing.sm, fontSize: 18 }}>No Posts Yet</Text>
+          <Text variant="bodySmall" color={colors.muted} style={{ marginTop: 4, textAlign: 'center' }}>
+            Your posted photos and videos will{'\n'}appear here.
+          </Text>
         </View>
       }
       contentContainerStyle={styles.postsGrid}
@@ -552,9 +556,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.xxl,
   },
-  emptyEmoji: {
-    fontSize: 48,
-    marginBottom: spacing.md,
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 1.5,
+    borderColor: colors.text,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
   },
   actionButtonsRow: {
     flexDirection: 'row',
