@@ -95,6 +95,19 @@ export default function HomeScreen() {
       }
     }
 
+
+    // Fetch restaurant data for this item if needed
+    if (passedItem && passedItem.google_place_id && !restaurantCache[passedItem.google_place_id]) {
+      searchApi.getRestaurant(passedItem.google_place_id).then(restaurant => {
+        if (restaurant) {
+          setRestaurantCache(prev => ({
+            ...prev,
+            [passedItem.google_place_id!]: restaurant
+          }));
+        }
+      }).catch(err => console.error('[Feed] Failed to fetch linked restaurant:', err));
+    }
+
     // Scroll to top
     setTimeout(() => {
       flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
@@ -106,6 +119,12 @@ export default function HomeScreen() {
   // ============================================================================
 
   const loadNearbyFeed = useCallback(async (forceRefresh = false) => {
+    // If we are deep linking to a pending video, skip loading nearby feed
+    if (params.videoDataId) {
+      if (__DEV__) console.log('[Feed] Skipping nearby load due to videoDataId param');
+      return;
+    }
+
     // Check cache first (unless force refresh)
     // Preload service should have already populated this during splash
     if (!forceRefresh) {
