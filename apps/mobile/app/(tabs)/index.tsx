@@ -712,7 +712,7 @@ export default function HomeScreen() {
                       username: item.username || 'User',
                       avatarUrl: item.user_avatar || undefined
                     }}
-                    videoUrl={item.videoUrl}
+                    videoUrl={item.video_url}
                     caption={item.title || item.description}
                     userLocation={userLocation}
                   />
