@@ -779,6 +779,7 @@ export default function HomeScreen() {
                     videoUrl={item.video_url}
                     caption={item.title || item.description}
                     userLocation={userLocation}
+                    status={item.status}
                   />
                   {item.status !== 'ready' && (
                     <View style={styles.processingOverlay}>
