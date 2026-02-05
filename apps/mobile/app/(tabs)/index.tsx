@@ -374,7 +374,7 @@ export default function HomeScreen() {
       } finally {
         setLoading(false);
       }
-    }, []);
+    }, [params.videoDataId, feed.length]);
 
   const loadDemoFeed = useCallback(async () => {
     try {
