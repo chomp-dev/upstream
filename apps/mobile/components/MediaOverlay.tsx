@@ -86,7 +86,7 @@ export function MediaOverlay({
                     .from('videos')
                     .select('likes_count')
                     .eq('video_url', videoUrl)
-                    .single();
+                    .maybeSingle();
 
                 if (videoData) {
                     setLikesCount(videoData.likes_count || 0);
@@ -107,7 +107,7 @@ export function MediaOverlay({
                         .select('*')
                         .eq('video_url', videoUrl)
                         .eq('user_id', authUser.sub)
-                        .single();
+                        .maybeSingle();
 
                     setIsLiked(!!likeData);
 
@@ -117,7 +117,7 @@ export function MediaOverlay({
                         .select('*')
                         .eq('video_url', videoUrl)
                         .eq('user_id', authUser.sub)
-                        .single();
+                        .maybeSingle();
 
                     setIsSaved(!!saveData);
                 }
