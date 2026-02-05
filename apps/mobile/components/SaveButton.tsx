@@ -162,11 +162,9 @@ const styles = StyleSheet.create({
         gap: 4,
     },
     shadowIcon: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.5,
-        shadowRadius: 4,
-        elevation: 4, // Android shadow
+        textShadowColor: 'rgba(0, 0, 0, 0.5)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 4,
     },
     count: {
         color: '#fff',

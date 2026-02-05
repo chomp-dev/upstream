@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, StyleSheet, Image, TouchableOpacity, Linking, Platform } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, StyleSheet, Image, TouchableOpacity, Linking, Platform, AppState } from 'react-native';
 import { useContentDimensions } from '../src/hooks/useContentDimensions';
 import { Text } from '../src/ui';
 import { colors, spacing } from '../src/theme';
