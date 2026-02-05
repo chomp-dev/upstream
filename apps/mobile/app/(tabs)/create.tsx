@@ -416,7 +416,7 @@ export default function CreateScreen() {
             title: title.trim(),
             description: description.trim(),
             tags: tagArray, // Assuming backend accepts text array
-            user_id: user?.id || user?.sub  // FIX: Use Supabase user ID for RLS compatibility
+            user_id: user?.sub  // RLS policy expects auth.jwt() ->> 'https://supabase.chomp.com/user_id' which is set to sub
           })
           .select();
 
@@ -473,6 +473,23 @@ export default function CreateScreen() {
 
   return (
     <Screen edges={['top']}>
+      {/* Upload Progress Modal */}
+      {uploading && (
+        <Modal visible={true} transparent animationType="fade">
+          <View style={styles.uploadingOverlay}>
+            <View style={styles.uploadingCard}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text variant="subtitle" center style={{ marginTop: spacing.md }}>
+                {uploadStatus}
+              </Text>
+              <Text variant="body" color={colors.muted} center style={{ marginTop: spacing.sm }}>
+                {Math.round(uploadProgress * 100)}%
+              </Text>
+            </View>
+          </View>
+        </Modal>
+      )}
+
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <Text variant="heading" style={styles.title}>
           Create
