@@ -369,13 +369,16 @@ export default function CreateScreen() {
 
         // Inject into feed so it appears locally
         const { feedStore } = require('../../src/lib/feedStore');
-        const currentFeed = feedStore.getFeed();
+        const cachedFeed = await feedStore.getFeed();
+        const currentFeed = cachedFeed?.feed || [];
+        const nearbyPlaceIds = cachedFeed?.nearbyPlaceIds || [];
+        const feedMode = cachedFeed?.feedMode || 'nearby';
         // Add pending video at the top of the feed
-        feedStore.setFeed([pendingVideo, ...currentFeed]);
+        await feedStore.setFeed([pendingVideo, ...currentFeed], nearbyPlaceIds, feedMode);
         console.log('[Create] Injected pending video into feed');
 
         // Store pendingId in component state for navigation
-        let savedPendingId = pendingId;
+        savedPendingId = pendingId;
 
         // 2. Upload to Cloudflare
         setUploadStatus('Uploading video...');
