@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { View, StyleSheet, Image, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
+import { View, StyleSheet, Image, TouchableOpacity, ActivityIndicator, Platform, AppState } from 'react-native';
 import { useContentDimensions } from '../../src/hooks/useContentDimensions';
 import { Restaurant } from '../../src/lib/api/types';
 import { MediaOverlay } from '../MediaOverlay';
@@ -59,14 +59,34 @@ export function VideoPlayer({
     }, [player]);
 
     // Handle active state changes
+    // Handle active state changes and AppState
     useEffect(() => {
         if (!player) return;
 
-        if (isActive) {
-            player.play();
-        } else {
-            player.pause();
-        }
+        const handlePlayback = () => {
+            if (isActive) {
+                // Only play if app is active
+                if (AppState.currentState === 'active') {
+                    player.play();
+                } else {
+                    player.pause();
+                }
+            } else {
+                player.pause();
+            }
+        };
+
+        // Initial check
+        handlePlayback();
+
+        // Listen for AppState changes
+        const subscription = AppState.addEventListener('change', (nextAppState) => {
+            handlePlayback();
+        });
+
+        return () => {
+            subscription.remove();
+        };
     }, [isActive, player]);
 
     // If no playback URL is available yet, show thumbnail or placeholder
