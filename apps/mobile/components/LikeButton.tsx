@@ -15,7 +15,7 @@ export const LikeButton = ({ videoUrl }: { videoUrl: string }) => {
                 .from('videos')
                 .select('likes_count')
                 .eq('video_url', videoUrl)
-                .single();
+                .maybeSingle();
 
             if (videoData) {
                 setLikesCount(videoData.likes_count || 0);
@@ -28,7 +28,7 @@ export const LikeButton = ({ videoUrl }: { videoUrl: string }) => {
                     .select('*')
                     .eq('video_url', videoUrl)
                     .eq('user_id', user.sub)
-                    .single();
+                    .maybeSingle();
 
                 setIsLiked(!!likeData);
             }

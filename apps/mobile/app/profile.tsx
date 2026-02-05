@@ -62,7 +62,7 @@ export default function ProfileScreen() {
                         .from('users')
                         .select('name, email, bio, avatar')
                         .eq('auth0_id', targetUserId)
-                        .single();
+                        .maybeSingle();
 
                     if (userData) {
                         setProfile(userData);
@@ -121,8 +121,9 @@ export default function ProfileScreen() {
                             .select('id')
                             .eq('follower_id', user.sub)
                             .eq('following_id', targetUserId)
-                            .single();
-                        setIsFollowing(!!followData);
+                            .limit(1);
+
+                        setIsFollowing(!!(followData && followData.length > 0));
                     }
 
                 } catch (err) {

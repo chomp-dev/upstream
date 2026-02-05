@@ -58,7 +58,7 @@ export default function ConversationScreen() {
                     .from('users')
                     .select('auth0_id, name, avatar')
                     .eq('auth0_id', otherUserId)
-                    .single();
+                    .maybeSingle();
 
                 if (userData) {
                     setOtherUser(userData);
@@ -73,7 +73,7 @@ export default function ConversationScreen() {
                     .select('id')
                     .eq('participant_1', p1)
                     .eq('participant_2', p2)
-                    .single();
+                    .maybeSingle();
 
                 if (convData) {
                     setConversationId(convData.id);
@@ -127,7 +127,15 @@ export default function ConversationScreen() {
                 },
                 (payload) => {
                     const newMsg = payload.new as Message;
-                    setMessages(prev => [...prev, newMsg]);
+                    setMessages(prev => {
+                        // Prevent duplicates
+                        const exists = prev.some(m => m.id === newMsg.id);
+                        if (exists) {
+                            console.log('[Conversation] Duplicate message from Realtime ignored:', newMsg.id);
+                            return prev;
+                        }
+                        return [...prev, newMsg];
+                    });
                 }
             )
             .subscribe();
@@ -171,7 +179,7 @@ export default function ConversationScreen() {
                         participant_2: p2,
                     })
                     .select('id')
-                    .single();
+                    .maybeSingle();
 
                 if (convError) throw convError;
                 convId = newConv?.id;
@@ -187,15 +195,24 @@ export default function ConversationScreen() {
                     content: messageText,
                 })
                 .select()
-                .single();
+                .maybeSingle();
 
             if (msgError) throw msgError;
 
             // Replace optimistic message with real one
             if (sentMsg) {
-                setMessages(prev => prev.map(m =>
-                    m.id === optimisticId ? sentMsg : m
-                ));
+                setMessages(prev => {
+                    // Check if the real message was already added by the subscription
+                    const alreadyExists = prev.some(m => m.id === sentMsg.id);
+                    if (alreadyExists) {
+                        console.log('[Conversation] Message already added by subscription, removing optimistic:', optimisticId);
+                        // If it exists, just remove the optimistic one
+                        return prev.filter(m => m.id !== optimisticId);
+                    }
+                    console.log('[Conversation] Replacing optimistic message with real one:', sentMsg.id);
+                    // Otherwise replace optimistic with real
+                    return prev.map(m => m.id === optimisticId ? sentMsg : m);
+                });
             }
 
             // Update conversation timestamp

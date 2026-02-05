@@ -102,7 +102,7 @@ function ProfileSection() {
             .from('users')
             .select('*')
             .eq('auth0_id', user.sub)
-            .single();
+            .maybeSingle();
 
           if (profileData) setProfile(profileData);
 
@@ -351,7 +351,7 @@ function MessagesSection() {
               .eq('conversation_id', c.id)
               .order('created_at', { ascending: false })
               .limit(1)
-              .single();
+              .maybeSingle();
 
             // Get unread count
             const { count: unread } = await supabase

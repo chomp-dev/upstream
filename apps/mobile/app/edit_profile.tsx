@@ -30,7 +30,7 @@ export default function EditProfileScreen() {
                     .from('users')
                     .select('*')
                     .eq('auth0_id', user.sub)
-                    .single();
+                    .maybeSingle();
 
                 if (error) {
                     console.error('Error fetching profile:', error);

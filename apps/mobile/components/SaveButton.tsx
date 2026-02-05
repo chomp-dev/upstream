@@ -44,7 +44,7 @@ export const SaveButton = ({
                     return;
                 }
 
-                const { data } = await query.single();
+                const { data } = await query.maybeSingle();
                 setIsSaved(!!data);
 
                 // Get total saves count
