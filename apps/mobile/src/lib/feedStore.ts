@@ -30,6 +30,13 @@ export const feedStore = {
     hydrate: async (): Promise<void> => {
         try {
             console.log('[FeedStore] Starting hydration from AsyncStorage...');
+
+            // Check if AsyncStorage is actually available (not on mobile web)
+            if (typeof AsyncStorage?.getItem !== 'function') {
+                console.warn('[FeedStore] AsyncStorage not available on this platform, using memory-only mode');
+                return;
+            }
+
             const data = await AsyncStorage.getItem(FEED_CACHE_KEY);
             if (data) {
                 memoryCache = JSON.parse(data);

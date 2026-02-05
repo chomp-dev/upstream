@@ -494,12 +494,19 @@ export default function CreateScreen() {
           console.log('[Create] Stored image post in navigationStore:', imageDataId);
 
           // Inject into feed so it appears locally
+<<<<<<< HEAD
           try {
             const { feedStore } = require('../../src/lib/feedStore');
             const cachedFeed = await feedStore.getFeed();
             const currentFeed = cachedFeed?.feed || [];
             await feedStore.setFeed([imagePostItem, ...currentFeed], [], 'for-you');
             console.log('[Create] Injected image post into feed');
+=======
+          const { feedStore } = require('../../src/lib/feedStore');
+          const currentFeed = feedStore.getFeed();
+          feedStore.setFeed([imagePostItem, ...currentFeed]);
+          console.log('[Create] Injected image post into feed');
+>>>>>>> parent of 8a57139 (fix: critical async bug in feedStore causing Safari failures + simplify pending UI)
 
             // Store for navigation (declared in outer scope)
             savedImageDataId = imageDataId;
