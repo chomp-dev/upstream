@@ -157,20 +157,34 @@ export default function HomeScreen() {
 
         // OPTIMIZATION: Also hydrate restaurant cache from mapStore
         // This ensures overlays appear instantly without waiting for individual fetches
-        const { mapStore } = require('../../src/lib/mapStore');
-        const mapData = await mapStore.getRestaurants();
-        if (mapData && mapData.restaurants) {
-          const newCache: Record<string, Restaurant> = {};
-          mapData.restaurants.forEach((r: Restaurant) => {
-            if (r.google_place_id) {
-              newCache[r.google_place_id] = r;
-            }
-          });
-          setRestaurantCache(prev => ({ ...prev, ...newCache }));
-          // UNCONDITIONAL LOG for debugging production issues
-          console.log('[Feed] Hydrated restaurant cache from mapStore:', Object.keys(newCache).length, 'items');
+        let mapHydrationSuccess = false;
+        try {
+          const { mapStore } = require('../../src/lib/mapStore');
+          const mapData = await mapStore.getRestaurants();
+
+          if (mapData && mapData.restaurants) {
+            const newCache: Record<string, Restaurant> = {};
+            mapData.restaurants.forEach((r: Restaurant) => {
+              if (r.google_place_id) {
+                newCache[r.google_place_id] = r;
+              }
+            });
+            setRestaurantCache(prev => ({ ...prev, ...newCache }));
+            // UNCONDITIONAL LOG for debugging production issues
+            console.log('[Feed] Hydrated restaurant cache from mapStore:', Object.keys(newCache).length, 'items');
+            mapHydrationSuccess = true;
+          } else {
+            console.log('[Feed] mapStore cache miss/expired - will background fetch');
+          }
+        } catch (err) {
+          console.error('[Feed] Failed to hydrate mapStore:', err);
         }
-        return;
+
+        // Only skip network load if we have both feed AND restaurant data
+        if (mapHydrationSuccess) {
+          return;
+        }
+        console.log('[Feed] Partial cache hit (Feed only) - proceeding to network fetch to repair missing info');
       }
     }
 
