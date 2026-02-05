@@ -20,6 +20,7 @@ interface VideoPlayerProps {
     };
     videoUrl?: string; // Database video_url for social features
     caption?: string; // Title/description to show in overlay
+    userLocation?: { lat: number; lng: number } | null;
 }
 
 // Helper to detect iOS Mobile Web
@@ -34,7 +35,8 @@ export function VideoPlayer({
     restaurant,
     user,
     videoUrl,
-    caption
+    caption,
+    userLocation
 }: VideoPlayerProps) {
     const { width, height } = useContentDimensions();
 

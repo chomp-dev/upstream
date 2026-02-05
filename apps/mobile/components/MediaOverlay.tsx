@@ -22,6 +22,7 @@ interface MediaOverlayProps {
     videoUrl?: string;
     imagePostId?: number;
     title?: string;
+    userLocation?: { lat: number; lng: number } | null;
 }
 
 export function MediaOverlay({
@@ -32,6 +33,7 @@ export function MediaOverlay({
     videoUrl,
     imagePostId,
     title,
+    userLocation,
 }: MediaOverlayProps) {
     const router = useRouter();
     const { user: authUser, supabase, login } = useAuth();
@@ -45,35 +47,46 @@ export function MediaOverlay({
     const [isLiked, setIsLiked] = useState(false);
     const [isSaved, setIsSaved] = useState(false);
 
-    // Calculate distance on mount
+    // Calculate distance on mount (or when location updates)
     useEffect(() => {
         if (!restaurant?.lat || !restaurant?.lng) return;
 
+        const calculateDistance = (lat: number, lng: number) => {
+            const distMeters = getDistanceMeters(
+                lat,
+                lng,
+                restaurant.lat!,
+                restaurant.lng!
+            );
+
+            const distMiles = distMeters * 0.000621371;
+
+            if (distMiles < 0.1) {
+                const distFeet = Math.round(distMeters * 3.28084);
+                setDistance(`${distFeet} ft`);
+            } else {
+                setDistance(`${distMiles.toFixed(1)} mi`);
+            }
+        };
+
+        // Use passed location first (Instant)
+        if (userLocation) {
+            calculateDistance(userLocation.lat, userLocation.lng);
+            return;
+        }
+
+        // Fallback to async fetch if no prop
         (async () => {
             try {
                 const location = await Location.getLastKnownPositionAsync({});
                 if (location) {
-                    const distMeters = getDistanceMeters(
-                        location.coords.latitude,
-                        location.coords.longitude,
-                        restaurant.lat!,
-                        restaurant.lng!
-                    );
-
-                    const distMiles = distMeters * 0.000621371;
-
-                    if (distMiles < 0.1) {
-                        const distFeet = Math.round(distMeters * 3.28084);
-                        setDistance(`${distFeet} ft`);
-                    } else {
-                        setDistance(`${distMiles.toFixed(1)} mi`);
-                    }
+                    calculateDistance(location.coords.latitude, location.coords.longitude);
                 }
             } catch (e) {
                 // Ignore location errors
             }
         })();
-    }, [restaurant]);
+    }, [restaurant, userLocation]);
 
     // Fetch social data
     useEffect(() => {
