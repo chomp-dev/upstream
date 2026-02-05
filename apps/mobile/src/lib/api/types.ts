@@ -9,6 +9,7 @@
 export interface FeedItem {
   id: number;
   type: 'video' | 'image_post' | 'tiktok_embed';
+  video_url?: string; // Primary key for video table - needed for likes/saves
   playback_url?: string;
   thumbnail_url?: string;
   status?: string;
@@ -20,6 +21,7 @@ export interface FeedItem {
   // Shared metadata
   google_place_id?: string | null;
   created_at: string;
+  description?: string;
   // TikTok specific (some overlap)
   tiktok_url?: string;
   embed_html?: string;

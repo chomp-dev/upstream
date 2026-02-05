@@ -468,6 +468,7 @@ const styles = StyleSheet.create({
     actionButton: {
         alignItems: 'center',
         gap: 4,
+        backgroundColor: 'transparent',
     },
     shadowIcon: {
         shadowColor: '#000',
