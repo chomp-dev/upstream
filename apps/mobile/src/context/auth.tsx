@@ -62,7 +62,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
             await clearSession({
                 returnTo: Platform.OS === 'web'
-                    ? 'https://www.usechomp.com/demo'
+                    ? 'https://www.usechomp.com/demo/social'
                     : undefined
             } as any);
             setAccessToken(null);
