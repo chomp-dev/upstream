@@ -297,6 +297,10 @@ export default function CreateScreen() {
       return;
     }
 
+    // Track IDs for navigation
+    let savedPendingId: string | null = null;
+    let savedImageDataId: string | null = null;
+
     try {
       setUploading(true);
       setUploadStatus('Preparing upload...');
