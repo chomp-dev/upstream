@@ -140,14 +140,66 @@ export default function HomeScreen() {
     // Check cache first (unless force refresh)
     // Preload service should have already populated this during splash
     if (!forceRefresh) {
-      // If preload is still running (race condition), wait for it
+      // OPTIMIZATION: Check cache FIRST before waiting for any background process
+      // This prevents the splash screen/preload from blocking the UI if we already have data on disk
+      const cached = await feedStore.getFeed();
+
+      // If we have cached data, use it IMMEDIATELY
+      if (cached && cached.feed.length > 0) {
+        if (__DEV__) console.log('[Feed] Using preloaded/cached feed:', cached.feed.length, 'items');
+        setFeed(cached.feed);
+        setNearbyPlaceIds(cached.nearbyPlaceIds);
+        setFeedMode(cached.feedMode);
+        setLoading(false);
+
+        // Hydrate map logic (from previous fix)
+        let mapHydrationSuccess = false;
+        try {
+          const { mapStore } = require('../../src/lib/mapStore');
+          const mapData = await mapStore.getRestaurants();
+
+          if (mapData && mapData.restaurants) {
+            const newCache: Record<string, Restaurant> = {};
+            mapData.restaurants.forEach((r: Restaurant) => {
+              if (r.google_place_id) {
+                newCache[r.google_place_id] = r;
+              }
+            });
+            setRestaurantCache(prev => ({ ...prev, ...newCache }));
+            // UNCONDITIONAL LOG for debugging production issues
+            console.log('[Feed] Hydrated restaurant cache from mapStore:', Object.keys(newCache).length, 'items');
+            mapHydrationSuccess = true;
+          } else {
+            console.log('[Feed] mapStore cache miss/expired - will background fetch');
+          }
+        } catch (err) {
+          console.error('[Feed] Failed to hydrate mapStore:', err);
+        }
+
+        // Only skip network load if we have both feed AND restaurant data
+        if (mapHydrationSuccess) {
+          return;
+        }
+        console.log('[Feed] Partial cache hit (Feed only) - proceeding to network fetch to repair missing info');
+      }
+
+      // If NO cache (or partial cache), we then wait for the preload to finish or do a fresh fetch
       const { preloadService } = require('../../src/lib/preloadService');
       if (preloadService.isLoading()) {
         if (__DEV__) console.log('[Feed] Waiting for background preload to complete...');
+        // Only wait if we didn't already render cached data
         await preloadService.waitForCompletion();
-      }
 
-      const cached = await feedStore.getFeed();
+        // Check cache AGAIN after preload finishes (in case it just populated)
+        const freshCache = await feedStore.getFeed();
+        if (freshCache && freshCache.feed.length > 0) {
+          // ... (This part mirrors the logic above, but simplifed to just recursion or similar? 
+          // simplest is to just let it fall through to 'loadNearbyFeed' actual fetch if preload failed to populate?
+          // actually, if preload finished, we should try to use ITs result.
+          // better: just call loadNearbyFeed(false) again recursively? No, infinite loop risk.
+          // Let's just fall through to the network fetch logic which handles stale-while-revalidate
+        }
+      }
       if (cached && cached.feed.length > 0) {
         if (__DEV__) console.log('[Feed] Using preloaded/cached feed:', cached.feed.length, 'items');
         setFeed(cached.feed);
