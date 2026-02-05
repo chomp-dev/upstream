@@ -263,7 +263,7 @@ export default function SplashAnimation({
                     <Animated.View style={[styles.progressFill, progressBarStyle]} />
                 </View>
                 {statusText ? (
-                    <Text variant="caption" color="rgba(0,0,0,0.6)" style={styles.statusText}>
+                    <Text variant="caption" color="#eeb57e" style={styles.statusText}>
                         {statusText}
                     </Text>
                 ) : null}
