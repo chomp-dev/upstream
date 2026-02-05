@@ -523,6 +523,7 @@ export default function HomeScreen() {
                       username: item.username || 'User',
                       avatarUrl: item.user_avatar || undefined
                     }}
+                    videoUrl={item.video_url}
                   />
                   {item.status !== 'ready' && (
                     <View style={styles.processingOverlay}>
@@ -568,6 +569,7 @@ export default function HomeScreen() {
                     avatarUrl: item.user_avatar || undefined
                   }}
                   caption={item.title || item.description || ''}
+                  imagePostId={item.id}
                 />
               )}
             </View>

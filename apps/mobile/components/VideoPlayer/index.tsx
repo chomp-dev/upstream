@@ -18,6 +18,7 @@ interface VideoPlayerProps {
         username: string;
         avatarUrl: string;
     };
+    videoUrl?: string; // Database video_url for social features
 }
 
 // Helper to detect iOS Mobile Web
@@ -30,7 +31,8 @@ export function VideoPlayer({
     thumbnailUrl,
     isActive,
     restaurant,
-    user
+    user,
+    videoUrl
 }: VideoPlayerProps) {
     const { width, height } = useContentDimensions();
 
@@ -116,7 +118,7 @@ export function VideoPlayer({
                 </View>
             )}
 
-            <MediaOverlay height={height} restaurant={restaurant} user={user} />
+            <MediaOverlay height={height} restaurant={restaurant} user={user} videoUrl={videoUrl} />
         </TouchableOpacity>
     );
 }
