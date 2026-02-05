@@ -321,11 +321,13 @@ export const CommentSheet = ({ videoUrl, onClose, visible }: CommentSheetProps) 
 
 const styles = StyleSheet.create({
     container: {
-        position: 'absolute',
+        position: Platform.OS === 'web' ? 'fixed' : 'absolute',
         bottom: 0,
         left: 0,
         right: 0,
-        height: '75%', // Taller sheet like Instagram
+        // Web: slightly shorter to avoid browser chrome issues
+        height: Platform.OS === 'web' ? '70vh' : '75%',
+        zIndex: 9999,
         backgroundColor: '#1C1C1E', // Darker background
         borderTopLeftRadius: 16,
         borderTopRightRadius: 16,

@@ -60,15 +60,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 clearInterval(refreshIntervalRef.current);
                 refreshIntervalRef.current = null;
             }
-            await clearSession({
-                clientId: process.env.EXPO_PUBLIC_AUTH0_CLIENT_ID,
-                returnTo: Platform.OS === 'web'
-                    ? (window.location.hostname.includes('usechomp.com')
-                        ? 'https://www.usechomp.com/demo/social'
-                        : `${window.location.origin}/social`)
-                    : undefined
-            } as any);
-            console.log('Logout successful, redirecting to:', Platform.OS === 'web' ? `${window.location.origin}/social` : 'native');
+            if (Platform.OS === 'web') {
+                const domain = "dev-dm0k5l2f2j2qi2g3.us.auth0.com";
+                const clientId = process.env.EXPO_PUBLIC_AUTH0_CLIENT_ID;
+
+                // Determine strictly explicitly where to go
+                const origin = typeof window !== 'undefined' && window.location.origin
+                    ? window.location.origin
+                    : 'https://www.usechomp.com';
+
+                // If on production, force the deep link path to avoid landing page
+                const returnTo = window.location.hostname.includes('usechomp.com')
+                    ? 'https://www.usechomp.com/demo/social'
+                    : `${origin}/social`;
+
+                console.log('[Auth] Manual web logout to:', returnTo);
+
+                // Clear local state first
+                setAccessToken(null);
+                setSupabaseClient(publicSupabase);
+
+                // Construct Auth0 logout URL manually to prevent SDK magic
+                const logoutUrl = `https://${domain}/v2/logout?client_id=${clientId}&returnTo=${encodeURIComponent(returnTo)}`;
+                window.location.href = logoutUrl;
+                return;
+            }
+
+            // Native logout
+            await clearSession();
             setAccessToken(null);
             setSupabaseClient(publicSupabase);
         } catch (e) {
