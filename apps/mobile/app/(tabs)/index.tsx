@@ -202,6 +202,16 @@ export default function HomeScreen() {
       setNearbyPlaceIds(placeIds);
       setNearbyRestaurantCount(nearbyResponse.restaurants.length);
 
+      // OPTIMIZATION: Seed restaurant cache immediately with the data we just got
+      // This prevents the "missing info" delay by avoiding redundant fetches
+      const newCache: Record<string, Restaurant> = {};
+      nearbyResponse.restaurants.forEach(r => {
+        if (r.google_place_id) {
+          newCache[r.google_place_id] = r;
+        }
+      });
+      setRestaurantCache(prev => ({ ...prev, ...newCache }));
+
       if (__DEV__) console.log(`[Feed] Found ${nearbyResponse.restaurants.length} nearby restaurants, checking ${placeIds.length}`);
 
       if (placeIds.length === 0) {
@@ -440,7 +450,10 @@ export default function HomeScreen() {
       if (feed.length > 0 && lastScrolledRef.current !== scrollKey) {
         const targetIndex = parseInt(params.scrollToIndex, 10);
         const itemIndex = feed.findIndex(item => item.id.toString() === params.itemId);
-        const finalIndex = itemIndex >= 0 ? itemIndex : targetIndex;
+
+        // FIX: Do NOT fall back to targetIndex (from Explore grid) if item not found.
+        // Explore grid index does not match Home feed index.
+        const finalIndex = itemIndex;
 
         if (finalIndex >= 0 && finalIndex < feed.length) {
           setTimeout(() => {

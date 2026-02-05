@@ -132,9 +132,15 @@ export default function MapScreen() {
       if (!loc) return;
 
       // Check local cache first (unless force refresh)
-      // Preload service should have already populated this during splash
       if (!isRefresh && !skipCache) {
         const cached = await mapStore.getRestaurants();
+
+        // If we already have data in state (from mount optimization), don't reload
+        if (restaurants.length > 0 && cached) {
+          setLoading(false);
+          return;
+        }
+
         if (cached && cached.restaurants.length > 0) {
           if (__DEV__) console.log('[Map] Using preloaded/cached restaurants:', cached.restaurants.length, 'items');
           setRestaurants(cached.restaurants);
@@ -264,6 +270,34 @@ export default function MapScreen() {
   useEffect(() => {
     let mounted = true;
     (async () => {
+      // OPTIMIZATION: Check cache first to avoid waiting for GPS if we have data
+      const cached = await mapStore.getRestaurants();
+      if (cached && cached.restaurants.length > 0 && mounted) {
+        if (__DEV__) console.log('[Map] Hydrated from cache immediately');
+
+        // Use cached location
+        setLocation({
+          coords: {
+            latitude: cached.lastLocation.lat,
+            longitude: cached.lastLocation.lng,
+            altitude: null,
+            accuracy: null,
+            altitudeAccuracy: null,
+            heading: null,
+            speed: null,
+          },
+          timestamp: cached.lastFetchedAt,
+        } as Location.LocationObject);
+
+        setRestaurants(cached.restaurants);
+        setMediaSummary(cached.mediaSummary);
+        setRadiusIndex(cached.lastRadiusIndex || 2);
+        setCached(true);
+        setLoading(false);
+        return;
+      }
+
+      // If no cache, fallback to fresh load
       const loc = await loadLocation();
       if (loc && mounted) {
         await loadRestaurants(loc, currentRadius);
