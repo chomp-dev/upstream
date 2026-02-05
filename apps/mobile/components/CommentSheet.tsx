@@ -324,8 +324,16 @@ const styles = StyleSheet.create({
     container: {
         position: Platform.OS === 'web' ? 'fixed' : 'absolute',
         bottom: 0,
-        left: 0,
-        right: 0,
+        // On web, center the sheet and constrain to mobile wrapper width
+        ...(Platform.OS === 'web' ? {
+            left: '50%',
+            transform: [{ translateX: '-50%' }],
+            width: '100%',
+            maxWidth: 500,
+        } : {
+            left: 0,
+            right: 0,
+        }),
         // Web: slightly shorter to avoid browser chrome issues
         height: Platform.OS === 'web' ? '70vh' : '75%',
         zIndex: 9999,
