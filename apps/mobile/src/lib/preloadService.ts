@@ -113,7 +113,11 @@ export const preloadService = {
             // Step 2: Get location permission and coords
             setStatus('Getting location permission...');
             onProgress(15);
+
+            console.log('[Preload] Browser:', Platform.OS, 'Requesting location permission...');
             const { status } = await Location.requestForegroundPermissionsAsync();
+            console.log('[Preload] Location permission status:', status);
+
             if (status !== 'granted') {
                 console.log('[Preload] Location denied - will use demo/cached data');
                 setStatus('Location denied');
