@@ -158,11 +158,12 @@ export const CommentSheet = ({ videoUrl, onClose, visible }: CommentSheetProps) 
 
                 {/* Comments List */}
                 {loading ? (
-                    <View style={styles.loadingContainer}>
+                    <View style={[styles.loadingContainer, { flex: 1 }]}>
                         <ActivityIndicator size="large" color="#fff" />
                     </View>
                 ) : (
                     <FlatList
+                        style={{ flex: 1 }}
                         data={comments}
                         keyExtractor={(item) => item.id}
                         renderItem={({ item }) => (
