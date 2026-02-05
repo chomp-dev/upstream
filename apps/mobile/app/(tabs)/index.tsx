@@ -154,6 +154,21 @@ export default function HomeScreen() {
         setNearbyPlaceIds(cached.nearbyPlaceIds);
         setFeedMode(cached.feedMode);
         setLoading(false);
+
+        // OPTIMIZATION: Also hydrate restaurant cache from mapStore
+        // This ensures overlays appear instantly without waiting for individual fetches
+        const { mapStore } = require('../../src/lib/mapStore');
+        const mapData = await mapStore.getRestaurants();
+        if (mapData && mapData.restaurants) {
+          const newCache: Record<string, Restaurant> = {};
+          mapData.restaurants.forEach((r: Restaurant) => {
+            if (r.google_place_id) {
+              newCache[r.google_place_id] = r;
+            }
+          });
+          setRestaurantCache(prev => ({ ...prev, ...newCache }));
+          if (__DEV__) console.log('[Feed] Hydrated restaurant cache from mapStore:', Object.keys(newCache).length, 'items');
+        }
         return;
       }
     }
