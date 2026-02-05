@@ -181,6 +181,13 @@ export default function HomeScreen() {
           const { mapStore } = require('../../src/lib/mapStore');
           const mapData = await mapStore.getRestaurants();
 
+          console.log('[Feed] mapStore.getRestaurants() returned:', {
+            hasData: !!mapData,
+            hasRestaurants: !!mapData?.restaurants,
+            restaurantCount: mapData?.restaurants?.length || 0,
+            firstRestaurant: mapData?.restaurants?.[0]
+          });
+
           if (mapData && mapData.restaurants) {
             const newCache: Record<string, Restaurant> = {};
             mapData.restaurants.forEach((r: Restaurant) => {
@@ -188,6 +195,10 @@ export default function HomeScreen() {
                 newCache[r.google_place_id] = r;
               }
             });
+
+            console.log('[Feed] Built newCache with', Object.keys(newCache).length, 'restaurants');
+            console.log('[Feed] Sample keys:', Object.keys(newCache).slice(0, 3));
+
             setRestaurantCache(prev => {
               const updated = { ...prev, ...newCache };
               console.log('[Feed] setRestaurantCache called - Adding keys:', Object.keys(newCache));
