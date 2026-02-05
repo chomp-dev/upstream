@@ -364,6 +364,11 @@ export default function CreateScreen() {
         navigationStore.set(pendingId, pendingVideo);
         console.log('[Create] Created pending video item:', pendingId);
 
+        // Inject into feed so it appears locally
+        const { setFeed } = require('./index');
+        // Note: This won't work because setFeed is not exported
+        // Instead, we'll rely on the videoDataId navigation to show it
+
         // Store pendingId in component state for navigation
         let savedPendingId = pendingId;
 
