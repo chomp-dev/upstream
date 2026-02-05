@@ -58,6 +58,7 @@ export default function HomeScreen() {
   const [locationAvailable, setLocationAvailable] = useState<boolean>(false);
   const [nearbyRestaurantCount, setNearbyRestaurantCount] = useState(0);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   // ============================================================================
   // Handle videoDataId param (for navigating from profile/explore to specific post)
