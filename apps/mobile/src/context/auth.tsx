@@ -60,10 +60,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 clearInterval(refreshIntervalRef.current);
                 refreshIntervalRef.current = null;
             }
-            // Use SDK clearSession for all platforms - it handles Auth0 logout properly
-            await clearSession();
             setAccessToken(null);
             setSupabaseClient(publicSupabase);
+
+            if (Platform.OS === 'web') {
+                // Construct logout URL with whitelisted returnTo
+                const clientId = process.env.EXPO_PUBLIC_AUTH0_CLIENT_ID;
+                const returnTo = encodeURIComponent('https://www.usechomp.com/demo/social');
+                const logoutUrl = `https://dev-dm0k5l2f2j2qi2g3.us.auth0.com/v2/logout?client_id=${clientId}&returnTo=${returnTo}`;
+                window.location.href = logoutUrl;
+            } else {
+                await clearSession();
+            }
         } catch (e) {
             console.error('Logout failed', e);
         }
