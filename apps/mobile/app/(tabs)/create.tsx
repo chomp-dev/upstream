@@ -369,9 +369,11 @@ export default function CreateScreen() {
         console.log('[Create] Created pending video item:', pendingId);
 
         // Inject into feed so it appears locally
-        const { setFeed } = require('./index');
-        // Note: This won't work because setFeed is not exported
-        // Instead, we'll rely on the videoDataId navigation to show it
+        const { feedStore } = require('../../src/lib/feedStore');
+        const currentFeed = feedStore.getFeed();
+        // Add pending video at the top of the feed
+        feedStore.setFeed([pendingVideo, ...currentFeed]);
+        console.log('[Create] Injected pending video into feed');
 
         // Store pendingId in component state for navigation
         let savedPendingId = pendingId;
@@ -472,13 +474,21 @@ export default function CreateScreen() {
         if (insertedPost) {
           const imageDataId = `image-${Date.now()}`;
           const { navigationStore } = require('../../src/lib/navigationStore');
-          navigationStore.set(imageDataId, {
+          const imagePostItem = {
             ...insertedPost,
             type: 'image',
             username: user?.user_metadata?.username || user?.name || 'You',
             user_avatar: user?.user_metadata?.avatar_url || user?.picture,
-          });
+          };
+          navigationStore.set(imageDataId, imagePostItem);
           console.log('[Create] Stored image post in navigationStore:', imageDataId);
+
+          // Inject into feed so it appears locally
+          const { feedStore } = require('../../src/lib/feedStore');
+          const currentFeed = feedStore.getFeed();
+          feedStore.setFeed([imagePostItem, ...currentFeed]);
+          console.log('[Create] Injected image post into feed');
+
           // Store for navigation (declared in outer scope)
           savedImageDataId = imageDataId;
         }
