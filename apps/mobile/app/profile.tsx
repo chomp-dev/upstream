@@ -89,10 +89,22 @@ export default function ProfileScreen() {
                     const combinedPosts: PostItem[] = [];
 
                     if (videoData) {
-                        combinedPosts.push(...videoData.map((v: any) => ({ ...v, type: 'video' })));
+                        combinedPosts.push(...videoData.map((v: any) => ({
+                            ...v,
+                            type: 'video',
+                            username: userData?.name || 'User',
+                            user_avatar: userData?.avatar,
+                            user_id: targetUserId
+                        })));
                     }
                     if (imageData) {
-                        combinedPosts.push(...imageData.map((i: any) => ({ ...i, type: 'image' })));
+                        combinedPosts.push(...imageData.map((i: any) => ({
+                            ...i,
+                            type: 'image',
+                            username: userData?.name || 'User',
+                            user_avatar: userData?.avatar,
+                            user_id: targetUserId
+                        })));
                     }
 
                     // Sort by created_at desc
