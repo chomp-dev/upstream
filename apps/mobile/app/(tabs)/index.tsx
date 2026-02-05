@@ -152,6 +152,15 @@ export default function HomeScreen() {
 
     handleExploreNavigation();
   }, [params.videoDataId]);  // FIX: Removed feed.length to prevent infinite loop
+
+  // ============================================================================
+  // Load nearby feed on mount
+  // ============================================================================
+  useEffect(() => {
+    console.log('[Feed] Component mounted - triggering loadNearbyFeed');
+    loadNearbyFeed();
+  }, []); // Empty deps = run once on mount
+
   // ============================================================================
   // Location & Nearby Feed Logic
   // ============================================================================
