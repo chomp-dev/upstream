@@ -357,12 +357,12 @@ const styles = StyleSheet.create({
     metaContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 16,
         marginTop: 2,
     },
     metaText: {
         color: '#8E8E93',
         fontSize: 12,
+        marginRight: 16,
     },
     metaTextReply: {
         color: '#8E8E93',

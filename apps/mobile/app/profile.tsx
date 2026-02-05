@@ -214,7 +214,7 @@ export default function ProfileScreen() {
                         <TouchableOpacity style={styles.editProfileButton} onPress={() => router.push('/edit_profile')}>
                             <Text variant="caption" color={colors.bg}>Edit Profile</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.logoutButton} onPress={() => { logout(); router.replace('/'); }}>
+                        <TouchableOpacity style={styles.logoutButton} onPress={logout}>
                             <Text variant="caption" color={colors.muted}>Log Out</Text>
                         </TouchableOpacity>
                     </View>
