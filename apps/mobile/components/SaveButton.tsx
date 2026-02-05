@@ -19,7 +19,7 @@ export const SaveButton = ({
     showCount = true,
     style
 }: SaveButtonProps) => {
-    const { user, supabase } = useAuth();
+    const { user, supabase, login } = useAuth();
     const [isSaved, setIsSaved] = useState(false);
     const [savesCount, setSavesCount] = useState(0);
     const [loading, setLoading] = useState(false);
@@ -70,7 +70,7 @@ export const SaveButton = ({
 
     const toggleSave = async () => {
         if (!user) {
-            Alert.alert('Sign In Required', 'Please sign in to save posts.');
+            login();
             return;
         }
 

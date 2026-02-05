@@ -33,7 +33,7 @@ interface CommentSheetProps {
 }
 
 export const CommentSheet = ({ videoUrl, onClose, visible }: CommentSheetProps) => {
-    const { user, supabase } = useAuth();
+    const { user, supabase, login } = useAuth();
     const [comments, setComments] = useState<Comment[]>([]);
     const [newComment, setNewComment] = useState('');
     const [loading, setLoading] = useState(false);
@@ -238,9 +238,11 @@ export const CommentSheet = ({ videoUrl, onClose, visible }: CommentSheetProps) 
                             </TouchableOpacity>
                         </>
                     ) : (
-                        <Text variant="body" color={colors.muted} style={styles.loginHint}>
-                            Sign in to comment
-                        </Text>
+                        <TouchableOpacity onPress={login} style={styles.loginHint}>
+                            <Text variant="body" color={colors.muted}>
+                                Sign in to comment
+                            </Text>
+                        </TouchableOpacity>
                     )}
                 </View>
             </KeyboardAvoidingView>

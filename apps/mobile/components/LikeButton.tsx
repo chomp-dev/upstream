@@ -3,7 +3,7 @@ import { TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { useAuth } from '../src/context/auth';
 
 export const LikeButton = ({ videoUrl }: { videoUrl: string }) => {
-    const { user, supabase: authSupabase } = useAuth();
+    const { user, supabase: authSupabase, login } = useAuth();
     const [likesCount, setLikesCount] = useState(0);
     const [isLiked, setIsLiked] = useState(false);
 
@@ -38,7 +38,10 @@ export const LikeButton = ({ videoUrl }: { videoUrl: string }) => {
     }, [videoUrl, user]);
 
     const toggleLike = async () => {
-        if (!user) return; // Or show login prompt
+        if (!user) {
+            login();
+            return;
+        }
 
         const previousLiked = isLiked;
         const previousCount = likesCount;

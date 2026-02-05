@@ -31,7 +31,7 @@ interface PostItem {
 import { navigationStore } from '../src/lib/navigationStore';
 
 export default function ProfileScreen() {
-    const { user, logout, supabase } = useAuth();
+    const { user, logout, supabase, login } = useAuth();
     const { userId } = useLocalSearchParams();
     const targetUserId = typeof userId === 'string' ? userId : user?.sub;
     const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -138,7 +138,11 @@ export default function ProfileScreen() {
     );
 
     const handleFollowToggle = async () => {
-        if (!user || !targetUserId || followLoading) return;
+        if (!user) {
+            login();
+            return;
+        }
+        if (!targetUserId || followLoading) return;
 
         const previousFollowing = isFollowing;
         const previousCount = followersCount;
@@ -214,7 +218,7 @@ export default function ProfileScreen() {
                             <Text variant="caption" color={colors.muted}>Log Out</Text>
                         </TouchableOpacity>
                     </View>
-                ) : user && (
+                ) : (
                     <View style={styles.actionButtonsRow}>
                         <TouchableOpacity
                             style={[styles.followButton, isFollowing && styles.followingButton]}
@@ -227,7 +231,13 @@ export default function ProfileScreen() {
                         </TouchableOpacity>
                         <TouchableOpacity
                             style={styles.messageButton}
-                            onPress={() => router.push({ pathname: '/conversation', params: { userId: targetUserId } })}
+                            onPress={() => {
+                                if (!user) {
+                                    login();
+                                    return;
+                                }
+                                router.push({ pathname: '/conversation', params: { userId: targetUserId } });
+                            }}
                         >
                             <Ionicons name="chatbubble-outline" size={18} color={colors.text} />
                         </TouchableOpacity>

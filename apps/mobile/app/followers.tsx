@@ -22,7 +22,7 @@ type TabType = 'followers' | 'following';
 
 export default function FollowersScreen() {
     const router = useRouter();
-    const { user, supabase } = useAuth();
+    const { user, supabase, login } = useAuth();
     const { userId, tab } = useLocalSearchParams<{ userId: string; tab: string }>();
     const [activeTab, setActiveTab] = useState<TabType>((tab as TabType) || 'followers');
     const [users, setUsers] = useState<UserItem[]>([]);
@@ -105,7 +105,10 @@ export default function FollowersScreen() {
     }, [users, user, supabase]);
 
     const handleFollow = async (targetUserId: string) => {
-        if (!user) return;
+        if (!user) {
+            login();
+            return;
+        }
 
         const isCurrentlyFollowing = followingMap[targetUserId];
 
@@ -162,7 +165,7 @@ export default function FollowersScreen() {
                         <Text variant="caption" color={colors.muted} numberOfLines={1}>{item.bio}</Text>
                     )}
                 </View>
-                {!isOwnProfile && user && (
+                {(!isOwnProfile || !user) && (
                     <TouchableOpacity
                         style={[styles.followButton, isFollowing && styles.followingButton]}
                         onPress={() => handleFollow(item.auth0_id)}
