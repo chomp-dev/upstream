@@ -3,6 +3,7 @@
  * Loads feed and map data in parallel for instant navigation
  */
 
+import { Platform } from 'react-native';
 import * as Location from 'expo-location';
 import { feedStore } from './feedStore';
 import { mapStore } from './mapStore';
@@ -97,6 +98,14 @@ export const preloadService = {
             // Check if we have valid cached data
             const cachedFeed = await feedStore.getFeed();
             const cachedMap = await mapStore.getRestaurants();
+
+            console.log('[Preload] Cache check:', {
+                hasCachedFeed: !!cachedFeed,
+                feedLength: cachedFeed?.feed?.length || 0,
+                hasCachedMap: !!cachedMap,
+                mapLength: cachedMap?.restaurants?.length || 0,
+                shouldRefetch: feedStore.shouldRefetch()
+            });
 
             if (cachedFeed && cachedMap && !feedStore.shouldRefetch()) {
                 console.log('[Preload] Using cached data - feed:', cachedFeed.feed.length, 'items, map:', cachedMap.restaurants.length, 'restaurants');
