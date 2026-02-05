@@ -253,6 +253,13 @@ export default function HomeScreen() {
         console.log('[Feed] Partial cache hit (Feed only) - proceeding to network fetch to repair missing info');
       }
 
+      // FIX: Check if we're showing a specific video AFTER cache hydration
+      // This allows restaurant cache to load even when navigating to pending videos
+      if (params.videoDataId) {
+        console.log('[Feed] Showing specific video, skipping network fetch but cache is hydrated');
+        return;
+      }
+
       // If NO cache (or partial cache), we then wait for the preload to finish or do a fresh fetch
       const { preloadService } = require('../../src/lib/preloadService');
       if (preloadService.isLoading()) {
