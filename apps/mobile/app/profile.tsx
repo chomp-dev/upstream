@@ -324,6 +324,10 @@ export default function ProfileScreen() {
             <FlatList
                 data={posts}
                 keyExtractor={(item) => `${item.type}-${item.id}`}
+                // Performance optimizations
+                windowSize={10}
+                maxToRenderPerBatch={6}
+                removeClippedSubviews={true}
                 renderItem={({ item, index }) => {
                     const handlePress = () => {
                         // Navigation similar to explore.tsx
