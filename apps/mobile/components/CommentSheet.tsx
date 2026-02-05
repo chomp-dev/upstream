@@ -222,14 +222,10 @@ export const CommentSheet = ({ videoUrl, onClose, visible }: CommentSheetProps) 
                 )}
 
                 {/* Input Area */}
-                <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                    keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-                >
+                {Platform.OS === 'web' ? (
                     <View style={styles.inputContainer}>
                         {user ? (
                             <>
-                                {/* Current User Avatar in Input */}
                                 <Image
                                     source={{ uri: user.picture }}
                                     style={styles.inputAvatar}
@@ -269,7 +265,55 @@ export const CommentSheet = ({ videoUrl, onClose, visible }: CommentSheetProps) 
                             </TouchableOpacity>
                         )}
                     </View>
-                </KeyboardAvoidingView>
+                ) : (
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+                    >
+                        <View style={styles.inputContainer}>
+                            {user ? (
+                                <>
+                                    <Image
+                                        source={{ uri: user.picture }}
+                                        style={styles.inputAvatar}
+                                    />
+                                    <View style={styles.inputWrapper}>
+                                        <TextInput
+                                            style={styles.input}
+                                            value={newComment}
+                                            onChangeText={setNewComment}
+                                            placeholder={`Add a comment for ${user.name?.split(' ')[0] || '...'}`}
+                                            placeholderTextColor="#8E8E93"
+                                            multiline
+                                            maxLength={500}
+                                        />
+                                        <TouchableOpacity
+                                            style={[styles.sendButton, !newComment.trim() && styles.sendButtonDisabled]}
+                                            onPress={postComment}
+                                            disabled={!newComment.trim() || posting}
+                                        >
+                                            {posting ? (
+                                                <ActivityIndicator size="small" color={colors.primary} />
+                                            ) : (
+                                                <Ionicons
+                                                    name="arrow-up-circle"
+                                                    size={28}
+                                                    color={newComment.trim() ? colors.primary : "#555"}
+                                                />
+                                            )}
+                                        </TouchableOpacity>
+                                    </View>
+                                </>
+                            ) : (
+                                <TouchableOpacity onPress={login} style={styles.loginHint} activeOpacity={0.7}>
+                                    <Text variant="body" style={{ color: colors.primary, fontWeight: '600' }}>
+                                        Log in to comment
+                                    </Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                    </KeyboardAvoidingView>
+                )}
             </View>
         </TouchableWithoutFeedback>
     );

@@ -61,10 +61,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 refreshIntervalRef.current = null;
             }
             await clearSession({
+                clientId: process.env.EXPO_PUBLIC_AUTH0_CLIENT_ID,
                 returnTo: Platform.OS === 'web'
-                    ? 'https://www.usechomp.com/demo/social'
+                    ? `${window.location.origin}/social`
                     : undefined
             } as any);
+            console.log('Logout successful, redirecting to:', Platform.OS === 'web' ? `${window.location.origin}/social` : 'native');
             setAccessToken(null);
             setSupabaseClient(publicSupabase);
         } catch (e) {
