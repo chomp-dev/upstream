@@ -416,7 +416,7 @@ export default function CreateScreen() {
             title: title.trim(),
             description: description.trim(),
             tags: tagArray, // Assuming backend accepts text array
-            user_id: user?.sub
+            user_id: user?.id || user?.sub  // FIX: Use Supabase user ID for RLS compatibility
           })
           .select();
 
