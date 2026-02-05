@@ -363,11 +363,11 @@ export default function ProfileScreen() {
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
                         <View style={styles.emptyIconContainer}>
-                            <Ionicons name="camera-outline" size={48} color={colors.muted} />
+                            <Ionicons name="grid-outline" size={40} color={colors.text} />
                         </View>
-                        <Text variant="body" color={colors.text} style={{ marginTop: spacing.md }}>No posts yet</Text>
-                        <Text variant="caption" color={colors.muted} style={{ marginTop: spacing.xs }}>
-                            Share your first food discovery!
+                        <Text variant="title" style={{ marginTop: spacing.sm, fontSize: 18 }}>No Posts Yet</Text>
+                        <Text variant="bodySmall" color={colors.muted} style={{ marginTop: 4, textAlign: 'center' }}>
+                            Your posted photos and videos will{'\n'}appear here.
                         </Text>
                     </View>
                 }
@@ -544,9 +544,11 @@ const styles = StyleSheet.create({
         width: 80,
         height: 80,
         borderRadius: 40,
-        backgroundColor: colors.surface,
+        borderWidth: 1.5,
+        borderColor: colors.text, // or colors.border
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: spacing.sm,
+        // Remove background color for outlined look
     },
 });
