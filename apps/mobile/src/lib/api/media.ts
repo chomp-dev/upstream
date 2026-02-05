@@ -190,8 +190,16 @@ export async function uploadImageToCloudflare(
 ): Promise<void> {
   const formData = new FormData();
 
+  // Detect mobile Safari
+  const isMobileSafari = Platform.OS === 'web' &&
+    typeof navigator !== 'undefined' &&
+    /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
   console.log('[Upload] Starting image upload...');
-  console.log('[Upload] Platform:', Platform.OS, 'URI:', imageUri);
+  console.log('[Upload] Platform:', Platform.OS);
+  console.log('[Upload] Is Mobile Safari:', isMobileSafari);
+  console.log('[Upload] Image URI:', imageUri);
+  console.log('[Upload] Upload URL:', uploadUrl);
 
   try {
     if (Platform.OS === 'web') {
