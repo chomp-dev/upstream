@@ -46,8 +46,8 @@ export function VideoPlayer({
     // We only create the player if we have a playbackUrl
     const player = useVideoPlayer(playbackUrl ?? '', (player) => {
         player.loop = true;
-        // Mute on Web to allow autoplay
-        player.muted = Platform.OS === 'web';
+        // Start with audio enabled for better UX
+        player.muted = false;
 
         // On web we might want to start paused
         if (isActive) {
