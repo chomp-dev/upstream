@@ -188,51 +188,87 @@ export async function uploadImageToCloudflare(
   uploadUrl: string,
   imageUri: string
 ): Promise<void> {
-  // Create form data with the image
   const formData = new FormData();
 
-  console.log('[Upload] Starting image upload (V2)...');
+  console.log('[Upload] Starting image upload...');
+  console.log('[Upload] Platform:', Platform.OS, 'URI:', imageUri);
 
-  // For React Native (Mobile), we use the { uri, name, type } object
-  // For Web, we must fetch the blob and append it directly
-  if (Platform.OS === 'web') {
-    console.log('[Upload] Web detected, fetching blob from:', imageUri);
-    try {
-      const blob = await fetch(imageUri).then(r => r.blob());
-      console.log('[Upload] Blob created:', blob.size, blob.type);
-      formData.append('file', blob, 'image.jpg');
-    } catch (e) {
-      console.error('[Upload] Failed to create blob:', e);
-      throw e;
+  try {
+    if (Platform.OS === 'web') {
+      // Web platform (includes Safari on macOS and iOS)
+      console.log('[Upload] Web/Safari detected, fetching blob...');
+
+      // Safari fix: Fetch blob immediately before it expires
+      const response = await fetch(imageUri);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch image: ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      console.log('[Upload] Blob fetched:', blob.size, 'bytes, type:', blob.type);
+
+      // Safari fix: Ensure proper MIME type
+      const mimeType = blob.type || 'image/jpeg';
+      const extension = mimeType.split('/')[1] || 'jpg';
+      const filename = `image.${extension}`;
+
+      // Safari fix: Create new Blob with explicit type if missing
+      const finalBlob = blob.type ? blob : new Blob([blob], { type: 'image/jpeg' });
+
+      formData.append('file', finalBlob, filename);
+      console.log('[Upload] FormData prepared with blob as:', filename);
+    } else {
+      // Native iOS/Android
+      console.log('[Upload] Native platform, using URI directly');
+      const filename = imageUri.split('/').pop() || 'image.jpg';
+      const extension = filename.split('.').pop()?.toLowerCase() || 'jpg';
+
+      // Proper MIME type detection
+      const mimeTypes: { [key: string]: string } = {
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'gif': 'image/gif',
+        'webp': 'image/webp',
+        'heic': 'image/heic',
+      };
+      const mimeType = mimeTypes[extension] || 'image/jpeg';
+
+      formData.append('file', {
+        uri: imageUri,
+        name: filename,
+        type: mimeType,
+      } as any);
+
+      console.log('[Upload] FormData prepared:', { filename, mimeType });
     }
-  } else {
-    // Native (iOS/Android)
-    const filename = imageUri.split('/').pop() || 'image.jpg';
-    const match = /\.(\w+)$/.exec(filename);
-    const type = match ? `image/${match[1]}` : 'image/jpeg';
 
-    formData.append('file', {
-      uri: imageUri,
-      name: filename,
-      type,
-    } as any);
+    console.log('[Upload] Uploading to Cloudflare...');
+
+    const uploadResponse = await fetch(uploadUrl, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+
+    console.log('[Upload] Response status:', uploadResponse.status);
+
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text();
+      console.error('[Upload] Upload failed:', errorText);
+      throw new Error(`Upload failed (${uploadResponse.status}): ${errorText}`);
+    }
+
+    const result = await uploadResponse.json();
+    console.log('[Upload] Upload successful:', result);
+
+  } catch (error) {
+    console.error('[Upload] Error during image upload:', error);
+    throw new Error(`Image upload failed: ${(error as Error).message}`);
   }
-
-  console.log('[Upload] Sending to Cloudflare:', uploadUrl);
-
-  const response = await fetch(uploadUrl, {
-    method: 'POST',
-    body: formData,
-    headers: {
-      'Accept': 'application/json',
-    },
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    console.error('[Upload] Cloudflare upload failed:', text);
-    throw new Error('Failed to upload image to Cloudflare');
-  }
+}
 }
 
 /**
