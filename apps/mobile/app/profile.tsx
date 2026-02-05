@@ -362,7 +362,13 @@ export default function ProfileScreen() {
                 ListHeaderComponent={renderProfileHeader}
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
-                        <Text variant="bodySmall" color={colors.muted}>No posts yet</Text>
+                        <View style={styles.emptyIconContainer}>
+                            <Ionicons name="camera-outline" size={48} color={colors.muted} />
+                        </View>
+                        <Text variant="body" color={colors.text} style={{ marginTop: spacing.md }}>No posts yet</Text>
+                        <Text variant="caption" color={colors.muted} style={{ marginTop: spacing.xs }}>
+                            Share your first food discovery!
+                        </Text>
                     </View>
                 }
                 contentContainerStyle={styles.content}
@@ -531,6 +537,16 @@ const styles = StyleSheet.create({
     },
     emptyContainer: {
         alignItems: 'center',
-        marginTop: spacing.xl,
+        marginTop: spacing.xxl,
+        paddingBottom: spacing.xxl,
+    },
+    emptyIconContainer: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: colors.surface,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: spacing.sm,
     },
 });

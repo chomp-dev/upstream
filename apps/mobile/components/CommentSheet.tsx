@@ -143,8 +143,6 @@ export const CommentSheet = ({ videoUrl, onClose, visible }: CommentSheetProps) 
 
     if (!visible) return null;
 
-
-
     return (
         <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
             <View style={styles.container} onStartShouldSetResponder={() => true} onMoveShouldSetResponder={() => true} onTouchEnd={(e) => e.stopPropagation()}>
@@ -252,117 +250,118 @@ export const CommentSheet = ({ videoUrl, onClose, visible }: CommentSheetProps) 
                     </View>
                 </KeyboardAvoidingView>
             </View>
-            );
+        </TouchableWithoutFeedback>
+    );
 };
 
-            const styles = StyleSheet.create({
-                container: {
-                position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: '60%',
-            backgroundColor: colors.card,
-            borderTopLeftRadius: radius.xl,
-            borderTopRightRadius: radius.xl,
-            overflow: 'hidden',
+const styles = StyleSheet.create({
+    container: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: '60%',
+        backgroundColor: colors.card,
+        borderTopLeftRadius: radius.xl,
+        borderTopRightRadius: radius.xl,
+        overflow: 'hidden',
     },
-            touchTrap: {
-                flex: 1,
+    touchTrap: {
+        flex: 1,
     },
-            header: {
-                flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            paddingVertical: spacing.md,
-            borderBottomWidth: 1,
-            borderBottomColor: colors.border,
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: spacing.md,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
     },
-            title: {
-                flex: 1,
-            textAlign: 'center',
+    title: {
+        flex: 1,
+        textAlign: 'center',
     },
-            closeButton: {
-                position: 'absolute',
-            right: spacing.md,
-            padding: spacing.xs,
+    closeButton: {
+        position: 'absolute',
+        right: spacing.md,
+        padding: spacing.xs,
     },
-            loadingContainer: {
-                flex: 1,
-            justifyContent: 'center',
-            alignItems: 'center',
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
-            listContent: {
-                padding: spacing.md,
+    listContent: {
+        padding: spacing.md,
     },
-            commentItem: {
-                flexDirection: 'row',
-            marginBottom: spacing.md,
+    commentItem: {
+        flexDirection: 'row',
+        marginBottom: spacing.md,
     },
-            avatar: {
-                width: 36,
-            height: 36,
-            borderRadius: 18,
-            marginRight: spacing.sm,
+    avatar: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        marginRight: spacing.sm,
     },
-            avatarPlaceholder: {
-                backgroundColor: colors.surface,
-            justifyContent: 'center',
-            alignItems: 'center',
+    avatarPlaceholder: {
+        backgroundColor: colors.surface,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
-            avatarInitial: {
-                color: colors.text,
-            fontWeight: '600',
-            fontSize: 14,
+    avatarInitial: {
+        color: colors.text,
+        fontWeight: '600',
+        fontSize: 14,
     },
-            commentContent: {
-                flex: 1,
+    commentContent: {
+        flex: 1,
     },
-            commentHeader: {
-                flexDirection: 'row',
-            alignItems: 'center',
-            gap: spacing.sm,
-            marginBottom: 2,
+    commentHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
+        marginBottom: 2,
     },
-            username: {
-                fontWeight: '600',
-            color: colors.text,
+    username: {
+        fontWeight: '600',
+        color: colors.text,
     },
-            commentText: {
-                color: colors.text,
+    commentText: {
+        color: colors.text,
     },
-            emptyContainer: {
-                paddingVertical: spacing.xxl,
-            alignItems: 'center',
-            gap: spacing.xs,
+    emptyContainer: {
+        paddingVertical: spacing.xxl,
+        alignItems: 'center',
+        gap: spacing.xs,
     },
-            inputContainer: {
-                flexDirection: 'row',
-            alignItems: 'center',
-            padding: spacing.md,
-            borderTopWidth: 1,
-            borderTopColor: colors.border,
-            backgroundColor: colors.surface,
+    inputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: spacing.md,
+        borderTopWidth: 1,
+        borderTopColor: colors.border,
+        backgroundColor: colors.surface,
     },
-            input: {
-                flex: 1,
-            backgroundColor: colors.bg,
-            borderRadius: radius.pill,
-            paddingHorizontal: spacing.md,
-            paddingVertical: spacing.sm,
-            color: colors.text,
-            maxHeight: 100,
+    input: {
+        flex: 1,
+        backgroundColor: colors.bg,
+        borderRadius: radius.pill,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        color: colors.text,
+        maxHeight: 100,
     },
-            sendButton: {
-                marginLeft: spacing.sm,
-            padding: spacing.sm,
+    sendButton: {
+        marginLeft: spacing.sm,
+        padding: spacing.sm,
     },
-            sendButtonDisabled: {
-                opacity: 0.5,
+    sendButtonDisabled: {
+        opacity: 0.5,
     },
-            loginHint: {
-                flex: 1,
-            textAlign: 'center',
-            paddingVertical: spacing.sm,
+    loginHint: {
+        flex: 1,
+        textAlign: 'center',
+        paddingVertical: spacing.sm,
     },
 });
