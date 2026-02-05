@@ -22,6 +22,7 @@ import { useAuth } from '../src/context/auth';
 
 interface Message {
     id: string;
+    conversation_id: string;
     sender_id: string;
     content: string;
     created_at: string;
@@ -143,6 +144,20 @@ export default function ConversationScreen() {
         setNewMessage('');
         setSending(true);
 
+        // Create optimistic message for immediate display
+        const optimisticId = `temp-${Date.now()}`;
+        const optimisticMessage: Message = {
+            id: optimisticId,
+            conversation_id: conversationId || '',
+            sender_id: user.sub,
+            content: messageText,
+            created_at: new Date().toISOString(),
+            read_at: undefined,
+        };
+
+        // Add optimistic message immediately
+        setMessages(prev => [...prev, optimisticMessage]);
+
         try {
             let convId = conversationId;
 
@@ -164,15 +179,24 @@ export default function ConversationScreen() {
             }
 
             // Send message
-            const { error: msgError } = await supabase
+            const { data: sentMsg, error: msgError } = await supabase
                 .from('messages')
                 .insert({
                     conversation_id: convId,
                     sender_id: user.sub,
                     content: messageText,
-                });
+                })
+                .select()
+                .single();
 
             if (msgError) throw msgError;
+
+            // Replace optimistic message with real one
+            if (sentMsg) {
+                setMessages(prev => prev.map(m =>
+                    m.id === optimisticId ? sentMsg : m
+                ));
+            }
 
             // Update conversation timestamp
             await supabase
@@ -182,6 +206,8 @@ export default function ConversationScreen() {
 
         } catch (err) {
             console.error('Error sending message:', err);
+            // Remove optimistic message on error
+            setMessages(prev => prev.filter(m => m.id !== optimisticId));
             setNewMessage(messageText); // Restore on error
         } finally {
             setSending(false);
