@@ -217,7 +217,7 @@ feedRouter.get('/nearby', async (req, res) => {
     // Fetch videos linked to nearby restaurants - exclude error/deleted videos
     // Fetch videos linked to nearby restaurants - exclude error/deleted videos
     const videosResult = await queryWithRetry(
-      `SELECT v.id, v.cloudflare_video_id, v.playback_url, v.playback_url as video_url, v.thumbnail_url, 
+      `SELECT v.id, v.cloudflare_video_id, v.video_url, v.playback_url, v.thumbnail_url, 
               v.status, v.duration, v.google_place_id, v.created_at,
               u.name as username, u.avatar as user_avatar, u.auth0_id as user_id
        FROM videos v
@@ -379,7 +379,7 @@ feedRouter.get('/', async (req, res) => {
     // Fetch videos - exclude error/deleted videos
     // Fetch videos - exclude error/deleted videos
     let videosResult = await queryWithRetry(
-      `SELECT v.id, v.cloudflare_video_id, v.playback_url, v.playback_url as video_url, v.thumbnail_url, 
+      `SELECT v.id, v.cloudflare_video_id, v.video_url, v.playback_url, v.thumbnail_url, 
               v.status, v.duration, v.google_place_id, v.created_at,
               u.name as username, u.avatar as user_avatar, u.auth0_id as user_id
        FROM videos v
