@@ -167,7 +167,8 @@ export default function HomeScreen() {
             }
           });
           setRestaurantCache(prev => ({ ...prev, ...newCache }));
-          if (__DEV__) console.log('[Feed] Hydrated restaurant cache from mapStore:', Object.keys(newCache).length, 'items');
+          // UNCONDITIONAL LOG for debugging production issues
+          console.log('[Feed] Hydrated restaurant cache from mapStore:', Object.keys(newCache).length, 'items');
         }
         return;
       }
@@ -480,20 +481,25 @@ export default function HomeScreen() {
           }, 100);
           lastScrolledRef.current = scrollKey;
         } else if (params.videoDataId) {
-          // If not found in feed but we have explicit video data, let the logic below handle it
-          if (__DEV__) console.log('[Feed] Deep link item not in current feed, relaying on injection logic');
+          // If not found in feed but we have explicit video data, let the logic above handle injection
+          if (__DEV__) console.log('[Feed] Deep link item not in current feed, relying on injection logic');
         }
+        lastScrolledRef.current = scrollKey;
+      } else if (params.videoDataId) {
+        // If not found in feed but we have explicit video data, let the logic below handle it
+        if (__DEV__) console.log('[Feed] Deep link item not in current feed, relaying on injection logic');
       }
-      setTimeout(() => {
-        flatListRef.current?.scrollToIndex({
-          index: finalIndex,
-          animated: false,
-        });
-        setCurrentIndex(finalIndex);
-      }, 100);
-
-      lastScrolledRef.current = scrollKey;
     }
+    setTimeout(() => {
+      flatListRef.current?.scrollToIndex({
+        index: finalIndex,
+        animated: false,
+      });
+      setCurrentIndex(finalIndex);
+    }, 100);
+
+    lastScrolledRef.current = scrollKey;
+  }
   }
     }
   }, [params.scrollToIndex, params.itemId, params.videoDataId, feed, loading]);
