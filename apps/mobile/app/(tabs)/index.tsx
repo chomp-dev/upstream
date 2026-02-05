@@ -598,6 +598,7 @@ export default function HomeScreen() {
 
       <FlatList
         ref={flatListRef}
+        extraData={restaurantCache} // FORCE UPDATE when cache changes
         data={feed}
         keyExtractor={(item) => `${item.type}-${item.id}`}
         refreshing={loading}
