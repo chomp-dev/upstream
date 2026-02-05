@@ -70,11 +70,10 @@ export function VideoPlayer({
                 // Only play if app is active
                 if (AppState.currentState === 'active') {
                     if (!player.playing) {
-                        // Catch AbortError if play() is interrupted
-                        try {
-                            player.play();
-                        } catch (e) {
-                            // Ignore AbortError
+                        // Handle Web Promise rejection (AbortError)
+                        const result = player.play() as any;
+                        if (result && typeof result.catch === 'function') {
+                            result.catch(() => { });
                         }
                     }
                 } else {

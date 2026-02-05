@@ -138,6 +138,7 @@ export const preloadService = {
             // If no last known position or it's too old (>5 mins), get fresh
             if (!location || (Date.now() - location.timestamp) > 5 * 60 * 1000) {
                 console.log('[Preload] Last known location missing or stale, getting fresh...');
+                const locStart = Date.now();
                 // Optimization: Add timeout to prevent hanging indefinitely
                 try {
                     location = await Promise.race([
@@ -150,6 +151,7 @@ export const preloadService = {
                     console.log('[Preload] Location fetch failed/timed out');
                     location = null;
                 }
+                console.log(`[Preload] Location fetch took ${Date.now() - locStart}ms`);
             } else {
                 console.log('[Preload] Using last known location (fast)');
             }
@@ -176,18 +178,20 @@ export const preloadService = {
             onProgress(30);
 
             // Step 3: Fetch nearby restaurants (shared between feed and map)
+            const searchStart = Date.now();
             const nearbyResponse = await searchApi.searchNearby(
                 latitude,
                 longitude,
                 NEARBY_RADIUS,
                 60 // Optimized to 60 (matches feed max + small buffer) for speed
             );
+            console.log(`[Preload] Nearby search took ${Date.now() - searchStart}ms. Found ${nearbyResponse.restaurants.length}`);
 
-            console.log(`[Preload] Found ${nearbyResponse.restaurants.length} nearby restaurants`);
             setStatus('Loading content...');
             onProgress(50);
 
             // Step 4: Load feed and map data in parallel
+            const contentStart = Date.now();
             const placeIds = nearbyResponse.restaurants.map(r => r.google_place_id);
             const limitedPlaceIds = placeIds.slice(0, 50); // Limit for feed
 
@@ -197,6 +201,7 @@ export const preloadService = {
                     if (limitedPlaceIds.length === 0) return { feed: [], raw: 0 };
 
                     // Fetch all chunks in parallel for speed
+                    const chunkStart = Date.now();
                     const CHUNK_SIZE = 10;
                     const chunks = [];
                     for (let i = 0; i < limitedPlaceIds.length; i += CHUNK_SIZE) {
@@ -207,6 +212,8 @@ export const preloadService = {
                     const chunkResults = await Promise.allSettled(
                         chunks.map(chunk => mediaApi.fetchNearbyFeed(chunk, 10))
                     );
+
+                    console.log(`[Preload] Feed chunks took ${Date.now() - chunkStart}ms`);
 
                     let allFeedItems: any[] = [];
                     for (const result of chunkResults) {
@@ -237,9 +244,14 @@ export const preloadService = {
                 // Load map media summary
                 (async () => {
                     if (placeIds.length === 0) return {};
-                    return await mediaApi.getMediaSummary(placeIds);
+                    const mapStart = Date.now();
+                    const res = await mediaApi.getMediaSummary(placeIds);
+                    console.log(`[Preload] Map summary took ${Date.now() - mapStart}ms`);
+                    return res;
                 })(),
             ]);
+
+            console.log(`[Preload] Content load took ${Date.now() - contentStart}ms total`);
 
             onProgress(85);
 
