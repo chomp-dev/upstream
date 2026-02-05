@@ -113,7 +113,7 @@ export function VideoPlayer({
                     {isIOSMobileWeb ? (
                         <Ionicons name="play-circle-outline" size={64} color="#fff" />
                     ) : (
-                        <ActivityIndicator size="large" color="#fff" />
+                        <Ionicons name="play" size={64} color="rgba(255,255,255,0.8)" />
                     )}
                 </View>
             )}

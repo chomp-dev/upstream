@@ -69,7 +69,9 @@ export const SaveButton = ({
     }, [videoUrl, imagePostId, user, supabase]);
 
     const toggleSave = async () => {
+        console.log('SaveButton pressed, user:', user?.sub);
         if (!user) {
+            console.log('User not logged in, triggering login');
             login();
             return;
         }

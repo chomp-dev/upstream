@@ -143,7 +143,7 @@ export const CommentSheet = ({ videoUrl, onClose, visible }: CommentSheetProps) 
     if (!visible) return null;
 
     return (
-        <View style={styles.container}>
+        <View style={styles.container} onStartShouldSetResponder={() => true} onMoveShouldSetResponder={() => true} onTouchEnd={(e) => e.stopPropagation()}>
             {/* Header */}
             <View style={styles.header}>
                 <Text variant="subtitle" style={styles.title}>
@@ -261,6 +261,9 @@ const styles = StyleSheet.create({
         borderTopLeftRadius: radius.xl,
         borderTopRightRadius: radius.xl,
         overflow: 'hidden',
+    },
+    touchTrap: {
+        flex: 1,
     },
     header: {
         flexDirection: 'row',

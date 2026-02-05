@@ -83,7 +83,7 @@ export const LikeButton = ({ videoUrl }: { videoUrl: string }) => {
     };
 
     return (
-        <TouchableOpacity onPress={toggleLike} style={styles.container} disabled={!user}>
+        <TouchableOpacity onPress={toggleLike} style={styles.container}>
             <Text style={[styles.icon, isLiked && styles.liked]}>
                 {isLiked ? '♥' : '♡'}
             </Text>
