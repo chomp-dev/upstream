@@ -383,16 +383,6 @@ export default function HomeScreen() {
 
       // Cache the feed for instant loading next time
       await feedStore.setFeed(uniqueFeed, placeIds, 'nearby');
-
-      // Prefetch restaurant data
-      const feedPlaceIds = uniqueFeed
-        .filter(item => item.google_place_id)
-        .map(item => item.google_place_id!)
-        .filter((id, idx, arr) => arr.indexOf(id) === idx);
-
-      if (feedPlaceIds.length > 0) {
-        fetchRestaurants(feedPlaceIds);
-      }
     } catch (error: any) {
       console.error('[Feed] Location/nearby error:', error.message);
       // On error, stay in nearby mode but show empty - user can choose to switch
@@ -401,7 +391,7 @@ export default function HomeScreen() {
     } finally {
       setLoading(false);
     }
-  }, [params.videoDataId, feed.length]);
+  }, []);  // No dependencies - only run on mount or manual refresh
 
   const loadDemoFeed = useCallback(async () => {
     try {
