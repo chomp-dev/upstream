@@ -259,8 +259,8 @@ export const CommentSheet = ({ videoUrl, onClose, visible }: CommentSheetProps) 
                                 </View>
                             </>
                         ) : (
-                            <TouchableOpacity onPress={login} style={styles.loginHint}>
-                                <Text variant="body" style={{ color: colors.primary }}>
+                            <TouchableOpacity onPress={login} style={styles.loginHint} activeOpacity={0.7}>
+                                <Text variant="body" style={{ color: colors.primary, fontWeight: '600' }}>
                                     Log in to comment
                                 </Text>
                             </TouchableOpacity>

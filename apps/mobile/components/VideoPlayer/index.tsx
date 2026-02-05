@@ -67,7 +67,9 @@ export function VideoPlayer({
             if (isActive) {
                 // Only play if app is active
                 if (AppState.currentState === 'active') {
-                    player.play();
+                    if (!player.playing) {
+                        player.play();
+                    }
                 } else {
                     player.pause();
                 }
