@@ -62,32 +62,43 @@ export default function HomeScreen() {
   // Handle videoDataId param (for navigating from profile/explore to specific post)
   // ============================================================================
   useEffect(() => {
-    if (params.videoDataId && feed.length > 0) {
-      const passedItem = navigationStore.get(params.videoDataId);
-      if (passedItem) {
-        // Check if this item is already in feed
-        const existingIndex = feed.findIndex(item =>
-          item.id === passedItem.id ||
-          (item.video_url && item.video_url === passedItem.video_url)
-        );
+    if (!params.videoDataId) return;
 
-        if (existingIndex === -1) {
-          // Prepend the item to feed
-          setFeed(prev => [passedItem, ...prev]);
-        } else if (existingIndex > 0) {
-          // Move to front if not already there
-          setFeed(prev => {
-            const newFeed = [...prev];
-            const [item] = newFeed.splice(existingIndex, 1);
-            return [item, ...newFeed];
-          });
-        }
-        // Clear from store
-        navigationStore.clear(params.videoDataId);
-        // Scroll to top
-        flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+    const passedItem = navigationStore.get(params.videoDataId);
+    if (!passedItem) return;
+
+    // Clear from store immediately to prevent re-processing
+    navigationStore.clear(params.videoDataId);
+
+    if (feed.length === 0) {
+      // Feed not loaded yet - set this as the initial feed item
+      setFeed([passedItem]);
+      setFeedMode('nearby'); // Assume nearby mode
+      setLoading(false); // Stop loading since we have content
+    } else {
+      // Feed already loaded - check if item exists
+      const existingIndex = feed.findIndex(item =>
+        item.id === passedItem.id ||
+        (item.video_url && item.video_url === passedItem.video_url)
+      );
+
+      if (existingIndex === -1) {
+        // Prepend the item to feed
+        setFeed(prev => [passedItem, ...prev]);
+      } else if (existingIndex > 0) {
+        // Move to front if not already there
+        setFeed(prev => {
+          const newFeed = [...prev];
+          const [item] = newFeed.splice(existingIndex, 1);
+          return [item, ...newFeed];
+        });
       }
     }
+
+    // Scroll to top
+    setTimeout(() => {
+      flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+    }, 100);
   }, [params.videoDataId, feed.length]);
 
   // ============================================================================
@@ -583,6 +594,7 @@ export default function HomeScreen() {
                       avatarUrl: item.user_avatar || undefined
                     }}
                     videoUrl={item.video_url}
+                    caption={item.title || item.description}
                   />
                   {item.status !== 'ready' && (
                     <View style={styles.processingOverlay}>
