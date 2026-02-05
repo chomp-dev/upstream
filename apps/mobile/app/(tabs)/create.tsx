@@ -342,6 +342,27 @@ export default function CreateScreen() {
         if (!initResponse.ok) throw new Error('Failed to init upload');
         const { uploadUrl } = await initResponse.json();
 
+        // Create pending video item to show in feed while processing
+        const pendingId = `pending-${Date.now()}`;
+        const { navigationStore } = require('../../src/lib/navigationStore');
+        const pendingVideo: any = {
+          id: pendingId,
+          type: 'video',
+          status: 'processing',
+          user_id: user?.sub,
+          username: user?.user_metadata?.username || user?.name || 'You',
+          user_avatar: user?.user_metadata?.avatar_url || user?.picture,
+          google_place_id: selectedRestaurant.google_place_id,
+          title: title.trim(),
+          description: description.trim(),
+          created_at: new Date().toISOString(),
+          cloudflare_video_id: null,
+          playback_url: null,
+          thumbnail_url: null,
+        };
+        navigationStore.set(pendingId, pendingVideo);
+        console.log('[Create] Created pending video item:', pendingId);
+
         // 2. Upload to Cloudflare
         setUploadStatus('Uploading video...');
 
@@ -429,9 +450,14 @@ export default function CreateScreen() {
       console.log('[Create] Upload flow complete. Resetting form and navigating home.');
       resetForm();
 
-      // Force navigation on next tick to ensure state updates process
+      // Navigate to feed with pending video (for videos) or just home (for images/tiktok)
+      const pendingId = mediaType === 'video' ? `pending-${Date.now()}` : null;
       setTimeout(() => {
-        router.push('/');
+        if (pendingId) {
+          router.push({ pathname: '/', params: { videoDataId: pendingId } });
+        } else {
+          router.push('/');
+        }
       }, 100);
 
     } catch (error: any) {

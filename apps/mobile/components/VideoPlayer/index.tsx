@@ -21,6 +21,7 @@ interface VideoPlayerProps {
     videoUrl?: string; // Database video_url for social features
     caption?: string; // Title/description to show in overlay
     userLocation?: { lat: number; lng: number } | null;
+    status?: string; // Video processing status
 }
 
 // Helper to detect iOS Mobile Web
@@ -36,7 +37,8 @@ export function VideoPlayer({
     user,
     videoUrl,
     caption,
-    userLocation
+    userLocation,
+    status
 }: VideoPlayerProps) {
     const { width, height } = useContentDimensions();
 
