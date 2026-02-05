@@ -249,7 +249,6 @@ export default function RestaurantDetailScreen() {
           ListHeaderComponent={renderHeader}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyEmoji}>🎬</Text>
               <Text variant="body" center color={colors.muted}>
                 No posts yet
               </Text>

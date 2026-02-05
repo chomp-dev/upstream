@@ -784,22 +784,16 @@ export default function HomeScreen() {
                   {item.status !== 'ready' && (
                     <View style={styles.processingOverlay}>
                       {item.status === 'error' ? (
-                        <>
-                          <Text style={styles.errorIcon}>⚠️</Text>
-                          <Text variant="body" style={styles.processingText}>
-                            Video unavailable
-                          </Text>
-                          <Text variant="bodySmall" style={[styles.processingText, { marginTop: spacing.xs }]}>
-                            This video may have been deleted
-                          </Text>
-                        </>
+                        <Text variant="body" style={styles.processingText}>
+                          Video unavailable
+                        </Text>
                       ) : (
                         <>
                           <ActivityIndicator size="large" color={colors.primary} />
                           <Text variant="body" style={styles.processingText}>
                             {item.status === 'inprogress' || item.status === 'processing'
-                              ? 'Almost ready...'
-                              : 'Processing video...'}
+                              ? 'Processing...'
+                              : 'Uploading...'}
                           </Text>
                         </>
                       )}
