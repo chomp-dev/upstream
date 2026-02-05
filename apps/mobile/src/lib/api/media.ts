@@ -208,12 +208,19 @@ export async function uploadImageToCloudflare(
 
       // Safari fix: Fetch blob immediately before it expires
       const response = await fetch(imageUri);
+      console.log('[Upload] Fetch response status:', response.status, response.statusText);
+
       if (!response.ok) {
-        throw new Error(`Failed to fetch image: ${response.status}`);
+        throw new Error(`Failed to fetch blob from picker: ${response.status} ${response.statusText}`);
       }
 
       const blob = await response.blob();
-      console.log('[Upload] Blob fetched:', blob.size, 'bytes, type:', blob.type);
+      console.log('[Upload] Blob fetched - Size:', blob.size, 'bytes, Type:', blob.type);
+
+      // CRITICAL: Check if blob is actually valid (Safari mobile may return empty blob)
+      if (blob.size === 0) {
+        throw new Error('Blob is empty - Safari/mobile may have failed to provide image data. Try selecting a different image or using a smaller file.');
+      }
 
       // Safari fix: Ensure proper MIME type
       const mimeType = blob.type || 'image/jpeg';
