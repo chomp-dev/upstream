@@ -45,11 +45,20 @@ usersRouter.post('/', async (req, res) => {
             status: 'success',
             user: result.rows[0]
         });
-    } catch (error) {
+    } catch (error: any) {
         if (error instanceof z.ZodError) {
             return res.status(400).json({ error: error.errors });
         }
-        console.error('Error syncing user:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        console.error('Error syncing user:', {
+            message: error?.message,
+            code: error?.code,
+            detail: error?.detail,
+            constraint: error?.constraint,
+            stack: error?.stack?.slice(0, 500)
+        });
+        res.status(500).json({
+            error: 'Internal server error',
+            details: process.env.NODE_ENV === 'development' ? error?.message : undefined
+        });
     }
 });
