@@ -63,70 +63,95 @@ export default function HomeScreen() {
   // Handle videoDataId param (for navigating from profile/explore to specific post)
   // ============================================================================
   useEffect(() => {
-    if (!params.videoDataId) return;
+    if (!params.videoDataId || typeof params.videoDataId !== 'string') return;
 
-    const passedItem = navigationStore.get(params.videoDataId);
-    if (!passedItem) return;
+    const handleExploreNavigation = async () => {
+      const passedItem = navigationStore.get(params.videoDataId as string);
+      if (!passedItem) return;
 
-    if (__DEV__) console.log('[Feed] Received pending item:', {
-      id: passedItem.id,
-      title: passedItem.title,
-      username: passedItem.username,
-      avatar: passedItem.user_avatar,
-      placeId: passedItem.google_place_id
-    });
+      if (__DEV__) console.log('[Feed] Received pending item:', {
+        id: passedItem.id,
+        title: passedItem.title,
+        username: passedItem.username,
+        avatar: passedItem.user_avatar,
+        placeId: passedItem.google_place_id
+      });
 
-    // Clear from store immediately to prevent re-processing
-    navigationStore.clear(params.videoDataId);
+      // Clear from store immediately to prevent re-processing
+      navigationStore.clear(params.videoDataId as string);
 
-    if (feed.length === 0) {
-      // Feed not loaded yet - set this as the initial feed item
-      setFeed([passedItem]);
-      setFeedMode('nearby'); // Assume nearby mode
-      setLoading(false); // Stop loading since we have content
-    } else {
-      // Feed already loaded - check if item exists
-      const existingIndex = feed.findIndex(item =>
-        item.id === passedItem.id ||
-        (item.video_url && item.video_url === passedItem.video_url)
-      );
-
-      if (existingIndex === -1) {
-        // Prepend the item to feed
-        setFeed(prev => [passedItem, ...prev]);
-      } else if (existingIndex > 0) {
-        // Move to front if not already there
-        setFeed(prev => {
-          const newFeed = [...prev];
-          const [item] = newFeed.splice(existingIndex, 1);
-          return [item, ...newFeed];
-        });
+      // FIX: Hydrate userLocation from cache if not already set
+      if (!userLocation) {
+        try {
+          const { mapStore } = require('../../src/lib/mapStore');
+          const mapData = await mapStore.getRestaurants();
+          if (mapData?.lastLocation) {
+            setUserLocation(mapData.lastLocation);
+            if (__DEV__) console.log('[Feed] Hydrated location for Explore item:', mapData.lastLocation);
+          }
+        } catch (e) {
+          console.warn('[Feed] Could not load cached location for Explore item');
+        }
       }
-    }
 
-
-    // Fetch restaurant data for this item if needed
-    if (passedItem && passedItem.google_place_id) {
-      // Optimistic check: do we have it in search store or cache?
-      if (!restaurantCache[passedItem.google_place_id]) {
-        searchApi.getRestaurant(passedItem.google_place_id).then(restaurant => {
+      // FIX: Fetch restaurant data BEFORE injecting to avoid missing pill
+      if (passedItem.google_place_id && !restaurantCache[passedItem.google_place_id]) {
+        try {
+          const restaurant = await searchApi.getRestaurant(passedItem.google_place_id);
           if (restaurant) {
             setRestaurantCache(prev => ({
               ...prev,
               [passedItem.google_place_id!]: restaurant
             }));
+            if (__DEV__) console.log('[Feed] Pre-fetched restaurant for Explore item:', restaurant.name);
           }
-        }).catch(err => console.error('[Feed] Failed to fetch linked restaurant:', err));
+        } catch (err) {
+          console.error('[Feed] Failed to fetch linked restaurant:', err);
+        }
       }
-    }
 
-    // Scroll to top immediately
-    // We use a small timeout to ensure FlatList has rendered the new data
-    setTimeout(() => {
-      flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
-    }, 50);
+      // Now inject the item
+      if (feed.length === 0) {
+        // Feed not loaded yet - set this as the initial feed item
+        setFeed([passedItem]);
+        setFeedMode('nearby'); // Assume nearby mode
+        setLoading(false); // Stop loading since we have content
+      } else {
+        // Feed already loaded - check if item exists
+        const existingIndex = feed.findIndex(item =>
+          item.id === passedItem.id ||
+          (item.video_url && item.video_url === passedItem.video_url)
+        );
 
-  }, [params.videoDataId, feed.length]);
+        if (existingIndex === -1) {
+          // Prepend the item to feed
+          setFeed(prev => [passedItem, ...prev]);
+        } else if (existingIndex > 0) {
+          // Move to front if not already there
+          setFeed(prev => {
+            const newFeed = [...prev];
+            const [item] = newFeed.splice(existingIndex, 1);
+            return [item, ...newFeed];
+          });
+        }
+      }
+
+      // Debug log after injection
+      if (__DEV__) console.log('[Feed] Item injected from Explore:', {
+        hasRestaurant: !!restaurantCache[passedItem.google_place_id || ''],
+        hasLocation: !!userLocation,
+        caption: passedItem.title || passedItem.description,
+        username: passedItem.username
+      });
+
+      // Scroll to top immediately
+      setTimeout(() => {
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+      }, 50);
+    };
+
+    handleExploreNavigation();
+  }, [params.videoDataId]);  // FIX: Removed feed.length to prevent infinite loop
   // ============================================================================
   // Location & Nearby Feed Logic
   // ============================================================================
