@@ -345,6 +345,7 @@ export default function CreateScreen() {
         // Create pending video item to show in feed while processing
         const pendingId = `pending-${Date.now()}`;
         const { navigationStore } = require('../../src/lib/navigationStore');
+        const { feedStore } = require('../../src/lib/feedStore');
         const pendingVideo: any = {
           id: pendingId,
           type: 'video',
@@ -362,6 +363,9 @@ export default function CreateScreen() {
         };
         navigationStore.set(pendingId, pendingVideo);
         console.log('[Create] Created pending video item:', pendingId);
+
+        // Store pendingId in component state for navigation
+        let savedPendingId = pendingId;
 
         // 2. Upload to Cloudflare
         setUploadStatus('Uploading video...');
@@ -429,6 +433,13 @@ export default function CreateScreen() {
         console.log('[Create] Inserting image post to Supabase:', imageUrls);
 
         // 3. Create Post in Supabase directly (RLS protected)
+        console.log('[Create] Attempting image insert with user:', {
+          sub: user?.sub,
+          id: user?.id,
+          email: user?.email,
+          fullUser: JSON.stringify(user)
+        });
+
         const { error } = await supabase
           .from('image_posts')
           .insert({
@@ -436,13 +447,14 @@ export default function CreateScreen() {
             google_place_id: selectedRestaurant.google_place_id,
             title: title.trim(),
             description: description.trim(),
-            tags: tagArray, // Assuming backend accepts text array
-            user_id: user?.sub  // RLS policy expects auth.jwt() ->> 'https://supabase.chomp.com/user_id' which is set to sub
+            tags: tagArray,
+            user_id: user?.sub  // Use sub which maps to JWT claim
           })
           .select();
 
         if (error) {
           console.error('[Create] Supabase insert failed:', error);
+          console.error('[Create] Full error details:', JSON.stringify(error, null, 2));
           throw new Error(error.message || 'Failed to create post record');
         }
       }
@@ -450,11 +462,10 @@ export default function CreateScreen() {
       console.log('[Create] Upload flow complete. Resetting form and navigating home.');
       resetForm();
 
-      // Navigate to feed with pending video (for videos) or just home (for images/tiktok)
-      const pendingId = mediaType === 'video' ? `pending-${Date.now()}` : null;
+      // Navigate to feed with pending video ID (stored earlier)
       setTimeout(() => {
-        if (pendingId) {
-          router.push({ pathname: '/', params: { videoDataId: pendingId } });
+        if (mediaType === 'video' && savedPendingId) {
+          router.push({ pathname: '/', params: { videoDataId: savedPendingId } });
         } else {
           router.push('/');
         }
