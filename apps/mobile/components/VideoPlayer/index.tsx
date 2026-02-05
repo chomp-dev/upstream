@@ -104,11 +104,28 @@ export function VideoPlayer({
         };
     }, [isActive, player]);
 
-    // If no playback URL is available yet, show thumbnail or placeholder
-    if (!playbackUrl) {
+    // If processing or no playback URL, show placeholder
+    if (status === 'processing' || !playbackUrl) {
         return (
             <View style={[styles.container, { width, height }]}>
-                {thumbnailUrl ? (
+                {status === 'processing' ? (
+                    <>
+                        {/* Processing Badge */}
+                        <View style={styles.processingBadge}>
+                            <Text style={styles.processingText}>⏳ Processing...</Text>
+                        </View>
+                        {/* Processing Placeholder */}
+                        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a1a1a' }}>
+                            <Text style={{ fontSize: 48 }}>🎬</Text>
+                            <Text style={{ color: '#fff', fontSize: 18, marginTop: 12, fontWeight: '600' }}>
+                                Video is processing
+                            </Text>
+                            <Text style={{ color: '#888', fontSize: 14, marginTop: 8, textAlign: 'center', paddingHorizontal: 40 }}>
+                                This usually takes a few minutes
+                            </Text>
+                        </View>
+                    </>
+                ) : thumbnailUrl ? (
                     <Image source={{ uri: thumbnailUrl }} style={[styles.thumbnail, { width, height }]} />
                 ) : (
                     <Placeholder width={width} height={height} />
