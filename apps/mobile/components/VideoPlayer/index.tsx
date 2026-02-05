@@ -70,7 +70,12 @@ export function VideoPlayer({
                 // Only play if app is active
                 if (AppState.currentState === 'active') {
                     if (!player.playing) {
-                        player.play();
+                        // Catch AbortError if play() is interrupted
+                        try {
+                            player.play();
+                        } catch (e) {
+                            // Ignore AbortError
+                        }
                     }
                 } else {
                     player.pause();

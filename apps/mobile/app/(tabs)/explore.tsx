@@ -119,6 +119,15 @@ export default function ExploreScreen() {
     // Navigate to home feed with item index to scroll to
     // We pass the full item data so Home can display it even if it's not in the local feed
     const dataId = `video-${Date.now()}`
+
+    if (__DEV__) console.log('[Explore] Navigating with item:', {
+      id: item.id,
+      title: item.title,
+      username: item.username,
+      avatar: item.user_avatar,
+      placeId: item.google_place_id
+    });
+
     navigationStore.set(dataId, item);
 
     router.push({

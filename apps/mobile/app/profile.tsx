@@ -335,6 +335,8 @@ export default function ProfileScreen() {
                         const dataId = `video-${Date.now()}`;
                         // We need to map PostItem to FeedItem (they are similar enough for this)
                         // @ts-ignore
+                        // @ts-ignore
+                        console.log('[Profile] Setting nav store item:', JSON.stringify(item, null, 2));
                         navigationStore.set(dataId, item);
 
                         router.push({

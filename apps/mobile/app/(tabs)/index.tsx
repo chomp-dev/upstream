@@ -67,6 +67,14 @@ export default function HomeScreen() {
     const passedItem = navigationStore.get(params.videoDataId);
     if (!passedItem) return;
 
+    if (__DEV__) console.log('[Feed] Received pending item:', {
+      id: passedItem.id,
+      title: passedItem.title,
+      username: passedItem.username,
+      avatar: passedItem.user_avatar,
+      placeId: passedItem.google_place_id
+    });
+
     // Clear from store immediately to prevent re-processing
     navigationStore.clear(params.videoDataId);
 
@@ -97,23 +105,27 @@ export default function HomeScreen() {
 
 
     // Fetch restaurant data for this item if needed
-    if (passedItem && passedItem.google_place_id && !restaurantCache[passedItem.google_place_id]) {
-      searchApi.getRestaurant(passedItem.google_place_id).then(restaurant => {
-        if (restaurant) {
-          setRestaurantCache(prev => ({
-            ...prev,
-            [passedItem.google_place_id!]: restaurant
-          }));
-        }
-      }).catch(err => console.error('[Feed] Failed to fetch linked restaurant:', err));
+    if (passedItem && passedItem.google_place_id) {
+      // Optimistic check: do we have it in search store or cache?
+      if (!restaurantCache[passedItem.google_place_id]) {
+        searchApi.getRestaurant(passedItem.google_place_id).then(restaurant => {
+          if (restaurant) {
+            setRestaurantCache(prev => ({
+              ...prev,
+              [passedItem.google_place_id!]: restaurant
+            }));
+          }
+        }).catch(err => console.error('[Feed] Failed to fetch linked restaurant:', err));
+      }
     }
 
-    // Scroll to top
+    // Scroll to top immediately
+    // We use a small timeout to ensure FlatList has rendered the new data
     setTimeout(() => {
       flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
-    }, 100);
-  }, [params.videoDataId, feed.length]);
+    }, 50);
 
+  }, [params.videoDataId, feed.length]);
   // ============================================================================
   // Location & Nearby Feed Logic
   // ============================================================================
