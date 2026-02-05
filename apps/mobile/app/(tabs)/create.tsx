@@ -430,14 +430,22 @@ export default function CreateScreen() {
           setUploadStatus(`Uploading image ${i + 1} of ${totalImages}...`);
           setUploadProgress(i / totalImages);
 
-          // 1. Get Upload URL and Delivery URL
-          // We need to use valid delivery URLs for the frontend insert
-          const { uploadURL, deliveryUrl } = await mediaApi.getImageUploadUrl();
+          try {
+            console.log(`[Create] Uploading image ${i + 1}:`, media.uri);
 
-          // 2. Upload to Cloudflare (Reuse existing helper for consistency)
-          await mediaApi.uploadImageToCloudflare(uploadURL, media.uri);
+            // 1. Get Upload URL and Delivery URL
+            const { uploadURL, deliveryUrl } = await mediaApi.getImageUploadUrl();
+            console.log(`[Create] Got upload URL for image ${i + 1}:`, deliveryUrl);
 
-          imageUrls.push(deliveryUrl);
+            // 2. Upload to Cloudflare
+            await mediaApi.uploadImageToCloudflare(uploadURL, media.uri);
+            console.log(`[Create] Successfully uploaded image ${i + 1}`);
+
+            imageUrls.push(deliveryUrl);
+          } catch (uploadError) {
+            console.error(`[Create] Failed to upload image ${i + 1}:`, uploadError);
+            throw new Error(`Failed to upload image ${i + 1}: ${(uploadError as Error).message}`);
+          }
         }
 
         setUploadProgress(1);
