@@ -29,13 +29,18 @@ export const feedStore = {
      */
     hydrate: async (): Promise<void> => {
         try {
+            console.log('[FeedStore] Starting hydration from AsyncStorage...');
             const data = await AsyncStorage.getItem(FEED_CACHE_KEY);
             if (data) {
                 memoryCache = JSON.parse(data);
-                console.log('[FeedStore] Hydrated from disk:', memoryCache?.feed.length, 'items');
+                console.log('[FeedStore] Hydrated from disk:', memoryCache?.feed?.length || 0, 'items');
+            } else {
+                console.log('[FeedStore] No cached data found');
             }
         } catch (error) {
             console.error('[FeedStore] Failed to hydrate:', error);
+            // Don't throw - just continue with empty cache
+            memoryCache = null;
         }
     },
 
