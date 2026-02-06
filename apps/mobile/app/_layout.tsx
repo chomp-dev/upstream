@@ -2,7 +2,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, StyleSheet, Platform } from 'react-native';
 import { useState, useEffect } from 'react';
-import SplashAnimation from '../components/SplashAnimation';
+import SimpleSplash from '../components/SimpleSplash';
 import { Auth0Provider } from 'react-native-auth0';
 import { colors } from '../src/theme';
 import { AuthProvider } from '../src/context/auth';
@@ -38,6 +38,16 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     });
   }, []);
+
+  // Complete splash screen after data is ready
+  useEffect(() => {
+    if (dataReady && preloadProgress >= 100) {
+      const timer = setTimeout(() => {
+        setIsSplashComplete(true);
+      }, 500); // Small delay for UX
+      return () => clearTimeout(timer);
+    }
+  }, [dataReady, preloadProgress]);
 
   const content = (
     <>
@@ -78,11 +88,8 @@ export default function RootLayout() {
     <View style={{ flex: 1 }}>
       {wrappedContent}
       {!isSplashComplete && (
-        <SplashAnimation
-          onComplete={() => setIsSplashComplete(true)}
+        <SimpleSplash
           progress={preloadProgress}
-          dataReady={dataReady}
-          minDisplayMs={1000}
           statusText={statusText}
         />
       )}
