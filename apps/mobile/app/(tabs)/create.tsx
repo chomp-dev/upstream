@@ -1001,6 +1001,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.xl,
     padding: spacing.xl,
     alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: spacing.md,
   },
   uploadButtonSecondary: {

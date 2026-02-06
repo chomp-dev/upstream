@@ -169,11 +169,8 @@ export default function HomeScreen() {
   const loadNearbyFeed = useCallback(async (forceRefresh = false) => {
     console.log('[Feed] loadNearbyFeed called - forceRefresh:', forceRefresh, 'params.videoDataId:', params.videoDataId);
 
-    // If we are deep linking to a pending video, skip loading nearby feed
-    if (params.videoDataId) {
-      if (__DEV__) console.log('[Feed] Skipping nearby load due to videoDataId param');
-      return;
-    }
+    // If we are deep linking to a pending video, we still load the feed but ensure we don't clobber the injected item
+    console.log('[Feed] loadNearbyFeed called - forceRefresh:', forceRefresh, 'params.videoDataId:', params.videoDataId);
 
     // Check cache first (unless force refresh)
     // Preload service should have already populated this during splash
@@ -418,26 +415,48 @@ export default function HomeScreen() {
         return;
       }
 
-      setLoadingProgress(100);
       setLoadingStatus('Preparing your feed...');
 
       // Give it a moment to show 100%
       await new Promise(r => setTimeout(r, 500));
 
-      setFeed(uniqueFeed);
+      setFeed(prev => {
+        // If we have a deep-linked item currently at the top (injected by handleExploreNavigation), preserve it
+        if (params.videoDataId && prev.length > 0) {
+          // Check if the current top item matches the requested ID (string vs string)
+          const currentTop = prev[0];
+          // Determine ID match (handle potential type mismatch or id property)
+          const isMatch = String(currentTop.id) === String(params.videoDataId) ||
+            (currentTop.type === 'video' && currentTop.cloudflare_video_id === params.videoDataId);
+
+          if (isMatch) {
+            console.log('[Feed] Preserving injected item at top of feed:', currentTop.id);
+            // Filter it out of uniqueFeed to avoid duplicates
+            const others = uniqueFeed.filter(item =>
+              item.id !== currentTop.id &&
+              !(item.type === currentTop.type && item.id.toString() === currentTop.id.toString())
+            );
+            return [currentTop, ...others];
+          }
+        }
+        return uniqueFeed;
+      });
       setFeedMode('nearby');
 
       // Cache the feed for instant loading next time
       await feedStore.setFeed(uniqueFeed, placeIds, 'nearby');
     } catch (error: any) {
       console.error('[Feed] Location/nearby error:', error.message);
-      // On error, stay in nearby mode but show empty - user can choose to switch
-      setFeed([]);
+      // On error, stay in nearby mode but don't wipe if we have an injected item
+      setFeed(prev => {
+        if (params.videoDataId && prev.length > 0) return prev;
+        return [];
+      });
       setFeedMode('nearby');
     } finally {
       setLoading(false);
     }
-  }, []);  // No dependencies - only run on mount or manual refresh
+  }, [params.videoDataId]);  // Add param dependency to ensure closure has latest param
 
   const loadDemoFeed = useCallback(async () => {
     try {

@@ -53,7 +53,7 @@ export const CommentSheet = ({ videoUrl, onClose, visible }: CommentSheetProps) 
     // When keyboard is visible, add keyboard height minus bottom safe area (since keyboard covers it)
     // When keyboard is hidden, add bottom safe area for home indicator
     const inputBottomPadding = keyboardHeight > 0
-        ? keyboardHeight - bottomSafeInset + 16
+        ? keyboardHeight - bottomSafeInset + 32 // Added extra padding for safety
         : bottomSafeInset + 16;
 
     const fetchComments = useCallback(async () => {
