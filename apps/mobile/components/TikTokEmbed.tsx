@@ -5,6 +5,8 @@ import { useContentDimensions } from '../src/hooks/useContentDimensions';
 import { Text } from '../src/ui';
 import { Ionicons } from '@expo/vector-icons';
 
+import { WebView } from 'react-native-webview';
+
 interface TikTokEmbedProps {
     embedHtml: string;
     thumbnailUrl?: string;
@@ -16,8 +18,7 @@ interface TikTokEmbedProps {
 
 /**
  * TikTokEmbed component renders a TikTok video preview.
- * Uses thumbnail + minimal overlay approach for stability.
- * Opens TikTok app/browser on tap.
+ * Uses WebView for autoplay when active, thumbnail otherwise.
  */
 export function TikTokEmbed({
     embedHtml,
@@ -34,6 +35,78 @@ export function TikTokEmbed({
             Linking.openURL(tiktokUrl);
         }
     };
+
+    // Wrap the embed HTML to ensure proper scaling and centered content
+    // We add autoplay=1 to the iframe src if it's missing (though usually embed code has it or we script it)
+    // Actually, the embed.js usually handles it.
+    const wrappedHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <style>
+          body { margin: 0; padding: 0; background: black; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+          blockquote { margin: 0 !important; width: 100% !important; height: 100% !important; }
+          iframe { width: 100% !important; height: 100% !important; }
+        </style>
+        <script async src="https://www.tiktok.com/embed.js"></script>
+      </head>
+      <body>
+        ${embedHtml}
+      </body>
+      </html>
+    `;
+
+    // Render WebView only when active to save resources
+    if (isActive) {
+        return (
+            <View style={[styles.container, { width, height }]}>
+                <WebView
+                    source={{ html: wrappedHtml }}
+                    style={{ width, height, backgroundColor: 'black' }}
+                    allowsInlineMediaPlayback={true}
+                    mediaPlaybackRequiresUserAction={false}
+                    javaScriptEnabled={true}
+                    scrollEnabled={false}
+                    onMessage={(event) => {
+                        // Handle messages if needed
+                    }}
+                />
+
+                {/* Overlay for "Open in TikTok" since WebView might eat taps */}
+                <View style={styles.webViewOverlay} pointerEvents="box-none">
+                    {/* Bottom info - author and title */}
+                    <TouchableOpacity
+                        style={styles.bottomInfo}
+                        onPress={openInTikTok}
+                        activeOpacity={0.8}
+                    >
+                        {/* Gradient for text readability */}
+                        <LinearGradient
+                            colors={['transparent', 'rgba(0,0,0,0.85)']}
+                            style={styles.bottomGradient}
+                            pointerEvents="none"
+                        />
+
+                        {authorName && (
+                            <Text style={styles.authorText} numberOfLines={1}>
+                                @{authorName}
+                            </Text>
+                        )}
+                        {title && (
+                            <Text style={styles.titleText} numberOfLines={2}>
+                                {title}
+                            </Text>
+                        )}
+                        <View style={styles.tapHint}>
+                            <Ionicons name="open-outline" size={12} color="rgba(255,255,255,0.7)" />
+                            <Text style={styles.tapHintText}>Tap to open in TikTok</Text>
+                        </View>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        );
+    }
 
     return (
         <TouchableOpacity
@@ -189,6 +262,13 @@ const styles = StyleSheet.create({
     tapHintText: {
         color: 'rgba(255,255,255,0.7)',
         fontSize: 12,
+    },
+    webViewOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
     },
 });
 
