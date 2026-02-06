@@ -372,7 +372,7 @@ export default function MapScreen() {
                   {item.rating.toFixed(1)}
                 </Text>
                 {item.user_rating_count !== null && (
-                  <Text variant="caption" color={colors.muted} style={{ marginLeft: 2 }}>
+                  <Text variant="caption" style={{ marginLeft: 2, color: '#ffffff' }}>
                     ({item.user_rating_count})
                   </Text>
                 )}
@@ -520,8 +520,8 @@ export default function MapScreen() {
         {/* View mode toggle */}
         <Segmented
           options={[
-            { key: 'map', label: '🗺️ Map' },
-            { key: 'list', label: '📋 List' },
+            { key: 'map', label: 'Map' },
+            { key: 'list', label: 'List' },
           ]}
           selected={viewMode}
           onSelect={(key) => setViewMode(key as ViewMode)}
@@ -679,7 +679,7 @@ const styles = StyleSheet.create({
   ratingBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.overlay,
+    backgroundColor: '#eeb57e',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: radius.sm,
@@ -691,7 +691,7 @@ const styles = StyleSheet.create({
   },
   ratingText: {
     fontWeight: '600',
-    color: colors.text,
+    color: '#ffffff',
   },
   listAddress: {
     marginBottom: spacing.xs,
