@@ -88,9 +88,10 @@ interface FloatingItemProps {
     containerHeight: number;
     index: number;
     total: number;
+    shouldStop?: boolean; // New prop to signal animations to stop
 }
 
-const FloatingItem = ({ source, containerWidth, containerHeight, index, total }: FloatingItemProps) => {
+const FloatingItem = ({ source, containerWidth, containerHeight, index, total, shouldStop = false }: FloatingItemProps) => {
     // Symmetrical Layout: Circular Orbit
     const radius = Math.min(containerWidth, containerHeight) * 0.35; // 35% of screen
     const angle = (index / total) * 2 * Math.PI;
@@ -106,6 +107,14 @@ const FloatingItem = ({ source, containerWidth, containerHeight, index, total }:
     const rotate = useSharedValue(0);
 
     useEffect(() => {
+        if (shouldStop) {
+            // Cancel all animations when stopping to prevent worklet conflicts
+            scale.value = withTiming(1, { duration: 200 });
+            translateY.value = withTiming(0, { duration: 200 });
+            rotate.value = withTiming(0, { duration: 200 });
+            return;
+        }
+
         // Breathing Effect
         scale.value = withRepeat(
             withSequence(
@@ -127,7 +136,7 @@ const FloatingItem = ({ source, containerWidth, containerHeight, index, total }:
             withTiming(index % 2 === 0 ? 10 : -10, { duration: 4000, easing: Easing.inOut(Easing.sin) }),
             -1, true
         );
-    }, []);
+    }, [shouldStop]);
 
     const style = useAnimatedStyle(() => ({
         transform: [
@@ -163,6 +172,7 @@ export default function SplashAnimation({
     const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
     const [minTimeElapsed, setMinTimeElapsed] = useState(false);
     const [hasTriggeredZoom, setHasTriggeredZoom] = useState(false);
+    const [stopAnimations, setStopAnimations] = useState(false); // NEW: flag to stop infinite animations
     const scale = useSharedValue(0);
     const opacity = useSharedValue(1);
     const progressAnim = useSharedValue(0);
@@ -189,13 +199,19 @@ export default function SplashAnimation({
         if (dataReady && minTimeElapsed && !hasTriggeredZoom) {
             setHasTriggeredZoom(true);
 
-            // Trigger the zoom-out sequence
-            scale.value = withTiming(50, { duration: 600, easing: Easing.in(Easing.cubic) }, () => {
-                runOnJS(onComplete)();
-            });
+            // CRITICAL FIX: Stop all infinite animations BEFORE starting zoom
+            setStopAnimations(true);
 
-            // Fade background
-            opacity.value = withDelay(400, withTiming(0, { duration: 200 }));
+            // Small delay to let animation cancellation take effect
+            setTimeout(() => {
+                // Trigger the zoom-out sequence
+                scale.value = withTiming(50, { duration: 600, easing: Easing.in(Easing.cubic) }, () => {
+                    runOnJS(onComplete)();
+                });
+
+                // Fade background
+                opacity.value = withDelay(400, withTiming(0, { duration: 200 }));
+            }, 100);
         }
     }, [dataReady, minTimeElapsed, hasTriggeredZoom]);
 
@@ -241,6 +257,7 @@ export default function SplashAnimation({
                     source={source}
                     containerWidth={dimensions.width}
                     containerHeight={dimensions.height}
+                    shouldStop={stopAnimations}
                 />
             ))}
 
