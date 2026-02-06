@@ -12,6 +12,12 @@ const UserSchema = z.object({
     emailVerified: z.boolean().optional(),
 });
 
+const ProfileUpdateSchema = z.object({
+    name: z.string().optional(),
+    bio: z.string().optional(),
+    avatar: z.string().optional(),
+});
+
 // Sync user from Auth0 to our database
 usersRouter.post('/', async (req, res) => {
     try {
@@ -59,6 +65,77 @@ usersRouter.post('/', async (req, res) => {
         });
         res.status(500).json({
             error: 'Internal server error',
+            details: process.env.NODE_ENV === 'development' ? error?.message : undefined
+        });
+    }
+});
+
+// Update user profile (bypasses RLS for iOS compatibility)
+usersRouter.put('/:auth0Id', async (req, res) => {
+    try {
+        const { auth0Id } = req.params;
+        const updates = ProfileUpdateSchema.parse(req.body);
+
+        if (!auth0Id) {
+            return res.status(400).json({ error: 'auth0Id is required' });
+        }
+
+        console.log('[Users] Updating profile for:', auth0Id, updates);
+
+        // Build dynamic update query
+        const setClauses: string[] = [];
+        const values: any[] = [];
+        let paramIndex = 1;
+
+        if (updates.name !== undefined) {
+            setClauses.push(`name = $${paramIndex++}`);
+            values.push(updates.name);
+        }
+        if (updates.bio !== undefined) {
+            setClauses.push(`bio = $${paramIndex++}`);
+            values.push(updates.bio);
+        }
+        if (updates.avatar !== undefined) {
+            setClauses.push(`avatar = $${paramIndex++}`);
+            values.push(updates.avatar);
+        }
+
+        if (setClauses.length === 0) {
+            return res.status(400).json({ error: 'No fields to update' });
+        }
+
+        setClauses.push(`updated_at = NOW()`);
+        values.push(auth0Id);
+
+        const query = `
+            UPDATE users 
+            SET ${setClauses.join(', ')}
+            WHERE auth0_id = $${paramIndex}
+            RETURNING *;
+        `;
+
+        const result = await pool.query(query, values);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        console.log('[Users] Profile updated successfully');
+        res.json({
+            status: 'success',
+            user: result.rows[0]
+        });
+    } catch (error: any) {
+        if (error instanceof z.ZodError) {
+            return res.status(400).json({ error: error.errors });
+        }
+        console.error('[Users] Error updating profile:', {
+            message: error?.message,
+            code: error?.code,
+            detail: error?.detail
+        });
+        res.status(500).json({
+            error: 'Failed to update profile',
             details: process.env.NODE_ENV === 'development' ? error?.message : undefined
         });
     }

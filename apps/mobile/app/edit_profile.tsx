@@ -13,7 +13,7 @@ import { getImageUploadUrl, uploadImageToCloudflare } from '../src/lib/api/media
 
 export default function EditProfileScreen() {
     const router = useRouter();
-    const { user, supabase, accessToken } = useAuth();
+    const { user, supabase } = useAuth();
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -107,37 +107,17 @@ export default function EditProfileScreen() {
 
         try {
             setSaving(true);
-            console.log('[Profile] Saving with auth0_id:', user.sub);
-            console.log('[Profile] Has access token:', !!accessToken);
-            console.log('[Profile] Token preview:', accessToken?.substring(0, 20) + '...');
+            console.log('[Profile] Saving via backend API with auth0_id:', user.sub);
 
-            // Use upsert with onConflict to handle both create and update cases
-            const { data, error } = await supabase
-                .from('users')
-                .upsert({
-                    auth0_id: user.sub,
-                    email: user.email || '',
-                    name: name,
-                    bio: bio,
-                    avatar: avatarUrl,
-                    updated_at: new Date().toISOString(),
-                }, {
-                    onConflict: 'auth0_id',
-                })
-                .select();
+            // Use backend API to bypass RLS issues on iOS
+            const { updateUserProfile } = await import('../src/lib/api/media');
+            const result = await updateUserProfile(user.sub, {
+                name: name,
+                bio: bio,
+                avatar: avatarUrl || undefined,
+            });
 
-            console.log('[Profile] Upsert response:', { data, error });
-
-            if (error) {
-                console.error('[Profile] Upsert error:', error);
-                throw error;
-            }
-
-            if (!data || data.length === 0) {
-                console.warn('[Profile] No data returned from upsert - RLS might be blocking');
-                // Even if no data returned, the operation may have succeeded
-                // The RLS policy might block SELECT but allow INSERT/UPDATE
-            }
+            console.log('[Profile] Update response:', result);
 
             // Success - navigate back
             router.back();

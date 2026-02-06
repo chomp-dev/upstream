@@ -312,7 +312,7 @@ export default function CreateScreen() {
       if (mediaType === 'tiktok') {
         // --- TIKTOK EMBED ---
         setUploadStatus('Saving TikTok...');
-        const response = await mediaApi.addTikTokEmbed(selectedMedia[0].uri, selectedRestaurant.google_place_id);
+        const response = await mediaApi.addTikTokEmbed(selectedMedia[0].uri, selectedRestaurant.google_place_id, user?.sub);
 
         if (!response.success) throw new Error('Failed to add TikTok embed');
         setUploadProgress(1);
@@ -451,41 +451,26 @@ export default function CreateScreen() {
         setUploadProgress(1);
         setUploadStatus('Finalizing post...');
 
-        console.log('[Create] Inserting image post to Supabase:', imageUrls);
+        console.log('[Create] Creating image post via backend API:', imageUrls);
 
-        // 3. Create Post in Supabase directly (RLS protected)
-        console.log('[Create] Attempting image insert with user:', {
-          sub: user?.sub,
-          id: user?.id,
-          email: user?.email,
-          fullUser: JSON.stringify(user)
-        });
+        // 3. Create Post via backend API (bypasses RLS for iOS compatibility)
+        const postResult = await mediaApi.uploadImages(
+          imageUrls,
+          selectedRestaurant.google_place_id,
+          title.trim(),
+          description.trim(),
+          tagArray,
+          user?.sub
+        );
 
-        const { data: insertedPost, error } = await supabase
-          .from('image_posts')
-          .insert({
-            images: imageUrls,
-            google_place_id: selectedRestaurant.google_place_id,
-            title: title.trim(),
-            description: description.trim(),
-            tags: tagArray,
-            user_id: user?.sub  // Use sub which maps to JWT claim
-          })
-          .select()
-          .single();
-
-        if (error) {
-          console.error('[Create] Supabase insert failed:', error);
-          console.error('[Create] Full error details:', JSON.stringify(error, null, 2));
-          throw new Error(error.message || 'Failed to create post record');
-        }
+        console.log('[Create] Backend image post created:', postResult);
 
         // Store image post in navigationStore for feed to display
-        if (insertedPost) {
+        if (postResult.post) {
           const imageDataId = `image-${Date.now()}`;
           const { navigationStore } = require('../../src/lib/navigationStore');
           const imagePostItem = {
-            ...insertedPost,
+            ...postResult.post,
             type: 'image',
             username: user?.user_metadata?.username || user?.name || 'You',
             user_avatar: user?.user_metadata?.avatar_url || user?.picture,

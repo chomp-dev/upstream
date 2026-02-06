@@ -314,10 +314,15 @@ export async function uploadImagesWithCloudflare(
 /**
  * Upload images for an image post
  * Now accepts either local URIs (legacy) or Cloudflare image IDs
+ * Uses backend API to bypass RLS issues on iOS
  */
 export async function uploadImages(
   images: string[],
-  googlePlaceId?: string
+  googlePlaceId?: string,
+  title?: string,
+  description?: string,
+  tags?: string[],
+  userId?: string
 ): Promise<UploadImagesResponse> {
   const response = await fetch(`${MEDIA_API_BASE}/api/upload/images`, {
     method: 'POST',
@@ -325,11 +330,16 @@ export async function uploadImages(
     body: JSON.stringify({
       images,
       google_place_id: googlePlaceId || null,
+      title: title || null,
+      description: description || null,
+      tags: tags || [],
+      user_id: userId || null,
     }),
   });
 
   if (!response.ok) {
-    throw new Error('Failed to upload images');
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || 'Failed to upload images');
   }
 
   return response.json();
@@ -400,10 +410,12 @@ export async function checkHealth(): Promise<boolean> {
  * Add a TikTok embed to the feed
  * @param tiktokUrl - The TikTok video URL
  * @param googlePlaceId - Optional restaurant association
+ * @param userId - User ID for ownership
  */
 export async function addTikTokEmbed(
   tiktokUrl: string,
-  googlePlaceId?: string
+  googlePlaceId?: string,
+  userId?: string
 ): Promise<{ success: boolean; embed?: any }> {
   const response = await fetch(`${MEDIA_API_BASE}/api/tiktok`, {
     method: 'POST',
@@ -411,12 +423,35 @@ export async function addTikTokEmbed(
     body: JSON.stringify({
       tiktok_url: tiktokUrl,
       google_place_id: googlePlaceId || null,
+      user_id: userId || null,
     }),
   });
 
   if (!response.ok) {
     const data = await response.json();
     throw new Error(data.error || 'Failed to add TikTok embed');
+  }
+
+  return response.json();
+}
+
+/**
+ * Update user profile via backend API
+ * Bypasses RLS for iOS compatibility
+ */
+export async function updateUserProfile(
+  auth0Id: string,
+  updates: { name?: string; bio?: string; avatar?: string }
+): Promise<{ status: string; user: any }> {
+  const response = await fetch(`${MEDIA_API_BASE}/api/users/${encodeURIComponent(auth0Id)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || 'Failed to update profile');
   }
 
   return response.json();

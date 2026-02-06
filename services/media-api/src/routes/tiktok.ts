@@ -30,7 +30,7 @@ interface TikTokOEmbedResponse {
  */
 tiktokRouter.post('/', async (req, res) => {
     try {
-        const { tiktok_url, google_place_id } = req.body;
+        const { tiktok_url, google_place_id, user_id } = req.body;
 
         if (!tiktok_url) {
             return res.status(400).json({ error: 'tiktok_url is required' });
@@ -59,12 +59,12 @@ tiktokRouter.post('/', async (req, res) => {
 
         console.log(`[TikTok] Got oEmbed: "${oembed.title}" by ${oembed.author_name}`);
 
-        // Store in database
+        // Store in database with user_id
         const result = await pool.query(
             `INSERT INTO tiktok_embeds 
-       (tiktok_url, embed_html, title, author_name, author_url, thumbnail_url, thumbnail_width, thumbnail_height, google_place_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-       RETURNING id, tiktok_url, title, author_name, thumbnail_url, google_place_id, created_at`,
+       (tiktok_url, embed_html, title, author_name, author_url, thumbnail_url, thumbnail_width, thumbnail_height, google_place_id, user_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING id, tiktok_url, title, author_name, thumbnail_url, google_place_id, created_at, user_id`,
             [
                 tiktok_url,
                 oembed.html,
@@ -75,6 +75,7 @@ tiktokRouter.post('/', async (req, res) => {
                 oembed.thumbnail_width,
                 oembed.thumbnail_height,
                 google_place_id || null,
+                user_id || null,
             ]
         );
 

@@ -16,16 +16,20 @@ import { Text } from '../src/ui';
 import { colors, spacing, radius } from '../src/theme';
 import { Image } from 'expo-image';
 import { useKeyboardHeight, getBottomSafeInset } from '../src/hooks/useKeyboardHeight';
+import { BASE_URL } from '../src/lib/api/media';
 
 interface Comment {
     id: string;
     content: string;
     user_id: string;
     created_at: string;
+    parent_id?: string | null;
+    likes_count?: number;
     user?: {
         name: string;
         avatar: string;
     };
+    replies?: Comment[];
 }
 
 interface CommentSheetProps {
@@ -40,6 +44,8 @@ export const CommentSheet = ({ videoUrl, onClose, visible }: CommentSheetProps) 
     const [newComment, setNewComment] = useState('');
     const [loading, setLoading] = useState(false);
     const [posting, setPosting] = useState(false);
+    const [replyingTo, setReplyingTo] = useState<{ id: string; username: string } | null>(null);
+    const [likedComments, setLikedComments] = useState<Set<string>>(new Set());
     const keyboardHeight = useKeyboardHeight();
     const bottomSafeInset = getBottomSafeInset();
 
@@ -55,16 +61,19 @@ export const CommentSheet = ({ videoUrl, onClose, visible }: CommentSheetProps) 
 
         setLoading(true);
         try {
-            // Fetch comments with user info
+            // Fetch top-level comments (no parent_id) with user info
             const { data, error } = await supabase
                 .from('comments')
                 .select(`
                     id,
                     content,
                     user_id,
-                    created_at
+                    created_at,
+                    parent_id,
+                    likes_count
                 `)
                 .eq('video_url', videoUrl)
+                .is('parent_id', null)  // Only top-level comments
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -108,33 +117,114 @@ export const CommentSheet = ({ videoUrl, onClose, visible }: CommentSheetProps) 
         setPosting(true);
         const commentText = newComment.trim();
         setNewComment('');
+        const parentId = replyingTo?.id || null;
+        setReplyingTo(null);
 
         try {
-            const { error } = await supabase
-                .from('comments')
-                .insert({
+            // Use backend API to bypass RLS
+            const response = await fetch(`${BASE_URL}/api/comments`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
                     video_url: videoUrl,
                     user_id: user.sub,
                     content: commentText,
-                });
+                    parent_id: parentId,
+                }),
+            });
 
-            if (error) throw error;
+            if (!response.ok) throw new Error('Failed to post comment');
+            const data = await response.json();
 
             // Add to local state optimistically
             const newCommentItem: Comment = {
-                id: Date.now().toString(),
+                id: data.comment?.id || Date.now().toString(),
                 content: commentText,
                 user_id: user.sub,
                 created_at: new Date().toISOString(),
+                parent_id: parentId,
+                likes_count: 0,
                 user: { name: user.name || 'You', avatar: user.picture || '' },
             };
-            setComments(prev => [newCommentItem, ...prev]);
+
+            if (parentId) {
+                // Add as reply - update parent's replies
+                setComments(prev => prev.map(c =>
+                    c.id === parentId
+                        ? { ...c, replies: [...(c.replies || []), newCommentItem] }
+                        : c
+                ));
+            } else {
+                setComments(prev => [newCommentItem, ...prev]);
+            }
         } catch (err) {
             console.error('Error posting comment:', err);
             setNewComment(commentText); // Restore on error
         } finally {
             setPosting(false);
         }
+    };
+
+    const handleReply = (commentId: string, username: string) => {
+        setReplyingTo({ id: commentId, username });
+    };
+
+    const handleLike = async (commentId: string) => {
+        if (!user) return;
+
+        const isLiked = likedComments.has(commentId);
+
+        // Optimistic update
+        setLikedComments(prev => {
+            const next = new Set(prev);
+            if (isLiked) {
+                next.delete(commentId);
+            } else {
+                next.add(commentId);
+            }
+            return next;
+        });
+
+        // Update local likes count
+        setComments(prev => prev.map(c =>
+            c.id === commentId
+                ? { ...c, likes_count: (c.likes_count || 0) + (isLiked ? -1 : 1) }
+                : c
+        ));
+
+        try {
+            const method = isLiked ? 'DELETE' : 'POST';
+            const response = await fetch(`${BASE_URL}/api/comments/${commentId}/like`, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: user.sub }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to update like');
+            }
+        } catch (err) {
+            console.error('Error updating like:', err);
+            // Revert optimistic update on error
+            setLikedComments(prev => {
+                const next = new Set(prev);
+                if (isLiked) {
+                    next.add(commentId);
+                } else {
+                    next.delete(commentId);
+                }
+                return next;
+            });
+            setComments(prev => prev.map(c =>
+                c.id === commentId
+                    ? { ...c, likes_count: (c.likes_count || 0) + (isLiked ? 1 : -1) }
+                    : c
+            ));
+        }
+    };
+
+    const cancelReply = () => {
+        setReplyingTo(null);
     };
 
     const formatTime = (dateString: string) => {
@@ -205,15 +295,22 @@ export const CommentSheet = ({ videoUrl, onClose, visible }: CommentSheetProps) 
                                         <Text style={styles.metaText}>
                                             {formatTime(item.created_at)}
                                         </Text>
-                                        <TouchableOpacity activeOpacity={0.7}>
+                                        <TouchableOpacity activeOpacity={0.7} onPress={() => handleReply(item.id, item.user?.name || 'User')}>
                                             <Text style={styles.metaTextReply}>Reply</Text>
                                         </TouchableOpacity>
                                     </View>
                                 </View>
 
-                                {/* Like Heart (Visual Only for now) */}
-                                <TouchableOpacity style={styles.likeButton}>
-                                    <Ionicons name="heart-outline" size={14} color="#8E8E93" />
+                                {/* Like Heart */}
+                                <TouchableOpacity style={styles.likeButton} onPress={() => handleLike(item.id)}>
+                                    <Ionicons
+                                        name={likedComments.has(item.id) ? "heart" : "heart-outline"}
+                                        size={14}
+                                        color={likedComments.has(item.id) ? "#FF3B5C" : "#8E8E93"}
+                                    />
+                                    {(item.likes_count || 0) > 0 && (
+                                        <Text style={styles.likesCount}>{item.likes_count}</Text>
+                                    )}
                                 </TouchableOpacity>
                             </View>
                         )}
@@ -234,6 +331,17 @@ export const CommentSheet = ({ videoUrl, onClose, visible }: CommentSheetProps) 
 
                 {/* Input Area - uses dynamic keyboard height for iOS, fixed for others */}
                 <View style={[styles.inputContainer, { paddingBottom: Platform.OS === 'ios' ? inputBottomPadding : 12 }]}>
+                    {/* Reply indicator */}
+                    {replyingTo && (
+                        <View style={styles.replyIndicator}>
+                            <Text style={styles.replyIndicatorText}>
+                                Replying to @{replyingTo.username}
+                            </Text>
+                            <TouchableOpacity onPress={cancelReply}>
+                                <Ionicons name="close-circle" size={18} color="#8E8E93" />
+                            </TouchableOpacity>
+                        </View>
+                    )}
                     {user ? (
                         <>
                             <Image
@@ -378,11 +486,36 @@ const styles = StyleSheet.create({
     likeButton: {
         padding: 4,
         marginTop: 8, // Align with text block roughly
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    likesCount: {
+        fontSize: 11,
+        color: '#8E8E93',
     },
     emptyContainer: {
         paddingVertical: 40,
         alignItems: 'center',
         gap: 8,
+    },
+    replyIndicator: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        backgroundColor: '#2C2C2E',
+        borderTopWidth: 0.5,
+        borderTopColor: 'rgba(255,255,255,0.15)',
+        position: 'absolute',
+        top: -36,
+        left: 0,
+        right: 0,
+    },
+    replyIndicatorText: {
+        fontSize: 13,
+        color: colors.primary,
     },
     inputContainer: {
         flexDirection: 'row',

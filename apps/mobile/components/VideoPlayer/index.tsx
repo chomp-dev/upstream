@@ -176,7 +176,7 @@ export function VideoPlayer({
 
 const styles = StyleSheet.create({
     container: {
-        backgroundColor: '#f7f6f1',
+        backgroundColor: '#000',
         justifyContent: 'center',
         alignItems: 'center',
     },
