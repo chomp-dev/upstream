@@ -144,14 +144,15 @@ export default function HomeScreen() {
         username: passedItem.username
       });
 
-      // Scroll to top immediately
+      // Scroll to top immediately since we prepended
       setTimeout(() => {
-        flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
-      }, 50);
+        flatListRef.current?.scrollToIndex({ index: 0, animated: false });
+        setCurrentIndex(0);
+      }, 100);
     };
 
     handleExploreNavigation();
-  }, [params.videoDataId]);  // FIX: Removed feed.length to prevent infinite loop
+  }, [params.videoDataId]);
 
   // ============================================================================
   // Load nearby feed on mount
@@ -777,28 +778,12 @@ export default function HomeScreen() {
                       avatarUrl: item.user_avatar || undefined
                     }}
                     videoUrl={item.video_url}
-                    caption={item.title || item.description}
+                    title={item.title}
+                    caption={item.description}
                     userLocation={userLocation}
                     status={item.status}
                   />
-                  {item.status !== 'ready' && (
-                    <View style={styles.processingOverlay}>
-                      {item.status === 'error' ? (
-                        <Text variant="body" style={styles.processingText}>
-                          Video unavailable
-                        </Text>
-                      ) : (
-                        <>
-                          <ActivityIndicator size="large" color={colors.primary} />
-                          <Text variant="body" style={styles.processingText}>
-                            {item.status === 'inprogress' || item.status === 'processing'
-                              ? 'Processing...'
-                              : 'Uploading...'}
-                          </Text>
-                        </>
-                      )}
-                    </View>
-                  )}
+                  {/* Processing overlay handled by VideoPlayer internally now to avoid stacking */}
                 </>
               ) : item.type === 'tiktok_embed' ? (
                 <TikTokEmbed
@@ -818,7 +803,8 @@ export default function HomeScreen() {
                     username: item.username || 'User',
                     avatarUrl: item.user_avatar || undefined
                   }}
-                  caption={item.title || item.description || ''}
+                  title={item.title}
+                  caption={item.description}
                   imagePostId={item.id}
                 />
               )}

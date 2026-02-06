@@ -116,16 +116,14 @@ export default function ExploreScreen() {
   };
 
   const handleItemPress = (item: FeedItem, index: number) => {
-    // Navigate to home feed with item index to scroll to
-    // We pass the full item data so Home can display it even if it's not in the local feed
+    // Navigate to home feed with just the item data to inject/show
+    // We do NOT pass scrollToIndex merely to scroll to an index that might not exist in the Home feed list.
+    // Instead, we pass videoDataId which forces injection at the TOP of the feed.
     const dataId = `video-${Date.now()}`
 
     if (__DEV__) console.log('[Explore] Navigating with item:', {
       id: item.id,
       title: item.title,
-      username: item.username,
-      avatar: item.user_avatar,
-      placeId: item.google_place_id
     });
 
     navigationStore.set(dataId, item);
@@ -133,8 +131,6 @@ export default function ExploreScreen() {
     router.push({
       pathname: '/',
       params: {
-        scrollToIndex: index.toString(),
-        itemId: item.id.toString(),
         videoDataId: dataId
       },
     });

@@ -26,10 +26,11 @@ interface ImagePostViewerProps {
     avatarUrl: string;
   };
   caption?: string;
+  title?: string;
   imagePostId?: number; // Database id for social features
 }
 
-export function ImagePostViewer({ images, restaurant, user, caption, imagePostId }: ImagePostViewerProps) {
+export function ImagePostViewer({ images, restaurant, user, caption, title, imagePostId }: ImagePostViewerProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
   const { width, height } = useContentDimensions();
@@ -86,7 +87,14 @@ export function ImagePostViewer({ images, restaurant, user, caption, imagePostId
         })}
       </ScrollView>
 
-      <MediaOverlay height={height} restaurant={restaurant} user={user} caption={caption} imagePostId={imagePostId} />
+      <MediaOverlay
+        height={height}
+        restaurant={restaurant}
+        user={user}
+        caption={caption}
+        title={title}
+        imagePostId={imagePostId}
+      />
 
       {/* Indicator dots */}
       <View style={styles.indicatorContainer}>

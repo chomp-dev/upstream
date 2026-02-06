@@ -100,62 +100,93 @@ export function MediaOverlay({
 
     // Fetch social data
     useEffect(() => {
-        if (!videoUrl) return;
+        if (!videoUrl && !imagePostId) return;
 
         const fetchSocialData = async () => {
             try {
-                // Fetch like count from video_likes table (not stale likes_count column)
-                const { count: likeCount } = await supabase
-                    .from('video_likes')
-                    .select('*', { count: 'exact', head: true })
-                    .eq('video_url', videoUrl);
+                // LIKE COUNT
+                let likeCount = 0;
+                if (videoUrl) {
+                    const { count } = await supabase
+                        .from('video_likes')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('video_url', videoUrl);
+                    likeCount = count || 0;
+                } else if (imagePostId) {
+                    const { count } = await supabase
+                        .from('image_post_likes')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('image_post_id', imagePostId);
+                    likeCount = count || 0;
+                }
+                setLikesCount(likeCount);
 
-                setLikesCount(likeCount || 0);
-
-                // Fetch comment count
-                const { count: commentCount } = await supabase
-                    .from('comments')
-                    .select('id', { count: 'exact', head: true })
-                    .eq('video_url', videoUrl);
-
+                // COMMENT COUNT
+                let commentCount = 0;
+                if (videoUrl) {
+                    const { count } = await supabase
+                        .from('comments')
+                        .select('id', { count: 'exact', head: true })
+                        .eq('video_url', videoUrl);
+                    commentCount = count || 0;
+                } else if (imagePostId) {
+                    const { count } = await supabase
+                        .from('image_post_comments')
+                        .select('id', { count: 'exact', head: true })
+                        .eq('image_post_id', imagePostId);
+                    commentCount = count || 0;
+                }
                 setCommentsCount(commentCount || 0);
 
-                // Check if current user liked
+                // USER LIKE STATUS
                 if (authUser) {
-                    const { data: likeData } = await supabase
-                        .from('video_likes')
-                        .select('*')
-                        .eq('video_url', videoUrl)
-                        .eq('user_id', authUser.sub)
-                        .maybeSingle();
+                    let isLikedData = false;
+                    if (videoUrl) {
+                        const { data } = await supabase
+                            .from('video_likes')
+                            .select('*')
+                            .eq('video_url', videoUrl)
+                            .eq('user_id', authUser.sub)
+                            .maybeSingle();
+                        isLikedData = !!data;
+                    } else if (imagePostId) {
+                        const { data } = await supabase
+                            .from('image_post_likes')
+                            .select('*')
+                            .eq('image_post_id', imagePostId)
+                            .eq('user_id', authUser.sub)
+                            .maybeSingle();
+                        isLikedData = !!data;
+                    }
+                    setIsLiked(isLikedData);
 
-                    setIsLiked(!!likeData);
-
-                    // Check if saved
-                    const { data: saveData } = await supabase
-                        .from('saves')
-                        .select('*')
-                        .eq('video_url', videoUrl)
-                        .eq('user_id', authUser.sub)
-                        .maybeSingle();
-
-                    setIsSaved(!!saveData);
+                    // Saves (only video supported for now in original code, skipping for image post if unknown)
+                    if (videoUrl) {
+                        const { data: saveData } = await supabase
+                            .from('saves')
+                            .select('*')
+                            .eq('video_url', videoUrl)
+                            .eq('user_id', authUser.sub)
+                            .maybeSingle();
+                        setIsSaved(!!saveData);
+                    }
                 }
 
-                // Fetch saves count
-                const { count: saveCount } = await supabase
-                    .from('saves')
-                    .select('id', { count: 'exact', head: true })
-                    .eq('video_url', videoUrl);
-
-                setSavesCount(saveCount || 0);
+                // Saves Count (video only for now)
+                if (videoUrl) {
+                    const { count: saveCount } = await supabase
+                        .from('saves')
+                        .select('id', { count: 'exact', head: true })
+                        .eq('video_url', videoUrl);
+                    setSavesCount(saveCount || 0);
+                }
             } catch (err) {
-                // Silently handle errors - data will show defaults
+                // Silently handle errors
             }
         };
 
         fetchSocialData();
-    }, [videoUrl, authUser, supabase]);
+    }, [videoUrl, imagePostId, authUser, supabase]);
 
     const handleProfilePress = () => {
         if (user?.userId) {
@@ -171,7 +202,7 @@ export function MediaOverlay({
             login();
             return;
         }
-        if (!videoUrl) return;
+        if (!videoUrl && !imagePostId) return;
 
         const previousLiked = isLiked;
         const previousCount = likesCount;
@@ -182,18 +213,17 @@ export function MediaOverlay({
 
         try {
             if (previousLiked) {
-                await supabase
-                    .from('video_likes')
-                    .delete()
-                    .eq('video_url', videoUrl)
-                    .eq('user_id', authUser.sub);
+                if (videoUrl) {
+                    await supabase.from('video_likes').delete().eq('video_url', videoUrl).eq('user_id', authUser.sub);
+                } else if (imagePostId) {
+                    await supabase.from('image_post_likes').delete().eq('image_post_id', imagePostId).eq('user_id', authUser.sub);
+                }
             } else {
-                await supabase
-                    .from('video_likes')
-                    .insert({
-                        video_url: videoUrl,
-                        user_id: authUser.sub
-                    });
+                if (videoUrl) {
+                    await supabase.from('video_likes').insert({ video_url: videoUrl, user_id: authUser.sub });
+                } else if (imagePostId) {
+                    await supabase.from('image_post_likes').insert({ image_post_id: imagePostId, user_id: authUser.sub });
+                }
             }
         } catch (err) {
             // Revert on error
@@ -237,8 +267,16 @@ export function MediaOverlay({
     };
 
     const handleComment = () => {
-        if (!videoUrl) return;
-        openCommentSheet(videoUrl);
+        if (videoUrl) {
+            openCommentSheet(videoUrl);
+        } else if (imagePostId) {
+            // Pass explicitly as image post ID if comment sheet supports it, 
+            // or pass a construct that the sheet understands.
+            // Assuming openCommentSheet handles polymorphism via string ID or we need to update context.
+            // For now, let's try passing ID as string with prefix if needed, or just ID.
+            // The current context likely expects a string ID.
+            openCommentSheet(imagePostId.toString());
+        }
     };
 
     const handleShare = async () => {

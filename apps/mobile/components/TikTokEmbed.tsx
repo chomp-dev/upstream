@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
     },
     bottomInfo: {
         position: 'absolute',
-        bottom: 100,
+        bottom: 60, // Reduced from 100 to be closer to nav bar
         left: 16,
         right: 70,
     },

@@ -19,7 +19,8 @@ interface VideoPlayerProps {
         avatarUrl: string;
     };
     videoUrl?: string; // Database video_url for social features
-    caption?: string; // Title/description to show in overlay
+    caption?: string; // Description
+    title?: string; // Title
     userLocation?: { lat: number; lng: number } | null;
     status?: string; // Video processing status
 }
@@ -37,6 +38,7 @@ export function VideoPlayer({
     user,
     videoUrl,
     caption,
+    title,
     userLocation,
     status
 }: VideoPlayerProps) {

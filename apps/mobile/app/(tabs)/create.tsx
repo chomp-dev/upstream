@@ -917,6 +917,47 @@ export default function CreateScreen() {
           )}
         </View>
       </Modal>
+
+      {/* TikTok Link Input Modal */}
+      <Modal visible={showTikTokInput} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text variant="title" style={styles.modalTitle}>Add TikTok Link</Text>
+            <Text variant="bodySmall" color={colors.muted} style={{ marginBottom: spacing.md }}>
+              Paste the full URL for the TikTok video
+            </Text>
+
+            <TextInput
+              style={[styles.input, { width: '100%', marginBottom: spacing.lg }]}
+              placeholder="https://www.tiktok.com/..."
+              placeholderTextColor={colors.muted}
+              value={tempTikTokUrl}
+              onChangeText={setTempTikTokUrl}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+
+            <View style={{ flexDirection: 'row', gap: spacing.md, width: '100%' }}>
+              <TouchableOpacity
+                style={[styles.uploadButton, styles.uploadButtonSecondary, { flex: 1, marginBottom: 0 }]}
+                onPress={() => {
+                  setShowTikTokInput(false);
+                  setTempTikTokUrl('');
+                }}
+              >
+                <Text variant="body">Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.nextButton, { flex: 1 }]}
+                onPress={handleTikTokSelect}
+              >
+                <Text variant="subtitle" color="#fff">Add</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Screen >
   );
 }
