@@ -372,7 +372,7 @@ export default function MapScreen() {
                   {item.rating.toFixed(1)}
                 </Text>
                 {item.user_rating_count !== null && (
-                  <Text variant="caption" color={colors.muted} style={{ marginLeft: 2 }}>
+                  <Text variant="caption" style={{ marginLeft: 2, color: '#ffffff' }}>
                     ({item.user_rating_count})
                   </Text>
                 )}
@@ -691,7 +691,7 @@ const styles = StyleSheet.create({
   },
   ratingText: {
     fontWeight: '600',
-    color: colors.text,
+    color: '#ffffff',
   },
   listAddress: {
     marginBottom: spacing.xs,

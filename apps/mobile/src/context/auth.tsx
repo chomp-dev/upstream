@@ -9,7 +9,7 @@ interface AuthContextType {
     user: User | null;
     isLoading: boolean;
     login: () => Promise<void>;
-    logout: () => Promise<void>;
+    logout: (params?: { logoutParams?: { returnTo?: string } }) => Promise<void>;
     accessToken: string | null;
     supabase: SupabaseClient;
     refreshToken: () => Promise<void>;
@@ -54,7 +54,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
-    const logout = async () => {
+    const logout = async (params?: { logoutParams?: { returnTo?: string } }) => {
         try {
             if (refreshIntervalRef.current) {
                 clearInterval(refreshIntervalRef.current);
@@ -66,7 +66,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (Platform.OS === 'web') {
                 // Construct logout URL with whitelisted returnTo
                 const clientId = process.env.EXPO_PUBLIC_AUTH0_CLIENT_ID;
-                const returnTo = encodeURIComponent('https://www.usechomp.com/demo/social');
+                const returnTo = encodeURIComponent(params?.logoutParams?.returnTo || 'https://www.usechomp.com/demo/social');
                 const logoutUrl = `https://dev-dm0k5l2f2j2qi2g3.us.auth0.com/v2/logout?client_id=${clientId}&returnTo=${returnTo}`;
                 window.location.href = logoutUrl;
             } else {

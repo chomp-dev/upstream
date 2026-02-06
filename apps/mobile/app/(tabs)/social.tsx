@@ -221,12 +221,22 @@ function ProfileSection() {
             )}
 
             {/* Action Buttons Row */}
-            <TouchableOpacity
-              style={styles.editProfileButton}
-              onPress={() => router.push('/edit_profile')}
-            >
-              <Text variant="caption" color={colors.bg}>Edit Profile</Text>
-            </TouchableOpacity>
+            <View style={styles.actionButtonsRow}>
+              <TouchableOpacity
+                style={styles.editProfileButton}
+                onPress={() => router.push('/edit_profile')}
+              >
+                <Text variant="caption" color={colors.bg}>Edit Profile</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.logoutButton}
+                onPress={() => logout({
+                  logoutParams: { returnTo: 'https://usechomp.com/demo' }
+                })}
+              >
+                <Text variant="caption" color="red">Log Out</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Stats */}
@@ -563,8 +573,8 @@ const styles = StyleSheet.create({
   actionButtonsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: spacing.md,
     gap: spacing.sm,
+    marginTop: spacing.md, // Spacing from Bio
   },
   editProfileButton: {
     paddingHorizontal: spacing.md,
@@ -573,15 +583,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     borderWidth: 1,
     borderColor: colors.primary,
-    marginTop: spacing.md, // Add spacing to balance with bio
   },
   logoutButton: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     borderRadius: radius.pill,
-    backgroundColor: colors.surface,
+    backgroundColor: '#f7f6f1',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#f7f6f1', // Or border color if needed
   },
   loginContainer: {
     flex: 1,
@@ -612,9 +621,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-    backgroundColor: '#eeb57e', // Requested gold background
-    paddingHorizontal: spacing.md, // Add padding since we have a background now
-    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
     marginBottom: spacing.xs,
   },
   conversationAvatar: {
