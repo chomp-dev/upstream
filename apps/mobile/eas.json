@@ -11,6 +11,15 @@
             "distribution": "internal"
         },
         "production": {
+            "env": {
+                "EXPO_PUBLIC_MEDIA_API_BASE": "https://media-api-vq8j.onrender.com",
+                "EXPO_PUBLIC_SEARCH_API_BASE": "https://search-api-cbp7.onrender.com",
+                "EXPO_PUBLIC_AUTH0_DOMAIN": "dev-dm0k5l2f2j2qi2g3.us.auth0.com",
+                "EXPO_PUBLIC_AUTH0_CLIENT_ID": "cZ9xwl88jRBNdVwfLZuq0mHaJSkajX7W",
+                "EXPO_PUBLIC_AUTH0_AUDIENCE": "https://api.chomp.app",
+                "EXPO_PUBLIC_SUPABASE_URL": "https://gpucrivkkqqdzmaruicu.supabase.co",
+                "EXPO_PUBLIC_SUPABASE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdwdWNyaXZra3FxZHptYXJ1aWN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczNjY1ODYsImV4cCI6MjA4Mjk0MjU4Nn0.UT4RzxhSnMAAAsIz1VYFuPIXeN6tmhwzVx9U9t1FDYo"
+            },
             "android": {
                 "buildType": "app-bundle"
             },
