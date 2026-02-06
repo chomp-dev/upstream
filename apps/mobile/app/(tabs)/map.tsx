@@ -679,7 +679,7 @@ const styles = StyleSheet.create({
   ratingBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.overlay,
+    backgroundColor: '#eeb57e',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: radius.sm,
