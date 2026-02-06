@@ -115,22 +115,15 @@ export function VideoPlayer({
         return (
             <View style={[styles.container, { width, height }]}>
                 {status === 'processing' ? (
-                    <>
-                        {/* Processing Badge */}
-                        <View style={styles.processingBadge}>
-                            <RNText style={styles.processingText}>⏳ Processing...</RNText>
-                        </View>
-                        {/* Processing Placeholder */}
-                        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a1a1a' }}>
-                            <RNText style={{ fontSize: 48 }}>🎬</RNText>
-                            <RNText style={{ color: '#fff', fontSize: 18, marginTop: 12, fontWeight: '600' }}>
-                                Video is processing
-                            </RNText>
-                            <RNText style={{ color: '#888', fontSize: 14, marginTop: 8, textAlign: 'center', paddingHorizontal: 40 }}>
-                                This usually takes a few minutes
-                            </RNText>
-                        </View>
-                    </>
+                    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a1a1a' }}>
+                        <ActivityIndicator size="large" color="#fff" />
+                        <RNText style={{ color: '#fff', fontSize: 16, marginTop: 16, fontWeight: '600' }}>
+                            Video is processing
+                        </RNText>
+                        <RNText style={{ color: '#666', fontSize: 13, marginTop: 6 }}>
+                            This usually takes a few minutes
+                        </RNText>
+                    </View>
                 ) : thumbnailUrl ? (
                     <Image source={{ uri: thumbnailUrl }} style={[styles.thumbnail, { width, height }]} />
                 ) : (
@@ -197,20 +190,5 @@ const styles = StyleSheet.create({
     },
     placeholder: {
         // backgroundColor: '#222', // Handled by Placeholder component
-    },
-    processingBadge: {
-        position: 'absolute',
-        top: 60,
-        left: 20,
-        backgroundColor: 'rgba(0, 0, 0, 0.7)',
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 20,
-        zIndex: 10,
-    },
-    processingText: {
-        color: '#fff',
-        fontSize: 14,
-        fontWeight: '600',
     },
 });
