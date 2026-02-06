@@ -465,6 +465,7 @@ const styles = StyleSheet.create({
         backgroundColor: colors.primary,
         borderWidth: 1,
         borderColor: colors.primary,
+        marginTop: spacing.md,
     },
     logoutButton: {
         paddingHorizontal: spacing.md,

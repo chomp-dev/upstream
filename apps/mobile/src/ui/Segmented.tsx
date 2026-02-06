@@ -68,6 +68,6 @@ const styles = StyleSheet.create({
     color: colors.muted,
   },
   labelActive: {
-    color: '#000',
+    color: '#f7f6f1',
   },
 });

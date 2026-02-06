@@ -520,8 +520,8 @@ export default function MapScreen() {
         {/* View mode toggle */}
         <Segmented
           options={[
-            { key: 'map', label: '🗺️ Map' },
-            { key: 'list', label: '📋 List' },
+            { key: 'map', label: 'Map' },
+            { key: 'list', label: 'List' },
           ]}
           selected={viewMode}
           onSelect={(key) => setViewMode(key as ViewMode)}
@@ -679,7 +679,7 @@ const styles = StyleSheet.create({
   ratingBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.overlay,
+    backgroundColor: '#eeb57e',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: radius.sm,

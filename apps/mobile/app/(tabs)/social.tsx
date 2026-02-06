@@ -573,6 +573,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     borderWidth: 1,
     borderColor: colors.primary,
+    marginTop: spacing.md, // Add spacing to balance with bio
   },
   logoutButton: {
     paddingHorizontal: spacing.md,
@@ -611,6 +612,10 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    backgroundColor: '#eeb57e', // Requested gold background
+    paddingHorizontal: spacing.md, // Add padding since we have a background now
+    borderRadius: radius.md,
+    marginBottom: spacing.xs,
   },
   conversationAvatar: {
     width: 50,
