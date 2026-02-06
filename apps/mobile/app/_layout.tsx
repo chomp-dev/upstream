@@ -1,54 +1,33 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { View, StyleSheet, Platform } from 'react-native';
-import { useState, useEffect } from 'react';
-import SimpleSplash from '../components/SimpleSplash';
+import { View, StyleSheet, Platform, Text } from 'react-native';
 import { Auth0Provider } from 'react-native-auth0';
 import { colors } from '../src/theme';
 import { AuthProvider } from '../src/context/auth';
 import { CommentSheetProvider } from '../src/context/commentSheet';
 import * as SplashScreen from 'expo-splash-screen';
-import { preloadService } from '../src/lib/preloadService';
+import { ErrorBoundary } from 'react-error-boundary';
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync().catch(() => {
-  /* reloading the app might trigger some race conditions, ignore them */
-});
+// Hide native splash immediately
+SplashScreen.hideAsync().catch(() => { });
+
+// Error fallback component
+function ErrorFallback({ error }: { error: Error }) {
+  return (
+    <View style={styles.errorContainer}>
+      <Text style={styles.errorTitle}>⚠️ App Error</Text>
+      <Text style={styles.errorMessage}>
+        The app encountered an error but we caught it!
+        {'\n\n'}
+        Error: {error.message}
+        {'\n\n'}
+        Please close and reopen the app to try again.
+      </Text>
+    </View>
+  );
+}
 
 export default function RootLayout() {
-  const [isSplashComplete, setIsSplashComplete] = useState(false);
-  const [preloadProgress, setPreloadProgress] = useState(0);
-  const [dataReady, setDataReady] = useState(false);
-  const [statusText, setStatusText] = useState('Initializing...');
-
-  // Start preload immediately on mount
-  useEffect(() => {
-    console.log('[Layout] Starting preload...');
-    preloadService.preload(
-      (progress) => setPreloadProgress(progress),
-      (status) => setStatusText(status)
-    ).then((result) => {
-      console.log('[Layout] Preload complete:', result);
-      setDataReady(true);
-      // Hide native splash screen so our custom one can show
-      SplashScreen.hideAsync();
-    }).catch((error) => {
-      console.error('[Layout] Preload error:', error);
-      setDataReady(true); // Continue even on error
-      SplashScreen.hideAsync();
-    });
-  }, []);
-
-  // Complete splash screen after data is ready
-  useEffect(() => {
-    if (dataReady && preloadProgress >= 100) {
-      const timer = setTimeout(() => {
-        setIsSplashComplete(true);
-      }, 500); // Small delay for UX
-      return () => clearTimeout(timer);
-    }
-  }, [dataReady, preloadProgress]);
-
   const content = (
     <>
       <StatusBar style="light" />
@@ -56,7 +35,7 @@ export default function RootLayout() {
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: colors.bg },
-          animation: 'fade',
+          animation: 'none', // Disable all animations to avoid Reanimated
         }}
       >
         <Stack.Screen name="(tabs)" />
@@ -71,66 +50,65 @@ export default function RootLayout() {
   } : {};
 
   const wrappedContent = (
-    <Auth0Provider
-      domain={process.env.EXPO_PUBLIC_AUTH0_DOMAIN!}
-      clientId={process.env.EXPO_PUBLIC_AUTH0_CLIENT_ID!}
-      {...auth0Props}
+    <ErrorBoundary
+      FallbackComponent={ErrorFallback}
+      onError={(error) => {
+        console.error('[ErrorBoundary] Caught error:', error);
+      }}
     >
-      <AuthProvider>
-        <CommentSheetProvider>
-          {content}
-        </CommentSheetProvider>
-      </AuthProvider>
-    </Auth0Provider>
-  );
-
-  const appWithSplash = (
-    <View style={{ flex: 1 }}>
-      {wrappedContent}
-      {!isSplashComplete && (
-        <SimpleSplash
-          progress={preloadProgress}
-          statusText={statusText}
-        />
-      )}
-    </View>
+      <Auth0Provider
+        domain={process.env.EXPO_PUBLIC_AUTH0_DOMAIN!}
+        clientId={process.env.EXPO_PUBLIC_AUTH0_CLIENT_ID!}
+        {...auth0Props}
+      >
+        <AuthProvider>
+          <CommentSheetProvider>
+            {content}
+          </CommentSheetProvider>
+        </AuthProvider>
+      </Auth0Provider>
+    </ErrorBoundary>
   );
 
   if (Platform.OS === 'web') {
     return (
-      <View style={styles.webContainer}>
-        {/* Hide Scrollbar Globally on Web */}
-        <style type="text/css">{`
-          ::-webkit-scrollbar { display: none; }
-          body { -ms-overflow-style: none; scrollbar-width: none; }
-        `}</style>
-        <View style={styles.mobileWrapper}>
-          {appWithSplash}
-        </View>
-      </View>
+      <html lang="en">
+        <head>
+          <meta charSet="utf-8" />
+          <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+          <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+          <title>Chomp</title>
+        </head>
+        <body style={{ margin: 0, padding: 0 }}>
+          <div id="root" style={{ height: '100vh', width: '100vw' }}>
+            {wrappedContent}
+          </div>
+        </body>
+      </html>
     );
   }
 
-  return appWithSplash;
+  return wrappedContent;
 }
 
 const styles = StyleSheet.create({
-  webContainer: {
+  errorContainer: {
     flex: 1,
-    backgroundColor: '#000',
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+    padding: 20,
   },
-  mobileWrapper: {
-    width: '100%',
-    maxWidth: 500,
-    height: '100%',
-    backgroundColor: colors.bg,
-    // Add shadow for depth on desktop
-    ...Platform.select({
-      web: {
-        boxShadow: '0 0 40px rgba(0,0,0,0.5)',
-      },
-    }),
+  errorTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#ff6b6b',
+    marginBottom: 20,
+  },
+  errorMessage: {
+    fontSize: 16,
+    color: '#ffffff',
+    textAlign: 'center',
+    lineHeight: 24,
   },
 });
