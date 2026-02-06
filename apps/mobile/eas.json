@@ -16,7 +16,8 @@
                 "buildType": "app-bundle"
             },
             "ios": {
-                "resourceClass": "large"
+                "resourceClass": "large",
+                "autoIncrement": "buildNumber"
             }
         }
     },

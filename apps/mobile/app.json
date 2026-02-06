@@ -18,7 +18,6 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.usechomp.chomp",
-      "buildNumber": "2",
       "config": {
         "googleMapsApiKey": "AIzaSyAqq6mTFvn6DnnQkW9MUhjx59lcX5644n0"
       },
