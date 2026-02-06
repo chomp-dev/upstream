@@ -1,6 +1,7 @@
 {
     "cli": {
-        "version": ">= 7.0.0"
+        "version": ">= 7.0.0",
+        "appVersionSource": "remote"
     },
     "build": {
         "development": {
@@ -11,6 +12,7 @@
             "distribution": "internal"
         },
         "production": {
+            "autoIncrement": true,
             "env": {
                 "EXPO_PUBLIC_MEDIA_API_BASE": "https://media-api-vq8j.onrender.com",
                 "EXPO_PUBLIC_SEARCH_API_BASE": "https://search-api-cbp7.onrender.com",
