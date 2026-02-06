@@ -60,7 +60,7 @@
         "react-native-auth0",
         {
           "domain": "dev-dm0k5l2f2j2qi2g3.us.auth0.com",
-          "customScheme": "com.chomp.app"
+          "customScheme": "com.usechomp.chomp.auth0"
         }
       ]
     ],
@@ -72,7 +72,9 @@
       "router": {},
       "eas": {
         "projectId": "0a56de28-7fc3-485a-9649-245db73f4742"
-      }
+      },
+      "auth0Domain": "dev-dm0k5l2f2j2qi2g3.us.auth0.com",
+      "auth0ClientId": "cZ9xwl88jRBNdVwfLZuq0mHaJSkajX7W"
     },
     "owner": "chomps-organization"
   }
