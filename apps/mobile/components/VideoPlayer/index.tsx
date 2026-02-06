@@ -101,10 +101,11 @@ export function VideoPlayer({
 
         return () => {
             subscription.remove();
-            // Cleanup: pause and release player on unmount
+            // Cleanup: pause player on unmount
+            // Note: Don't call player.release() - it causes crashes on iOS
+            // expo-video handles cleanup automatically
             if (player) {
                 player.pause();
-                player.release();
             }
         };
     }, [isActive, player]);
