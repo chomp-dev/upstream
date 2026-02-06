@@ -157,6 +157,8 @@ export function VideoPlayer({
                 playsInline
                 // @ts-ignore: muted is required for iOS Web autoplay, but we want sound elsewhere
                 muted={Platform.OS === 'web'}
+                // @ts-ignore: Disable Live Text/Visual Analysis to prevent SIGSEGV crashes on iOS when recycling views
+                allowsVideoFrameAnalysis={false}
             />
 
             {/* Loading Indicator for initial buffer */}
