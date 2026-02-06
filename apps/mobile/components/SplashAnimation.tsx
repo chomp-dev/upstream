@@ -9,16 +9,18 @@ import Animated, {
     withTiming,
     withSequence,
     withDelay,
+    withSpring,
     Easing,
     runOnJS,
     ZoomIn,
     interpolate,
-    Extrapolate
+    Extrapolate,
+    type SharedValue
 } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 
-// Local Assets (User verified transparent)
+// Local Assets
 const ASSETS = {
     logo: require('../assets/images/chomp_logo.png'),
     bg: require('../assets/images/splash_assets/splash_bg.jpg'),
@@ -36,10 +38,10 @@ const FOOD_ITEMS = [
 
 interface SplashAnimationProps {
     onComplete: () => void;
-    progress?: number; // 0-100 external loading progress
-    dataReady?: boolean; // Signal that data loading is complete
-    minDisplayMs?: number; // Minimum time to show splash (default 2000)
-    statusText?: string; // Status text to display below progress bar
+    progress?: number;
+    dataReady?: boolean;
+    minDisplayMs?: number;
+    statusText?: string;
 }
 
 // Particle for "Crumbs" Effect
@@ -49,37 +51,16 @@ const Crumb = ({ index, total }: { index: number, total: number }) => {
     const scale = useSharedValue(0);
 
     useEffect(() => {
-        // Explode after 2.8s (synced with logo zoom)
-        const delay = 2800;
-        scale.value = withDelay(delay, withSequence(
-            withTiming(1, { duration: 100 }), // Appear
-            withTiming(0, { duration: 600 }) // Fade out
-        ));
-        progress.value = withDelay(delay, withTiming(1, { duration: 800, easing: Easing.out(Easing.exp) }));
+        // Explode after logo bounce (around 2200ms into sequence)
+        // Wait for absorption (600ms) + small delay
+        // Actually, let's trigger it manually or synced with a prop if needed, 
+        // but for now keeping it simple with delay relative to mount might be tricky if loading takes long.
+        // We'll disable crumbs for this new "clean" animation style as requested ("clean animation") 
+        // or re-enable them if we want them during the bounce.
+        // Let's remove them for the "clean" look requested.
     }, []);
 
-    const style = useAnimatedStyle(() => {
-        // Fly outward 300-600px
-        const distance = interpolate(progress.value, [0, 1], [0, 400 + (index % 5) * 50]);
-        const translateX = Math.cos(angle) * distance;
-        const translateY = Math.sin(angle) * distance;
-
-        return {
-            position: 'absolute',
-            width: 8 + (index % 3) * 4,
-            height: 8 + (index % 3) * 4,
-            backgroundColor: index % 2 === 0 ? '#eeb57e' : '#FDE047', // Orange/Yellow crumbs
-            borderRadius: 50,
-            transform: [
-                { translateX },
-                { translateY },
-                { scale: scale.value }
-            ],
-            zIndex: 20
-        };
-    });
-
-    return <Animated.View style={style} />;
+    return null;
 };
 
 interface FloatingItemProps {
@@ -88,9 +69,10 @@ interface FloatingItemProps {
     containerHeight: number;
     index: number;
     total: number;
+    absorbing: SharedValue<number>; // 0 to 1
 }
 
-const FloatingItem = ({ source, containerWidth, containerHeight, index, total }: FloatingItemProps) => {
+const FloatingItem = ({ source, containerWidth, containerHeight, index, total, absorbing }: FloatingItemProps) => {
     // Symmetrical Layout: Circular Orbit
     const radius = Math.min(containerWidth, containerHeight) * 0.35; // 35% of screen
     const angle = (index / total) * 2 * Math.PI;
@@ -100,6 +82,10 @@ const FloatingItem = ({ source, containerWidth, containerHeight, index, total }:
     const centerY = containerHeight / 2;
     const initialX = centerX + Math.cos(angle) * radius - 40; // -40 for half width
     const initialY = centerY + Math.sin(angle) * radius - 40;
+
+    // Center target (where logo is)
+    const targetX = centerX - 40;
+    const targetY = centerY - 40;
 
     const scale = useSharedValue(1);
     const translateY = useSharedValue(0);
@@ -129,19 +115,33 @@ const FloatingItem = ({ source, containerWidth, containerHeight, index, total }:
         );
     }, []);
 
-    const style = useAnimatedStyle(() => ({
-        transform: [
-            { translateY: translateY.value },
-            { scale: scale.value },
-            { rotate: `${rotate.value}deg` }
-        ],
-        position: 'absolute',
-        left: initialX,
-        top: initialY,
-        width: 80,
-        height: 80,
-        zIndex: 1,
-    }));
+    const style = useAnimatedStyle(() => {
+        // Interpolate position between initial "orbit" and center "target"
+        const currentLeft = interpolate(absorbing.value, [0, 1], [initialX, targetX]);
+        const currentTop = interpolate(absorbing.value, [0, 1], [initialY, targetY]);
+
+        // Scale down to 0 when absorbed
+        const currentScale = interpolate(absorbing.value, [0, 1], [scale.value, 0]);
+
+        // Face the center when absorbing? Or just spin?
+        // Let's spin fast when absorbing
+        const absorptionRotate = interpolate(absorbing.value, [0, 1], [0, 360]);
+
+        return {
+            transform: [
+                { translateY: translateY.value * (1 - absorbing.value) }, // Stop drifting
+                { scale: currentScale },
+                { rotate: `${rotate.value + absorptionRotate}deg` }
+            ],
+            position: 'absolute',
+            left: currentLeft,
+            top: currentTop,
+            width: 80,
+            height: 80,
+            zIndex: 1,
+            opacity: 1 - absorbing.value // Fade out slightly as they enter
+        };
+    });
 
     return (
         <Animated.View
@@ -162,10 +162,12 @@ export default function SplashAnimation({
 }: SplashAnimationProps) {
     const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
     const [minTimeElapsed, setMinTimeElapsed] = useState(false);
-    const [hasTriggeredZoom, setHasTriggeredZoom] = useState(false);
-    const scale = useSharedValue(0);
-    const opacity = useSharedValue(1);
+    const [isSequenceStarted, setIsSequenceStarted] = useState(false);
+
+    const logoScale = useSharedValue(0.1); // Start small
+    const containerOpacity = useSharedValue(1);
     const progressAnim = useSharedValue(0);
+    const absorbing = useSharedValue(0); // 0 = floating, 1 = absorbed
 
     // Update progress animation
     useEffect(() => {
@@ -174,7 +176,7 @@ export default function SplashAnimation({
 
     // Initial logo pop-in
     useEffect(() => {
-        scale.value = withTiming(1, { duration: 800, easing: Easing.elastic(1.2) });
+        logoScale.value = withSpring(1, { damping: 12 });
 
         // Set minimum display timer
         const timer = setTimeout(() => {
@@ -184,33 +186,49 @@ export default function SplashAnimation({
         return () => clearTimeout(timer);
     }, []);
 
-    // Trigger zoom-out when BOTH conditions are met
+    // Trigger Finish Sequence
     useEffect(() => {
-        if (dataReady && minTimeElapsed && !hasTriggeredZoom) {
-            setHasTriggeredZoom(true);
+        if (dataReady && minTimeElapsed && !isSequenceStarted) {
+            setIsSequenceStarted(true);
 
-            // Trigger the zoom-out sequence
-            scale.value = withTiming(50, { duration: 600, easing: Easing.in(Easing.cubic) }, () => {
+            // 1. Absorb Food (Duration: ~600ms)
+            absorbing.value = withTiming(1, { duration: 600, easing: Easing.inOut(Easing.cubic) }, () => {
+                // 2. Logo Bounce (Chomp effect)
+                // Using runOnJS to coordinate complex sequence if needed, but chaining callbacks works
+
+                // Scale up then spring back
+                logoScale.value = withSequence(
+                    withTiming(1.3, { duration: 150, easing: Easing.out(Easing.quad) }), // Open mouth / Anticipate
+                    withSpring(1.0, { damping: 8, stiffness: 200 }) // CHOMP / Settle
+                );
+
+                // 3. Fade Out (Total delay ~500ms after bounce starts)
+                runOnJS(startFadeOut)();
+            });
+        }
+    }, [dataReady, minTimeElapsed, isSequenceStarted]);
+
+    const startFadeOut = () => {
+        setTimeout(() => {
+            containerOpacity.value = withTiming(0, { duration: 400 }, () => {
                 runOnJS(onComplete)();
             });
-
-            // Fade background
-            opacity.value = withDelay(400, withTiming(0, { duration: 200 }));
-        }
-    }, [dataReady, minTimeElapsed, hasTriggeredZoom]);
+        }, 300); // Wait for bounce to finish a bit
+    };
 
     const logoStyle = useAnimatedStyle(() => ({
-        transform: [{ scale: scale.value }],
+        transform: [{ scale: logoScale.value }],
         zIndex: 10,
     }));
 
     // Progress bar width animation
     const progressBarStyle = useAnimatedStyle(() => ({
         width: `${progressAnim.value * 100}%`,
+        opacity: 1 - absorbing.value, // Hide progress bar when absorbing starts
     }));
 
     const containerStyle = useAnimatedStyle(() => ({
-        opacity: opacity.value,
+        opacity: containerOpacity.value,
     }));
 
     const handleLayout = (e: LayoutChangeEvent) => {
@@ -224,10 +242,10 @@ export default function SplashAnimation({
                 source={ASSETS.bg}
                 style={StyleSheet.absoluteFill}
                 contentFit="cover"
-                blurRadius={10} // Significant blur to reduce noise
-                priority="high" // Load immediately
+                blurRadius={10}
+                priority="high"
             />
-            {/* Dark Overlay for Contrast */}
+            {/* Dark Overlay */}
             <LinearGradient
                 colors={['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.7)']}
                 style={StyleSheet.absoluteFill}
@@ -241,12 +259,8 @@ export default function SplashAnimation({
                     source={source}
                     containerWidth={dimensions.width}
                     containerHeight={dimensions.height}
+                    absorbing={absorbing}
                 />
-            ))}
-
-            {/* Crumbs Explosion */}
-            {Array.from({ length: 12 }).map((_, i) => (
-                <Crumb key={`crumb-${i}`} index={i} total={12} />
             ))}
 
             <Animated.View style={[styles.logoContainer, logoStyle]}>
@@ -258,7 +272,7 @@ export default function SplashAnimation({
             </Animated.View>
 
             {/* Progress Bar */}
-            <View style={styles.progressContainer}>
+            <Animated.View style={[styles.progressContainer, { opacity: useAnimatedStyle(() => ({ opacity: 1 - absorbing.value })).opacity }]}>
                 <View style={styles.progressTrack}>
                     <Animated.View style={[styles.progressFill, progressBarStyle]} />
                 </View>
@@ -267,7 +281,7 @@ export default function SplashAnimation({
                         {statusText}
                     </Text>
                 ) : null}
-            </View>
+            </Animated.View>
         </Animated.View>
     );
 }
@@ -279,10 +293,10 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         overflow: 'hidden',
-        backgroundColor: '#f7f6f1', // Fully opaque black background
+        backgroundColor: '#0D0B0A',
     },
     logoContainer: {
-        width: 300, // Bigger Logo
+        width: 300,
         height: 150,
         justifyContent: 'center',
         alignItems: 'center',
@@ -300,13 +314,13 @@ const styles = StyleSheet.create({
     progressTrack: {
         width: '100%',
         height: 4,
-        backgroundColor: 'rgba(0,0,0,0.1)',
+        backgroundColor: 'rgba(255,255,255,0.1)', // Lighter track
         borderRadius: 2,
         overflow: 'hidden',
     },
     progressFill: {
         height: '100%',
-        backgroundColor: '#eeb57e', // Orange to match crumbs
+        backgroundColor: '#eeb57e',
         borderRadius: 2,
     },
     statusText: {

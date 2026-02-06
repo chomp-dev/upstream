@@ -2,7 +2,7 @@
  * Create Tab - Upload video/images + attach restaurant
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -15,6 +15,9 @@ import {
   TextInput,
   Image,
   Platform,
+  Animated,
+  Dimensions,
+  KeyboardAvoidingView,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -183,7 +186,12 @@ export default function CreateScreen() {
   // Metadata state
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [tags, setTags] = useState('');
+
+  // Stage flow state (1=media, 2=restaurant, 3=description)
+  const [currentStage, setCurrentStage] = useState(1);
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const { width: screenWidth } = Dimensions.get('window');
 
   interface MediaItem {
     type: 'video' | 'image' | 'tiktok';
@@ -201,10 +209,56 @@ export default function CreateScreen() {
     setSelectedRestaurant(null);
     setTitle('');
     setDescription('');
-    setTags('');
     setUploadProgress(0);
     setUploadStatus('');
+    setCurrentStage(1);
+    fadeAnim.setValue(1);
+    slideAnim.setValue(0);
   };
+
+  // Animate to next stage
+  const goToStage = (stage: number) => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: stage > currentStage ? -50 : 50,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setCurrentStage(stage);
+      slideAnim.setValue(stage > currentStage ? 50 : -50);
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 50,
+          friction: 8,
+        }),
+      ]).start();
+    });
+  };
+
+  // Auto-advance when media is selected
+  useEffect(() => {
+    if (selectedMedia.length > 0 && currentStage === 1) {
+      // If restaurant is pre-selected, skip to stage 3
+      if (selectedRestaurant) {
+        goToStage(3);
+      } else {
+        goToStage(2);
+      }
+    }
+  }, [selectedMedia]);
 
   const pickVideo = async () => {
     try {
@@ -306,7 +360,7 @@ export default function CreateScreen() {
       setUploadStatus('Preparing upload...');
       setUploadProgress(0);
 
-      const tagArray = tags.split(',').map(t => t.trim()).filter(Boolean);
+      const tagArray: string[] = []; // Tags removed from UI
       const mediaType = selectedMedia[0].type;
 
       if (mediaType === 'tiktok') {
@@ -315,6 +369,11 @@ export default function CreateScreen() {
         const response = await mediaApi.addTikTokEmbed(selectedMedia[0].uri, selectedRestaurant.google_place_id, user?.sub);
 
         if (!response.success) throw new Error('Failed to add TikTok embed');
+
+        // Store TikTok ID for navigation (like video does)
+        if (response.embed?.id) {
+          savedPendingId = `tiktok-${response.embed.id}`;
+        }
         setUploadProgress(1);
 
       } else if (mediaType === 'video') {
@@ -501,7 +560,7 @@ export default function CreateScreen() {
 
       // Navigate to feed with the uploaded content
       setTimeout(() => {
-        if (mediaType === 'video' && savedPendingId) {
+        if ((mediaType === 'video' || mediaType === 'tiktok') && savedPendingId) {
           router.push({ pathname: '/', params: { videoDataId: savedPendingId } });
         } else if (mediaType === 'image' && savedImageDataId) {
           router.push({ pathname: '/', params: { videoDataId: savedImageDataId } });
@@ -566,197 +625,219 @@ export default function CreateScreen() {
         </Modal>
       )}
 
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        <Text variant="heading" style={styles.title}>
-          Create
-        </Text>
-        <Text variant="bodySmall" color={colors.muted} style={styles.subtitle}>
-          Share your food discoveries
-        </Text>
+      <View style={styles.headerContainer}>
+        <Text variant="heading" style={styles.title}>New Post</Text>
+        <Text variant="caption" color={colors.muted}>Step {currentStage} of 3</Text>
+      </View>
 
-        {/* Media Selection Section */}
-        <View style={styles.section}>
-          <Text variant="label" style={styles.sectionLabel}>Select Media <Text color={colors.coral}>*</Text></Text>
+      {/* Stage Progress Bar */}
+      <View style={styles.stageProgressContainer}>
+        <View style={[styles.stageDot, currentStage >= 1 && styles.stageActive]} />
+        <View style={[styles.stageLine, currentStage >= 2 && styles.stageActive]} />
+        <View style={[styles.stageDot, currentStage >= 2 && styles.stageActive]} />
+        <View style={[styles.stageLine, currentStage >= 3 && styles.stageActive]} />
+        <View style={[styles.stageDot, currentStage >= 3 && styles.stageActive]} />
+      </View>
 
-          {selectedMedia.length === 0 ? (
-            <View style={{ gap: spacing.md }}>
-              <TouchableOpacity
-                style={styles.uploadButton}
-                onPress={pickVideo}
-                disabled={uploading}
-              >
-                <Ionicons name="videocam" size={36} color={colors.bg} style={{ marginBottom: spacing.sm }} />
-                <Text variant="subtitle" color={colors.bg}>Pick Video</Text>
-                <Text variant="caption" color={colors.bg} style={{ opacity: 0.7 }}>Up to 60 seconds</Text>
-              </TouchableOpacity>
+      <Animated.View
+        style={[
+          styles.container,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateX: slideAnim }]
+          }
+        ]}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+        >
+          <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+            {/* STAGE 1: MEDIA SELECTION */}
+            {currentStage === 1 && (
+              <View style={styles.stageContent}>
+                <Text variant="title" style={styles.stageTitle}>What are we eating?</Text>
+                <Text variant="body" color={colors.muted} style={{ marginBottom: 24 }}>
+                  Start by selecting a video or photo.
+                </Text>
 
-              <View style={{ flexDirection: 'row', gap: spacing.md }}>
-                <TouchableOpacity
-                  style={[styles.uploadButton, styles.uploadButtonSecondary, { flex: 1 }]}
-                  onPress={pickImages}
-                  disabled={uploading}
-                >
-                  <Ionicons name="images-outline" size={32} color={colors.text} style={{ marginBottom: spacing.sm }} />
-                  <Text variant="subtitle">Images</Text>
-                </TouchableOpacity>
+                {selectedMedia.length === 0 ? (
+                  <View style={{ gap: spacing.md }}>
+                    <TouchableOpacity
+                      style={styles.uploadButton}
+                      onPress={pickVideo}
+                      disabled={uploading}
+                    >
+                      <Ionicons name="videocam" size={36} color={colors.bg} style={{ marginBottom: spacing.sm }} />
+                      <Text variant="subtitle" color={colors.bg}>Upload Video</Text>
+                      <Text variant="caption" color={colors.bg} style={{ opacity: 0.7 }}>Best for experiences</Text>
+                    </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={[styles.uploadButton, styles.uploadButtonSecondary, { flex: 1, backgroundColor: '#f7f6f1', borderColor: '#f7f6f1' }]}
-                  onPress={() => setShowTikTokInput(true)}
-                  disabled={uploading}
-                >
-                  <Ionicons name="logo-tiktok" size={32} color="#000" style={{ marginBottom: spacing.sm }} />
-                  <Text variant="subtitle" color="#000">TikTok</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ) : (
-            <View style={styles.previewContainer}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing.sm }}>
-                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-                  {selectedMedia.map((media, index) => (
-                    <View key={index} style={styles.mediaPreview}>
-                      {media.type === 'video' ? (
-                        <View style={{ alignItems: 'center' }}>
-                          <Ionicons name="videocam" size={48} color={colors.muted} />
-                          <Text variant="caption">{media.mimeType || 'Video'}</Text>
-                        </View>
-                      ) : media.type === 'tiktok' ? (
-                        <View style={{ alignItems: 'center', padding: spacing.md }}>
-                          <Ionicons name="logo-tiktok" size={48} color={colors.text} />
-                          <Text variant="caption" numberOfLines={1} style={{ marginTop: spacing.sm, maxWidth: '100%' }}>
-                            {media.uri}
-                          </Text>
-                        </View>
-                      ) : (
-                        <Image source={{ uri: media.uri }} style={{ width: 200, height: 200, borderRadius: radius.lg }} resizeMode="cover" />
-                      )}
+                    <View style={{ flexDirection: 'row', gap: spacing.md }}>
+                      <TouchableOpacity
+                        style={[styles.uploadButton, styles.uploadButtonSecondary, { flex: 1 }]}
+                        onPress={pickImages}
+                        disabled={uploading}
+                      >
+                        <Ionicons name="images-outline" size={32} color={colors.text} style={{ marginBottom: spacing.sm }} />
+                        <Text variant="subtitle">Photos</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.uploadButton, styles.uploadButtonSecondary, { flex: 1, backgroundColor: '#000', borderColor: '#000' }]}
+                        onPress={() => setShowTikTokInput(true)}
+                        disabled={uploading}
+                      >
+                        <Ionicons name="logo-tiktok" size={32} color="#fff" style={{ marginBottom: spacing.sm }} />
+                        <Text variant="subtitle" color="#fff">TikTok</Text>
+                      </TouchableOpacity>
                     </View>
-                  ))}
-                </View>
-              </ScrollView>
+                  </View>
+                ) : (
+                  <View style={styles.previewContainer}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing.lg }}>
+                      <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                        {selectedMedia.map((media, index) => (
+                          <View key={index} style={styles.mediaPreview}>
+                            {media.type === 'video' ? (
+                              <View style={{ alignItems: 'center' }}>
+                                <Ionicons name="videocam" size={48} color={colors.muted} />
+                                <Text variant="caption">{media.mimeType || 'Video'}</Text>
+                              </View>
+                            ) : media.type === 'tiktok' ? (
+                              <View style={{ alignItems: 'center', padding: spacing.md }}>
+                                <Ionicons name="logo-tiktok" size={48} color={colors.text} />
+                                <Text variant="caption" numberOfLines={1} style={{ marginTop: spacing.sm, maxWidth: '100%' }}>
+                                  TikTok Link
+                                </Text>
+                              </View>
+                            ) : (
+                              <Image source={{ uri: media.uri }} style={{ width: 200, height: 200, borderRadius: radius.lg }} resizeMode="cover" />
+                            )}
+                          </View>
+                        ))}
+                      </View>
+                    </ScrollView>
 
-              <TouchableOpacity
-                style={styles.changeMediaButton}
-                onPress={() => setSelectedMedia([])}
-              >
-                <Text variant="caption" color={colors.coral}>Clear Selection</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-
-        {/* TikTok Input Modal */}
-        <Modal visible={showTikTokInput} transparent animationType="slide">
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text variant="title">Add TikTok Link</Text>
-              <TextInput
-                style={[styles.input, { width: '100%', marginTop: spacing.md }]}
-                placeholder="https://www.tiktok.com/..."
-                placeholderTextColor={colors.muted}
-                value={tempTikTokUrl}
-                onChangeText={setTempTikTokUrl}
-                autoCapitalize="none"
-              />
-              <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg }}>
-                <TouchableOpacity onPress={() => setShowTikTokInput(false)} style={{ padding: spacing.md }}>
-                  <Text variant="body" color={colors.muted}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={handleTikTokSelect}
-                  style={{ backgroundColor: colors.primary, padding: spacing.md, borderRadius: radius.md }}
-                >
-                  <Text variant="body" color={colors.bg}>Add</Text>
-                </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.changeMediaButton}
+                      onPress={() => setSelectedMedia([])}
+                    >
+                      <Text variant="body" color={colors.coral}>Change Selection</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
-            </View>
-          </View>
-        </Modal>
+            )}
 
-        {/* Form Container - ALWAYS VISIBLE */}
-        <View style={styles.formContainer}>
-          {/* Restaurant Picker */}
-          <View style={styles.section}>
-            <Text variant="label" style={styles.sectionLabel}>
-              Restaurant <Text color={colors.coral}>*</Text>
-            </Text>
-            <TouchableOpacity
-              style={styles.restaurantSelector}
-              onPress={() => setShowRestaurantPicker(true)}
-            >
-              {selectedRestaurant ? (
-                <View style={styles.selectedRestaurant}>
-                  <View style={[styles.ratingDot, { backgroundColor: ratingColor(selectedRestaurant.rating) }]} />
-                  <Text variant="body" numberOfLines={1} style={{ flex: 1 }}>{selectedRestaurant.name}</Text>
-                  <TouchableOpacity onPress={() => setSelectedRestaurant(null)}>
-                    <Ionicons name="close-circle" size={20} color={colors.coral} />
+            {/* STAGE 2: RESTAURANT */}
+            {currentStage === 2 && (
+              <View style={styles.stageContent}>
+                <Text variant="title" style={styles.stageTitle}>Where was this?</Text>
+                <Text variant="body" color={colors.muted} style={{ marginBottom: 24 }}>
+                  Tag the restaurant so others can find it.
+                </Text>
+
+                <TouchableOpacity
+                  style={styles.restaurantSelector}
+                  onPress={() => setShowRestaurantPicker(true)}
+                >
+                  {selectedRestaurant ? (
+                    <View style={styles.selectedRestaurant}>
+                      <View style={[styles.ratingDot, { backgroundColor: ratingColor(selectedRestaurant.rating) }]} />
+                      <View style={{ flex: 1 }}>
+                        <Text variant="subtitle">{selectedRestaurant.name}</Text>
+                        <Text variant="caption" color={colors.muted}>{selectedRestaurant.vicinity || 'No address'}</Text>
+                      </View>
+                      <TouchableOpacity onPress={() => setSelectedRestaurant(null)}>
+                        <Ionicons name="close-circle" size={24} color={colors.coral} />
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: 12 }}>
+                      <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name="search" size={20} color={colors.primary} />
+                      </View>
+                      <Text variant="body" color={colors.muted}>Search for location...</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+
+                <View style={styles.stageActions}>
+                  <TouchableOpacity onPress={() => goToStage(1)} style={styles.backButton}>
+                    <Text variant="body">Back</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => goToStage(3)}
+                    style={[styles.nextButton, !selectedRestaurant && { opacity: 0.5 }]}
+                    disabled={!selectedRestaurant}
+                  >
+                    <Text variant="subtitle" color="#fff">Next</Text>
                   </TouchableOpacity>
                 </View>
-              ) : (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                  <Ionicons name="location-outline" size={16} color={colors.muted} />
-                  <Text variant="bodySmall" color={colors.muted}>Select Restaurant</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          </View>
-
-          {/* Metadata Inputs */}
-          <View style={styles.section}>
-            <Text variant="label" style={styles.sectionLabel}>Title <Text color={colors.coral}>*</Text></Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. Best Sushi in Town!"
-              placeholderTextColor={colors.muted}
-              value={title}
-              onChangeText={setTitle}
-              maxLength={100}
-            />
-          </View>
-
-          <View style={styles.section}>
-            <Text variant="label" style={styles.sectionLabel}>Description</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Tell us about your experience..."
-              placeholderTextColor={colors.muted}
-              value={description}
-              onChangeText={setDescription}
-              multiline
-              maxLength={500}
-            />
-          </View>
-
-          <View style={styles.section}>
-            <Text variant="label" style={styles.sectionLabel}>Tags</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. sushi, spicy, date-night"
-              placeholderTextColor={colors.muted}
-              value={tags}
-              onChangeText={setTags}
-            />
-            <Text variant="caption" color={colors.muted} style={{ marginTop: 4 }}>Comma separated</Text>
-          </View>
-
-          {/* Post Button */}
-          <TouchableOpacity
-            style={[
-              styles.uploadButton,
-              (uploading || selectedMedia.length === 0 || !selectedRestaurant || !title.trim()) && styles.uploadButtonDisabled
-            ]}
-            onPress={handleUpload}
-            disabled={uploading || selectedMedia.length === 0 || !selectedRestaurant || !title.trim()}
-          >
-            {uploading ? (
-              <ActivityIndicator color={colors.bg} />
-            ) : (
-              <Text variant="subtitle" color={'#000'}>Post Review</Text>
+              </View>
             )}
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+
+            {/* STAGE 3: DETAILS */}
+            {currentStage === 3 && (
+              <View style={styles.stageContent}>
+                <Text variant="title" style={styles.stageTitle}>Add Details</Text>
+                <Text variant="body" color={colors.muted} style={{ marginBottom: 24 }}>
+                  Give it a catchy title and tell us more.
+                </Text>
+
+                <View style={styles.formContainer}>
+                  <View>
+                    <Text variant="label" style={styles.sectionLabel}>Title</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="e.g. Best Sushi in Town!"
+                      placeholderTextColor={colors.muted}
+                      value={title}
+                      onChangeText={setTitle}
+                      maxLength={100}
+                    />
+                  </View>
+
+                  <View>
+                    <Text variant="label" style={styles.sectionLabel}>Description <Text variant="caption" color={colors.muted}>(Optional)</Text></Text>
+                    <TextInput
+                      style={[styles.input, styles.textArea]}
+                      placeholder="What did you order? How was the service?"
+                      placeholderTextColor={colors.muted}
+                      value={description}
+                      onChangeText={setDescription}
+                      multiline
+                      maxLength={500}
+                    />
+                  </View>
+
+                  <View style={styles.stageActions}>
+                    <TouchableOpacity onPress={() => goToStage(2)} style={styles.backButton}>
+                      <Text variant="body">Back</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.nextButton,
+                        (uploading || !title.trim()) && { opacity: 0.5 }
+                      ]}
+                      onPress={handleUpload}
+                      disabled={uploading || !title.trim()}
+                    >
+                      {uploading ? (
+                        <ActivityIndicator color={colors.bg} />
+                      ) : (
+                        <Text variant="subtitle" color={'#fff'}>Post Review</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            )}
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Animated.View>
 
       {/* Upload Progress Modal */}
       <Modal visible={uploading} transparent animationType="fade">
@@ -1043,6 +1124,64 @@ const styles = StyleSheet.create({
     borderRadius: radius.xl,
     padding: spacing.xxl,
     minWidth: 200,
+    alignItems: 'center',
+  },
+
+  // Stage UI Styles
+  headerContainer: {
+    paddingHorizontal: spacing.xl,
+    marginBottom: spacing.lg,
+  },
+  stageProgressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+    marginBottom: spacing.xl,
+    gap: 4,
+  },
+  stageDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  stageLine: {
+    flex: 1,
+    height: 2,
+    backgroundColor: colors.surface,
+  },
+  stageActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  stageContent: {
+    // Content layout
+  },
+  stageTitle: {
+    marginBottom: spacing.lg,
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: colors.text,
+  },
+  stageActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing.xxl,
+    marginBottom: spacing.xxl,
+  },
+  backButton: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  nextButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    borderRadius: radius.pill,
+    minWidth: 120,
     alignItems: 'center',
   },
 });

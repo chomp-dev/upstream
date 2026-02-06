@@ -53,8 +53,8 @@ export const CommentSheet = ({ videoUrl, onClose, visible }: CommentSheetProps) 
     // When keyboard is visible, add keyboard height minus bottom safe area (since keyboard covers it)
     // When keyboard is hidden, add bottom safe area for home indicator
     const inputBottomPadding = keyboardHeight > 0
-        ? keyboardHeight - bottomSafeInset + 8
-        : bottomSafeInset + 8;
+        ? keyboardHeight - bottomSafeInset + 16
+        : bottomSafeInset + 16;
 
     const fetchComments = useCallback(async () => {
         if (!visible) return;
@@ -267,52 +267,84 @@ export const CommentSheet = ({ videoUrl, onClose, visible }: CommentSheetProps) 
                         data={comments}
                         keyExtractor={(item) => item.id}
                         renderItem={({ item }) => (
-                            <View style={styles.commentItem}>
-                                {/* Avatar */}
-                                {item.user?.avatar ? (
-                                    <Image source={{ uri: item.user.avatar }} style={styles.avatar} />
-                                ) : (
-                                    <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                                        <Text style={styles.avatarInitial}>
-                                            {item.user?.name?.[0]?.toUpperCase() || 'U'}
-                                        </Text>
-                                    </View>
-                                )}
+                            <>
+                                <View style={styles.commentItem}>
+                                    {/* Avatar */}
+                                    {item.user?.avatar ? (
+                                        <Image source={{ uri: item.user.avatar }} style={styles.avatar} />
+                                    ) : (
+                                        <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                                            <Text style={styles.avatarInitial}>
+                                                {item.user?.name?.[0]?.toUpperCase() || 'U'}
+                                            </Text>
+                                        </View>
+                                    )}
 
-                                {/* Content */}
-                                <View style={styles.commentContent}>
-                                    <Text style={styles.commentTextLine}>
-                                        <Text style={styles.username}>
-                                            {item.user?.name || 'User'}{'  '}
+                                    {/* Content */}
+                                    <View style={styles.commentContent}>
+                                        <Text style={styles.commentTextLine}>
+                                            <Text style={styles.username}>
+                                                {item.user?.name || 'User'}{'  '}
+                                            </Text>
+                                            <Text style={styles.commentText}>
+                                                {item.content}
+                                            </Text>
                                         </Text>
-                                        <Text style={styles.commentText}>
-                                            {item.content}
-                                        </Text>
-                                    </Text>
 
-                                    {/* Meta Row: Time | Reply */}
-                                    <View style={styles.metaContainer}>
-                                        <Text style={styles.metaText}>
-                                            {formatTime(item.created_at)}
-                                        </Text>
-                                        <TouchableOpacity activeOpacity={0.7} onPress={() => handleReply(item.id, item.user?.name || 'User')}>
-                                            <Text style={styles.metaTextReply}>Reply</Text>
-                                        </TouchableOpacity>
+                                        {/* Meta Row: Time | Reply */}
+                                        <View style={styles.metaContainer}>
+                                            <Text style={styles.metaText}>
+                                                {formatTime(item.created_at)}
+                                            </Text>
+                                            <TouchableOpacity activeOpacity={0.7} onPress={() => handleReply(item.id, item.user?.name || 'User')}>
+                                                <Text style={styles.metaTextReply}>Reply</Text>
+                                            </TouchableOpacity>
+                                        </View>
                                     </View>
+
+                                    {/* Like Heart */}
+                                    <TouchableOpacity style={styles.likeButton} onPress={() => handleLike(item.id)}>
+                                        <Ionicons
+                                            name={likedComments.has(item.id) ? "heart" : "heart-outline"}
+                                            size={14}
+                                            color={likedComments.has(item.id) ? "#FF3B5C" : "#8E8E93"}
+                                        />
+                                        {(item.likes_count || 0) > 0 && (
+                                            <Text style={styles.likesCount}>{item.likes_count}</Text>
+                                        )}
+                                    </TouchableOpacity>
                                 </View>
 
-                                {/* Like Heart */}
-                                <TouchableOpacity style={styles.likeButton} onPress={() => handleLike(item.id)}>
-                                    <Ionicons
-                                        name={likedComments.has(item.id) ? "heart" : "heart-outline"}
-                                        size={14}
-                                        color={likedComments.has(item.id) ? "#FF3B5C" : "#8E8E93"}
-                                    />
-                                    {(item.likes_count || 0) > 0 && (
-                                        <Text style={styles.likesCount}>{item.likes_count}</Text>
-                                    )}
-                                </TouchableOpacity>
-                            </View>
+                                {/* Nested Replies */}
+                                {item.replies && item.replies.length > 0 && (
+                                    <View style={styles.repliesContainer}>
+                                        {item.replies.map((reply) => (
+                                            <View key={reply.id} style={styles.replyItem}>
+                                                {reply.user?.avatar ? (
+                                                    <Image source={{ uri: reply.user.avatar }} style={styles.replyAvatar} />
+                                                ) : (
+                                                    <View style={[styles.replyAvatar, styles.avatarPlaceholder]}>
+                                                        <Text style={styles.avatarInitial}>
+                                                            {reply.user?.name?.[0]?.toUpperCase() || 'U'}
+                                                        </Text>
+                                                    </View>
+                                                )}
+                                                <View style={styles.replyContent}>
+                                                    <Text style={styles.commentTextLine}>
+                                                        <Text style={styles.username}>
+                                                            {reply.user?.name || 'User'}{'  '}
+                                                        </Text>
+                                                        <Text style={styles.commentText}>
+                                                            {reply.content}
+                                                        </Text>
+                                                    </Text>
+                                                    <Text style={styles.metaText}>{formatTime(reply.created_at)}</Text>
+                                                </View>
+                                            </View>
+                                        ))}
+                                    </View>
+                                )}
+                            </>
                         )}
                         contentContainerStyle={styles.listContent}
                         showsVerticalScrollIndicator={false}
@@ -384,7 +416,7 @@ export const CommentSheet = ({ videoUrl, onClose, visible }: CommentSheetProps) 
                     )}
                 </View>
             </View>
-        </TouchableWithoutFeedback>
+        </TouchableWithoutFeedback >
     );
 };
 
@@ -562,5 +594,26 @@ const styles = StyleSheet.create({
         flex: 1,
         textAlign: 'center',
         paddingVertical: 12,
+    },
+    repliesContainer: {
+        marginLeft: 50,
+        marginTop: 8,
+        paddingLeft: 12,
+        borderLeftWidth: 1,
+        borderLeftColor: 'rgba(255,255,255,0.1)',
+    },
+    replyItem: {
+        flexDirection: 'row',
+        marginBottom: 12,
+        gap: 10,
+    },
+    replyAvatar: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        backgroundColor: '#333',
+    },
+    replyContent: {
+        flex: 1,
     },
 });

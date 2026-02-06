@@ -419,7 +419,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'flex-end',
         paddingHorizontal: 12,
-        paddingBottom: Platform.select({ web: 20, ios: 75, android: 70 }),
+        paddingBottom: Platform.select({ web: 20, ios: 55, android: 50 }),
     },
     leftColumn: {
         flex: 1,

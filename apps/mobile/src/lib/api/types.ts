@@ -96,6 +96,7 @@ export interface Restaurant {
   price_level: number | null;
   phone: string | null;
   website: string | null;
+  vicinity?: string | null;
   last_fetched_at?: string;
 }
 

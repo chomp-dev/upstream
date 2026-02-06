@@ -500,22 +500,6 @@ export default function MapScreen() {
         <Text variant="caption" color={colors.muted} style={styles.headerCount}>
           {filteredRestaurants.length} restaurants found{searchQuery.trim() ? ` (filtering "${searchQuery}")` : ''}
         </Text>
-        {fetchMeta?.requestsMade != null && (
-          <View style={styles.fetchMetaContainer}>
-            <Text variant="caption" style={styles.fetchMetaText}>
-              🔄 Made {fetchMeta.requestsMade}/{fetchMeta.maxRequests} API calls
-            </Text>
-            <Text variant="caption" style={styles.fetchMetaText}>
-              📍 Found {fetchMeta.uniquePlaces ?? restaurants.length} unique places
-              {fetchMeta.rawPlaces != null ? ` from ${fetchMeta.rawPlaces} total` : ''}
-            </Text>
-            {fetchMeta.truncated && (
-              <Text variant="caption" style={[styles.fetchMetaText, { color: colors.coral }]}>
-                ⚠️ Results capped at {restaurants.length} (more available in this area)
-              </Text>
-            )}
-          </View>
-        )}
 
         {/* View mode toggle */}
         <Segmented

@@ -77,8 +77,8 @@ export function ImagePostViewer({ images, restaurant, user, caption, imagePostId
             <Image
               key={index}
               source={{ uri: imageUri }}
-              style={{ width, height }}
-              contentFit="cover"
+              style={{ width, height, backgroundColor: '#000' }}
+              contentFit="contain"
               transition={200}
               onError={(e) => console.warn('[ImagePostViewer] Load Error:', e.error)}
             />
