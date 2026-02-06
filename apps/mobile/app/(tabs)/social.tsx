@@ -231,7 +231,7 @@ function ProfileSection() {
               <TouchableOpacity
                 style={styles.logoutButton}
                 onPress={() => logout({
-                  logoutParams: { returnTo: 'https://usechomp.com/demo' }
+                  logoutParams: { returnTo: 'https://www.usechomp.com/demo/' }
                 })}
               >
                 <Text variant="caption" color="red">Log Out</Text>
