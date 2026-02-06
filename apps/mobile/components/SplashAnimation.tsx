@@ -13,7 +13,8 @@ import Animated, {
     runOnJS,
     ZoomIn,
     interpolate,
-    Extrapolate
+    Extrapolate,
+    cancelAnimation
 } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -108,12 +109,23 @@ const FloatingItem = ({ source, containerWidth, containerHeight, index, total, s
 
     useEffect(() => {
         if (shouldStop) {
-            // Cancel all animations when stopping to prevent worklet conflicts
+            // CRITICAL: Cancel all ongoing animations to free worklet memory
+            cancelAnimation(scale);
+            cancelAnimation(translateY);
+            cancelAnimation(rotate);
+
+            // Reset to neutral state
             scale.value = withTiming(1, { duration: 200 });
             translateY.value = withTiming(0, { duration: 200 });
             rotate.value = withTiming(0, { duration: 200 });
             return;
         }
+
+        // CRITICAL: Cancel any existing animations before starting new ones
+        // This prevents worklet memory leaks on re-renders
+        cancelAnimation(scale);
+        cancelAnimation(translateY);
+        cancelAnimation(rotate);
 
         // Breathing Effect
         scale.value = withRepeat(
@@ -136,6 +148,13 @@ const FloatingItem = ({ source, containerWidth, containerHeight, index, total, s
             withTiming(index % 2 === 0 ? 10 : -10, { duration: 4000, easing: Easing.inOut(Easing.sin) }),
             -1, true
         );
+
+        // Cleanup on unmount
+        return () => {
+            cancelAnimation(scale);
+            cancelAnimation(translateY);
+            cancelAnimation(rotate);
+        };
     }, [shouldStop]);
 
     const style = useAnimatedStyle(() => ({
