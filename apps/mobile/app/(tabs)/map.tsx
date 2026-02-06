@@ -520,8 +520,8 @@ export default function MapScreen() {
         {/* View mode toggle */}
         <Segmented
           options={[
-            { key: 'map', label: '🗺️ Map' },
-            { key: 'list', label: '📋 List' },
+            { key: 'map', label: 'Map' },
+            { key: 'list', label: 'List' },
           ]}
           selected={viewMode}
           onSelect={(key) => setViewMode(key as ViewMode)}

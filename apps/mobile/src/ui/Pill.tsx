@@ -23,7 +23,7 @@ export function Pill({
   const backgroundColor = active
     ? '#eeb57e'
     : color || colors.surface;
-  const textColor = active ? '#000' : colors.text;
+  const textColor = active ? '#f7f6f1' : colors.text;
 
   return (
     <TouchableOpacity
