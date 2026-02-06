@@ -292,6 +292,13 @@ export function MediaOverlay({
                         </TouchableOpacity>
                     )}
 
+                    {/* Title */}
+                    {title && (
+                        <Text style={styles.title} numberOfLines={1}>
+                            {title}
+                        </Text>
+                    )}
+
                     {/* Caption */}
                     {caption && (
                         <Text style={styles.caption} numberOfLines={3}>
@@ -412,7 +419,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'flex-end',
         paddingHorizontal: 12,
-        paddingBottom: Platform.select({ web: 20, ios: 90, android: 80 }),
+        paddingBottom: Platform.select({ web: 20, ios: 75, android: 70 }),
     },
     leftColumn: {
         flex: 1,
@@ -441,6 +448,15 @@ const styles = StyleSheet.create({
         textShadowColor: 'rgba(0,0,0,0.5)',
         textShadowOffset: { width: 1, height: 1 },
         textShadowRadius: 3,
+    },
+    title: {
+        color: '#fff',
+        fontSize: 18,
+        fontWeight: '700',
+        textShadowColor: 'rgba(0,0,0,0.6)',
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 4,
+        marginBottom: 4,
     },
     caption: {
         color: '#fff',

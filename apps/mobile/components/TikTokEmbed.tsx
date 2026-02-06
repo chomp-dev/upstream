@@ -1,14 +1,8 @@
-import React, { useEffect } from 'react';
-import { View, StyleSheet, Image, TouchableOpacity, Linking, Platform, AppState } from 'react-native';
+import React from 'react';
+import { View, StyleSheet, Image, TouchableOpacity, Linking } from 'react-native';
 import { useContentDimensions } from '../src/hooks/useContentDimensions';
 import { Text } from '../src/ui';
 import { colors, spacing } from '../src/theme';
-
-// Only import WebView on native platforms
-let WebView: any = null;
-if (Platform.OS !== 'web') {
-    WebView = require('react-native-webview').WebView;
-}
 
 interface TikTokEmbedProps {
     embedHtml: string;
@@ -20,9 +14,9 @@ interface TikTokEmbedProps {
 }
 
 /**
- * TikTokEmbed component renders a TikTok video embed.
- * - Native (iOS/Android): Uses WebView to render the TikTok embed
- * - Web: Shows thumbnail with link to open in TikTok
+ * TikTokEmbed component renders a TikTok video preview.
+ * Uses thumbnail + link approach on all platforms for stability.
+ * Opens TikTok app/browser on tap.
  */
 export function TikTokEmbed({
     embedHtml,
@@ -34,116 +28,42 @@ export function TikTokEmbed({
 }: TikTokEmbedProps) {
     const { width, height } = useContentDimensions();
 
-    // Wrap the TikTok embed HTML in a full HTML document for WebView
-    const htmlContent = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          html, body { 
-            width: 100%; 
-            height: 100%; 
-            background: #f7f6f1;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            overflow: hidden;
-          }
-          .tiktok-embed {
-            max-width: 100% !important;
-            min-width: 100% !important;
-          }
-          blockquote {
-            max-width: 100% !important;
-            min-width: 100% !important;
-          }
-        </style>
-      </head>
-      <body>
-        ${embedHtml}
-      </body>
-    </html>
-  `;
-
     const openInTikTok = () => {
         if (tiktokUrl) {
             Linking.openURL(tiktokUrl);
         }
     };
 
-    // Web platform OR no embed HTML: show thumbnail with link to TikTok
-    if (Platform.OS === 'web' || !embedHtml) {
-        return (
-            <TouchableOpacity
-                style={[styles.container, { width, height }]}
-                onPress={openInTikTok}
-                activeOpacity={0.9}
-            >
-                {thumbnailUrl ? (
-                    <Image source={{ uri: thumbnailUrl }} style={[styles.thumbnail, { width, height }]} />
-                ) : (
-                    <View style={[styles.placeholder, { width, height }]}>
-                        <Text style={styles.tiktokIconLarge}>🎵</Text>
-                    </View>
-                )}
-
-                {/* Dark gradient overlay */}
-                <View style={styles.gradientOverlay} />
-
-                {/* Centered Play Button with TikTok Logo */}
-                <View style={styles.centerPlayContainer}>
-                    <View style={styles.playButton}>
-                        <Text style={styles.playIcon}>▶</Text>
-                    </View>
-                    <View style={styles.tiktokLogoContainer}>
-                        <Text style={styles.tiktokLogoText}>TikTok</Text>
-                    </View>
-                    <Text style={styles.watchText}>Watch on TikTok</Text>
-                </View>
-
-                {/* Bottom info bar */}
-                <View style={styles.bottomBar}>
-                    <View style={styles.bottomContent}>
-                        {authorName && (
-                            <Text variant="body" style={styles.authorText}>
-                                @{authorName}
-                            </Text>
-                        )}
-                        {title && (
-                            <Text variant="caption" numberOfLines={2} style={styles.titleText}>
-                                {title}
-                            </Text>
-                        )}
-                    </View>
-                </View>
-            </TouchableOpacity>
-        );
-    }
-
-    // Native platforms with WebView
+    // Always use thumbnail approach for stability (no WebView crashes)
     return (
-        <View style={[styles.container, { width, height }]}>
-            <WebView
-                source={{ html: htmlContent }}
-                style={[styles.webview, { width, height }]}
-                scrollEnabled={false}
-                javaScriptEnabled={true}
-                domStorageEnabled={true}
-                allowsInlineMediaPlayback={true}
-                mediaPlaybackRequiresUserAction={false}
-                onError={(e: { nativeEvent: { description?: string } }) => console.log('[TikTokEmbed] WebView error:', e.nativeEvent)}
-            />
+        <TouchableOpacity
+            style={[styles.container, { width, height }]}
+            onPress={openInTikTok}
+            activeOpacity={0.9}
+        >
+            {thumbnailUrl ? (
+                <Image source={{ uri: thumbnailUrl }} style={[styles.thumbnail, { width, height }]} />
+            ) : (
+                <View style={[styles.placeholder, { width, height }]}>
+                    <Text style={styles.tiktokIconLarge}>🎵</Text>
+                </View>
+            )}
 
-            {/* TikTok branding overlay */}
-            <View style={styles.brandingOverlay}>
-                <TouchableOpacity style={styles.tiktokBadgeSmall} onPress={openInTikTok}>
-                    <Text style={styles.tiktokBadgeText}>TikTok</Text>
-                </TouchableOpacity>
+            {/* Dark gradient overlay */}
+            <View style={styles.gradientOverlay} />
+
+            {/* Centered Play Button with TikTok Logo */}
+            <View style={styles.centerPlayContainer}>
+                <View style={styles.playButton}>
+                    <Text style={styles.playIcon}>▶</Text>
+                </View>
+                <View style={styles.tiktokLogoContainer}>
+                    <Text style={styles.tiktokLogoText}>TikTok</Text>
+                </View>
+                <Text style={styles.watchText}>Tap to watch on TikTok</Text>
             </View>
 
-            {/* Author info at bottom */}
+            {/* Bottom info bar */}
             {(title || authorName) && (
                 <View style={styles.bottomBar}>
                     <View style={styles.bottomContent}>
@@ -160,7 +80,7 @@ export function TikTokEmbed({
                     </View>
                 </View>
             )}
-        </View>
+        </TouchableOpacity>
     );
 }
 
