@@ -204,13 +204,16 @@ export default function SplashAnimation({
 
             // Small delay to let animation cancellation take effect
             setTimeout(() => {
-                // Trigger the zoom-out sequence
-                scale.value = withTiming(50, { duration: 600, easing: Easing.in(Easing.cubic) }, () => {
-                    runOnJS(onComplete)();
-                });
+                // Trigger the zoom-out sequence (NO callback to avoid worklet serialization)
+                scale.value = withTiming(50, { duration: 600, easing: Easing.in(Easing.cubic) });
 
                 // Fade background
                 opacity.value = withDelay(400, withTiming(0, { duration: 200 }));
+
+                // Call onComplete after animation duration (safe from JS thread)
+                setTimeout(() => {
+                    onComplete();
+                }, 800); // 600ms zoom + 200ms safety buffer
             }, 100);
         }
     }, [dataReady, minTimeElapsed, hasTriggeredZoom]);
