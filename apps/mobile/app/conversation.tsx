@@ -423,8 +423,10 @@ const styles = StyleSheet.create({
     },
     inputContainer: {
         flexDirection: 'row',
-        alignItems: 'flex-end',
-        padding: spacing.md,
+        alignItems: 'center',
+        paddingHorizontal: spacing.md,
+        paddingTop: spacing.sm,
+        paddingBottom: Platform.OS === 'ios' ? 34 : spacing.md, // Add safe area padding
         borderTopWidth: 1,
         borderTopColor: colors.border,
         backgroundColor: colors.bg,
@@ -433,12 +435,13 @@ const styles = StyleSheet.create({
     input: {
         flex: 1,
         backgroundColor: colors.surface,
-        borderRadius: radius.lg,
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.sm,
+        borderRadius: radius.pill, // Rounder
+        paddingHorizontal: spacing.lg,
+        paddingVertical: 12, // Taller
         color: colors.text,
         maxHeight: 100,
-        fontSize: 15,
+        minHeight: 44, // Minimum touch target
+        fontSize: 16,
     },
     sendButton: {
         width: 40,

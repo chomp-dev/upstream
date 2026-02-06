@@ -1225,5 +1225,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     minWidth: 120,
     alignItems: 'center',
+    justifyContent: 'center', // Fix vertical alignment
   },
 });
