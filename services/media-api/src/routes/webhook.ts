@@ -29,6 +29,13 @@ webhookRouter.post('/cloudflare-stream', async (req, res) => {
 
     // Fetch full video details from Cloudflare to ensure we have latest data
     const videoDetails = await getVideo(videoId);
+    const finalStatus = videoDetails.status || status;
+
+    if (finalStatus === 'error') {
+      console.log(`[Webhook] Video ${videoId} has error status. Deleting from database.`);
+      await pool.query('DELETE FROM videos WHERE cloudflare_video_id = $1', [videoId]);
+      return res.json({ success: true, status: 'deleted', message: 'Video deleted due to error status' });
+    }
 
     // Update database with video details
     await pool.query(
@@ -39,7 +46,7 @@ webhookRouter.post('/cloudflare-stream', async (req, res) => {
            duration = $4
        WHERE cloudflare_video_id = $5`,
       [
-        videoDetails.status || status,
+        finalStatus,
         videoDetails.playback?.hls || videoDetails.playback?.dash || null,
         videoDetails.thumbnail || null,
         videoDetails.duration || null,
@@ -47,7 +54,7 @@ webhookRouter.post('/cloudflare-stream', async (req, res) => {
       ]
     );
 
-    console.log(`✅ Video ${videoId} processed with status: ${videoDetails.status || status}`);
+    console.log(`✅ Video ${videoId} processed with status: ${finalStatus}`);
     res.json({ success: true });
   } catch (error) {
     console.error('Webhook error:', error);

@@ -105,13 +105,13 @@ feedRouter.get('/check-status/:cloudflareVideoId', async (req, res) => {
         error?.statusCode === 400;
 
       if (is404) {
-        console.log(`[Debug] Video ${cloudflareVideoId} not found on Cloudflare (deleted), marking as error`);
+        console.log(`[Debug] Video ${cloudflareVideoId} not found on Cloudflare (deleted), removing from DB`);
 
         await pool.query(
-          `UPDATE videos SET status = 'error' WHERE cloudflare_video_id = $1`,
+          `DELETE FROM videos WHERE cloudflare_video_id = $1`,
           [cloudflareVideoId]
         );
-        return res.json({ success: true, status: 'error', message: 'Video marked as deleted' });
+        return res.json({ success: true, status: 'deleted', message: 'Video deleted from DB' });
       }
 
       throw error;
@@ -147,13 +147,13 @@ feedRouter.post('/admin/verify-all-videos', async (req, res) => {
             error?.message?.includes('not found');
 
           if (is404 && video.status !== 'error') {
-            // Mark as error
+            // Delete from DB
             await pool.query(
-              `UPDATE videos SET status = 'error' WHERE id = $1`,
+              `DELETE FROM videos WHERE id = $1`,
               [video.id]
             );
-            markedAsError++;
-            console.log(`[Admin] Marked video ${video.cloudflare_video_id} as error (deleted from Cloudflare)`);
+            markedAsError++; // Keeping variable name for stats but it's actually deleted
+            console.log(`[Admin] Deleted video ${video.cloudflare_video_id} (missing on Cloudflare)`);
           }
         }
         checked++;
@@ -339,10 +339,10 @@ feedRouter.get('/nearby', async (req, res) => {
             error?.statusCode === 400;
 
           if (is404) {
-            console.log(`[Feed/Nearby] Video ${video.cloudflare_video_id} deleted on Cloudflare, marking as error`);
+            console.log(`[Feed/Nearby] Video ${video.cloudflare_video_id} deleted on Cloudflare, removing from DB`);
 
             await pool.query(
-              `UPDATE videos SET status = 'error' WHERE cloudflare_video_id = $1`,
+              `DELETE FROM videos WHERE cloudflare_video_id = $1`,
               [video.cloudflare_video_id]
             );
           } else {
@@ -437,10 +437,10 @@ feedRouter.get('/', async (req, res) => {
             error?.statusCode === 400;
 
           if (is404) {
-            console.log(`[Feed] Video ${video.cloudflare_video_id} deleted on Cloudflare, marking as error`);
+            console.log(`[Feed] Video ${video.cloudflare_video_id} deleted on Cloudflare, removing from DB`);
 
             await pool.query(
-              `UPDATE videos SET status = 'error' WHERE cloudflare_video_id = $1`,
+              `DELETE FROM videos WHERE cloudflare_video_id = $1`,
               [video.cloudflare_video_id]
             );
           } else {
