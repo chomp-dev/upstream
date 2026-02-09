@@ -737,13 +737,11 @@ export default function HomeScreen() {
             />
           </TouchableOpacity>
 
-          {viewMode === 'explore' ? (
+          {viewMode === 'explore' && (
             <View style={styles.searchContainer}>
               <Ionicons name="search" size={20} color="rgba(255,255,255,0.8)" style={styles.searchIcon} />
-              <Text color="rgba(255,255,255,0.8)" style={styles.searchText}>Search restaurants...</Text>
+              <Text color="rgba(255,255,255,0.8)" style={styles.searchText} numberOfLines={1}>Search restaurants...</Text>
             </View>
-          ) : (
-            <View style={{ flex: 1 }} />
           )}
 
           {feedMode === 'nearby' && (
@@ -882,52 +880,7 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  headerControls: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 60 : 40,
-    left: 20,
-    right: 20,
-    zIndex: 100,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  viewToggle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  searchContainer: {
-    flex: 1,
-    height: 40,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 15,
-    marginRight: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchText: {
-    opacity: 0.8,
-  },
-  modeBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    marginLeft: 8,
-  },
+
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -997,31 +950,60 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  switchButton: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    borderRadius: radius.pill,
+  headerControls: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 50,
+    left: 20,
+    right: 20,
+    zIndex: 100,
   },
-  restaurantInfo: {
-    gap: spacing.xs,
-  },
-  restaurantMeta: {
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    justifyContent: 'flex-start', // Change to flex-start to control spacing manually
+    gap: 12, // Explicit gap between items
   },
-  ratingRow: {
+  viewToggle: {
+    width: 44, // Slightly larger touch target
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  searchContainer: {
+    flex: 1,
+    height: 44, // Match toggle height
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 22,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
-  star: {
-    fontSize: 14,
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchText: {
+    flex: 1, // Ensure text takes available space
+    opacity: 0.9,
+    fontSize: 15,
+  },
+  modeBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    marginLeft: 'auto', // Push to the right
   },
   gridContainer: {
     paddingHorizontal: GRID_GAP,
-    paddingTop: 60, // Space for header
+    paddingTop: 100, // Increase top padding to avoid header overlap
     paddingBottom: 120,
   },
   row: {
@@ -1045,6 +1027,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.card,
   },
+
   typeIndicator: {
     position: 'absolute',
     top: spacing.sm,
@@ -1053,5 +1036,27 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     padding: spacing.xxs,
     paddingHorizontal: spacing.xs,
+  },
+  switchButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: radius.pill,
+  },
+  restaurantInfo: {
+    gap: spacing.xs,
+  },
+  restaurantMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  star: {
+    fontSize: 14,
   },
 });
