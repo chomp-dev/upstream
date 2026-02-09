@@ -12,6 +12,8 @@ import {
   TouchableOpacity,
   Dimensions,
   Platform,
+  Image,
+  RefreshControl,
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -32,9 +34,14 @@ import { navigationStore } from '../../src/lib/navigationStore';
 
 // Feed mode types
 type FeedMode = 'loading' | 'nearby' | 'demo';
+type ViewMode = 'feed' | 'explore';
 
 // Default search radius for nearby restaurants (2 miles)
 const NEARBY_RADIUS = 3200;
+
+// Grid constants for explore view
+const GRID_GAP = 2;
+const NUM_COLUMNS = 3;
 
 export default function HomeScreen() {
   const [feed, setFeed] = useState<FeedItem[]>([]);
@@ -48,6 +55,9 @@ export default function HomeScreen() {
   const lastScrolledRef = useRef<string | null>(null);
   const { width, height: SCREEN_HEIGHT } = useContentDimensions();
 
+  const ITEM_WIDTH = (width - GRID_GAP * (NUM_COLUMNS + 1)) / NUM_COLUMNS;
+  const ITEM_HEIGHT = ITEM_WIDTH * 1.4;
+
   // Loading state
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingStatus, setLoadingStatus] = useState('Initializing...');
@@ -58,6 +68,9 @@ export default function HomeScreen() {
   const [locationAvailable, setLocationAvailable] = useState<boolean>(false);
   const [nearbyRestaurantCount, setNearbyRestaurantCount] = useState(0);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+
+  // View mode state (feed vs explore grid)
+  const [viewMode, setViewMode] = useState<ViewMode>('feed');
 
   // ============================================================================
   // Handle videoDataId param (for navigating from profile/explore to specific post)
@@ -616,6 +629,38 @@ export default function HomeScreen() {
     itemVisiblePercentThreshold: 50,
   }).current;
 
+  const renderGridItem = ({ item, index }: { item: FeedItem; index: number }) => {
+    const thumbnail = item.type === 'video' ? item.thumbnail_url : item.images?.[0];
+
+    return (
+      <TouchableOpacity
+        style={[styles.gridItem, { width: ITEM_WIDTH, height: ITEM_HEIGHT }]}
+        onPress={() => {
+          setViewMode('feed');
+          // Wait for view switch then scroll
+          setTimeout(() => {
+            flatListRef.current?.scrollToIndex({ index, animated: false });
+            setCurrentIndex(index);
+          }, 100);
+        }}
+        activeOpacity={0.8}
+      >
+        {thumbnail ? (
+          <Image source={{ uri: thumbnail }} style={styles.thumbnail} />
+        ) : (
+          <View style={styles.placeholderThumbnail}>
+            <Text style={{ fontSize: 24 }}>{item.type === 'video' ? '🎬' : '📷'}</Text>
+          </View>
+        )}
+        {item.type === 'video' && (
+          <View style={styles.typeIndicator}>
+            <Ionicons name="play" size={12} color="white" />
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
+
   // ============================================================================
   // Render States
   // ============================================================================
@@ -675,107 +720,143 @@ export default function HomeScreen() {
 
   return (
     <Screen safe={false}>
+      {/* Header Controls (View Toggle) */}
+      <View style={styles.headerControls}>
+        <TouchableOpacity
+          style={styles.viewToggle}
+          onPress={() => setViewMode(prev => prev === 'feed' ? 'explore' : 'feed')}
+        >
+          <Ionicons
+            name={viewMode === 'feed' ? 'grid-outline' : 'albums-outline'}
+            size={24}
+            color="white"
+          />
+        </TouchableOpacity>
+      </View>
 
+      {viewMode === 'feed' ? (
+        <FlatList
+          ref={flatListRef}
+          extraData={restaurantCache} // FORCE UPDATE when cache changes
+          data={feed}
+          keyExtractor={(item) => `${item.type}-${item.id}`}
+          refreshing={loading}
+          onRefresh={() => feedMode === 'nearby' ? loadNearbyFeed(true) : loadDemoFeed()}
+          pagingEnabled={true} // Native: Handles strict paging
+          bounces={Platform.OS !== 'web'} // Web: Disable bounce to prevent overscroll issues
+          showsVerticalScrollIndicator={false}
+          snapToInterval={SCREEN_HEIGHT}
+          snapToAlignment="start"
+          decelerationRate="fast"
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
+          getItemLayout={(_, index) => ({
+            length: SCREEN_HEIGHT,
+            offset: SCREEN_HEIGHT * index,
+            index,
+          })}
+          onScrollToIndexFailed={(info) => {
+            setTimeout(() => {
+              flatListRef.current?.scrollToIndex({
+                index: info.index,
+                animated: false,
+              });
+            }, 200);
+          }}
+          // Web: Force strict CSS snapping via style injection
+          {...(Platform.OS === 'web' ? {
+            style: { height: '100%', scrollSnapType: 'y mandatory', overflowY: 'scroll' } as any
+          } : {})}
+          renderItem={({ item, index }) => {
+            // DEBUG: Check why cache lookup fails
+            if (item.google_place_id && !restaurantCache[item.google_place_id]) {
+              console.log('[FeedDebug] MISS - Item:', item.google_place_id, '| Cache has', Object.keys(restaurantCache).length, 'keys:', Object.keys(restaurantCache).slice(0, 3));
+            } else if (item.google_place_id) {
+              console.log('[FeedDebug] HIT - Found restaurant for:', item.google_place_id);
+            }
 
-      <FlatList
-        ref={flatListRef}
-        extraData={restaurantCache} // FORCE UPDATE when cache changes
-        data={feed}
-        keyExtractor={(item) => `${item.type}-${item.id}`}
-        refreshing={loading}
-        onRefresh={() => feedMode === 'nearby' ? loadNearbyFeed(true) : loadDemoFeed()}
-        pagingEnabled={true} // Native: Handles strict paging
-        bounces={Platform.OS !== 'web'} // Web: Disable bounce to prevent overscroll issues
-        showsVerticalScrollIndicator={false}
-        snapToInterval={SCREEN_HEIGHT}
-        snapToAlignment="start"
-        decelerationRate="fast"
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={viewabilityConfig}
-        getItemLayout={(_, index) => ({
-          length: SCREEN_HEIGHT,
-          offset: SCREEN_HEIGHT * index,
-          index,
-        })}
-        onScrollToIndexFailed={(info) => {
-          setTimeout(() => {
-            flatListRef.current?.scrollToIndex({
-              index: info.index,
-              animated: false,
-            });
-          }, 200);
-        }}
-        // Web: Force strict CSS snapping via style injection
-        {...(Platform.OS === 'web' ? {
-          style: { height: '100%', scrollSnapType: 'y mandatory', overflowY: 'scroll' } as any
-        } : {})}
-        renderItem={({ item, index }) => {
-          // DEBUG: Check why cache lookup fails
-          if (item.google_place_id && !restaurantCache[item.google_place_id]) {
-            console.log('[FeedDebug] MISS - Item:', item.google_place_id, '| Cache has', Object.keys(restaurantCache).length, 'keys:', Object.keys(restaurantCache).slice(0, 3));
-          } else if (item.google_place_id) {
-            console.log('[FeedDebug] HIT - Found restaurant for:', item.google_place_id);
-          }
+            const restaurant = item.google_place_id
+              ? restaurantCache[item.google_place_id]
+              : undefined;
 
-          const restaurant = item.google_place_id
-            ? restaurantCache[item.google_place_id]
-            : null;
-
-          return (
-            <View style={[
-              { width, height: SCREEN_HEIGHT },
-              // Web: STRICT snapping on children (scrollSnapStop: always = strictly lock to this item)
-              // @ts-ignore
-              Platform.OS === 'web' ? { scrollSnapAlign: 'start', scrollSnapStop: 'always' } : {}
-            ]}>
-              {item.type === 'video' ? (
-                <>
+            if (item.type === 'video') {
+              return (
+                <View style={{ height: SCREEN_HEIGHT }}>
                   <VideoPlayer
                     videoId={item.cloudflare_video_id}
                     playbackUrl={item.playback_url}
                     thumbnailUrl={item.thumbnail_url}
-                    isActive={isFocused && index === currentIndex && item.status === 'ready'}
+                    isActive={index === currentIndex && isFocused}
                     restaurant={restaurant}
                     user={{
                       userId: item.user_id,
                       username: item.username || 'User',
-                      avatarUrl: item.user_avatar || undefined
+                      avatarUrl: item.user_avatar || ''
                     }}
                     videoUrl={item.video_url}
-                    title={item.title}
                     caption={item.description}
+                    title={item.title}
                     userLocation={userLocation}
                     status={item.status}
                   />
-                  {/* Processing overlay handled by VideoPlayer internally now to avoid stacking */}
-                </>
-              ) : item.type === 'tiktok_embed' ? (
-                <TikTokEmbed
-                  embedHtml={item.embed_html || ''}
-                  thumbnailUrl={item.thumbnail_url}
-                  title={item.title}
-                  authorName={item.author_name}
-                  tiktokUrl={item.tiktok_url}
-                  isActive={isFocused && index === currentIndex}
-                />
-              ) : (
-                <ImagePostViewer
-                  images={item.images || []}
-                  restaurant={restaurant}
-                  user={{
-                    userId: item.user_id,
-                    username: item.username || 'User',
-                    avatarUrl: item.user_avatar || undefined
-                  }}
-                  title={item.title}
-                  caption={item.description}
-                  imagePostId={item.id}
-                />
-              )}
-            </View>
-          );
-        }}
-      />
+                </View>
+              );
+            }
+            if (item.type === 'image_post') {
+              return (
+                <View style={{ height: SCREEN_HEIGHT }}>
+                  <ImagePostViewer
+                    images={item.images || []}
+                    restaurant={restaurant}
+                    user={{
+                      userId: item.user_id,
+                      username: item.username || 'User',
+                      avatarUrl: item.user_avatar || ''
+                    }}
+                    caption={item.description}
+                    title={item.title}
+                    imagePostId={item.id}
+                  />
+                </View>
+              );
+            }
+            if (item.type === 'tiktok_embed') {
+              return (
+                <View style={{ height: SCREEN_HEIGHT }}>
+                  <TikTokEmbed
+                    embedHtml={item.embed_html || ''}
+                    thumbnailUrl={item.thumbnail_url}
+                    title={item.title}
+                    authorName={item.username || item.author_name}
+                    tiktokUrl={item.video_url || item.tiktok_url}
+                    isActive={index === currentIndex && isFocused}
+                  />
+                </View>
+              );
+            }
+            return null;
+          }}
+        />
+      ) : (
+        <FlatList
+          key="explore-grid"
+          data={feed}
+          keyExtractor={(item) => `${item.type}-${item.id}`}
+          renderItem={renderGridItem}
+          numColumns={NUM_COLUMNS}
+          contentContainerStyle={styles.gridContainer}
+          columnWrapperStyle={styles.row}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={loading}
+              onRefresh={() => feedMode === 'nearby' ? loadNearbyFeed(true) : loadDemoFeed()}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
+        />
+      )}
     </Screen>
   );
 }
@@ -871,5 +952,56 @@ const styles = StyleSheet.create({
   },
   star: {
     fontSize: 14,
+  },
+  headerControls: {
+    position: 'absolute',
+    top: 50, // Safe area aware
+    left: spacing.lg,
+    zIndex: 100,
+  },
+  viewToggle: {
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  gridContainer: {
+    paddingHorizontal: GRID_GAP,
+    paddingTop: 60, // Space for header
+    paddingBottom: 120,
+  },
+  row: {
+    gap: GRID_GAP,
+    marginBottom: GRID_GAP,
+  },
+  gridItem: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    overflow: 'hidden',
+  },
+  thumbnail: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  placeholderThumbnail: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.card,
+  },
+  typeIndicator: {
+    position: 'absolute',
+    top: spacing.sm,
+    right: spacing.sm,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: radius.sm,
+    padding: spacing.xxs,
+    paddingHorizontal: spacing.xs,
   },
 });

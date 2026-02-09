@@ -83,7 +83,49 @@ const DEMO_RESULTS: RestaurantResult[] = [
   },
 ];
 
+// Demo results sorted by rating for second query
+const DEMO_RESULTS_BY_RATING: RestaurantResult[] = [
+  {
+    id: '2',
+    name: 'Teamoji',
+    rating: 4.7,
+    priceLevel: 1,
+    distance: '0.5 mi',
+    address: '616 E Green St, Champaign, IL',
+    image: 'https://images.unsplash.com/photo-1525803377221-99c58b1e3fc6?w=400',
+    cuisine: 'Bubble Tea • Desserts',
+    deliveryTime: '20-30 min',
+    deliveryFee: '$2.49',
+  },
+  {
+    id: '1',
+    name: 'Kung Fu Tea',
+    rating: 4.5,
+    priceLevel: 1,
+    distance: '0.3 mi',
+    address: '512 E Green St, Champaign, IL',
+    image: 'https://images.unsplash.com/photo-1558857563-b371033873b8?w=400',
+    cuisine: 'Bubble Tea',
+    deliveryTime: '15-25 min',
+    deliveryFee: '$1.99',
+  },
+  {
+    id: '3',
+    name: 'ShareTea',
+    rating: 4.3,
+    priceLevel: 2,
+    distance: '0.8 mi',
+    address: '703 S Wright St, Champaign, IL',
+    image: 'https://images.unsplash.com/photo-1571934811356-5cc061b6821f?w=400',
+    cuisine: 'Bubble Tea • Snacks',
+    deliveryTime: '25-35 min',
+    deliveryFee: '$0.99',
+  },
+];
+
 const DEMO_AI_RESPONSE = `I found 3 boba shops near you, sorted by price and distance. Here are your options:`;
+
+const DEMO_AI_RESPONSE_RATING = `Got it! Here are the same shops reordered by rating (highest first):`;
 
 export default function ExploreScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -96,6 +138,7 @@ export default function ExploreScreen() {
   ]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [queryCount, setQueryCount] = useState(0);
   const flatListRef = useRef<FlatList>(null);
 
   // Simulate AI response
@@ -115,10 +158,12 @@ export default function ExploreScreen() {
 
     // Simulate AI "thinking" delay
     setTimeout(() => {
+      const isSecondQuery = queryCount >= 1;
+
       const aiMessage: ChatMessage = {
         id: `ai-${Date.now()}`,
         type: 'assistant',
-        content: DEMO_AI_RESPONSE,
+        content: isSecondQuery ? DEMO_AI_RESPONSE_RATING : DEMO_AI_RESPONSE,
         timestamp: new Date(),
       };
 
@@ -126,11 +171,12 @@ export default function ExploreScreen() {
         id: `results-${Date.now()}`,
         type: 'results',
         content: '',
-        results: DEMO_RESULTS,
+        results: isSecondQuery ? DEMO_RESULTS_BY_RATING : DEMO_RESULTS,
         timestamp: new Date(),
       };
 
       setMessages(prev => [...prev, aiMessage, resultsMessage]);
+      setQueryCount(prev => prev + 1);
       setIsTyping(false);
     }, 1500);
   };

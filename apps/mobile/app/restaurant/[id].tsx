@@ -1,14 +1,14 @@
 /**
  * Restaurant Detail Page
- * Shows restaurant info, action buttons, and posts from this location
+ * Shows restaurant info, action buttons, simulated menu, and posts from this location
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, FlatList, Linking, Platform, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, FlatList, Linking, Platform, ActivityIndicator, Modal } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { Screen, Text, Badge } from '../../src/ui';
+import { Screen, Text, Badge, Card } from '../../src/ui';
 import { colors, spacing, radius } from '../../src/theme';
 import { ratingColor, priceDisplay } from '../../src/theme/styles';
 import { useAuth } from '../../src/context/auth';
@@ -27,6 +27,42 @@ interface PostItem {
   created_at: string;
 }
 
+interface MenuItem {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  image: string;
+  popular?: boolean;
+}
+
+// Simulated menu items for demo
+const DEMO_MENU: MenuItem[] = [
+  {
+    id: '1',
+    name: 'Classic Milk Tea',
+    description: 'House special black milk tea with tapioca pearls',
+    price: 5.99,
+    image: 'https://images.unsplash.com/photo-1558857563-b371033873b8?w=300',
+    popular: true,
+  },
+  {
+    id: '2',
+    name: 'Taro Milk Tea',
+    description: 'Creamy taro flavor with chewy boba',
+    price: 6.49,
+    image: 'https://images.unsplash.com/photo-1525803377221-99c58b1e3fc6?w=300',
+  },
+  {
+    id: '3',
+    name: 'Brown Sugar Boba',
+    description: 'Fresh milk with brown sugar syrup and warm boba',
+    price: 6.99,
+    image: 'https://images.unsplash.com/photo-1571934811356-5cc061b6821f?w=300',
+    popular: true,
+  },
+];
+
 export default function RestaurantDetailScreen() {
   const router = useRouter();
   const { supabase } = useAuth();
@@ -43,6 +79,11 @@ export default function RestaurantDetailScreen() {
 
   const [posts, setPosts] = useState<PostItem[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Order state
+  const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
+  const [orderModalVisible, setOrderModalVisible] = useState(false);
+  const [checkoutStep, setCheckoutStep] = useState<'confirm' | 'processing' | 'success'>('confirm');
 
   const ratingNum = rating ? parseFloat(rating) : null;
   const priceNum = price_level ? parseInt(price_level, 10) : null;
@@ -115,6 +156,28 @@ export default function RestaurantDetailScreen() {
     });
   }, [id, name, router]);
 
+  // Order handlers
+  const handleOrderItem = (item: MenuItem) => {
+    setSelectedItem(item);
+    setCheckoutStep('confirm');
+    setOrderModalVisible(true);
+  };
+
+  const handleConfirmOrder = () => {
+    setCheckoutStep('processing');
+
+    // Simulate payment processing
+    setTimeout(() => {
+      setCheckoutStep('success');
+    }, 2000);
+  };
+
+  const handleCloseModal = () => {
+    setOrderModalVisible(false);
+    setSelectedItem(null);
+    setCheckoutStep('confirm');
+  };
+
   const renderHeader = () => (
     <View style={styles.headerContent}>
       {/* Restaurant Info Card */}
@@ -170,6 +233,44 @@ export default function RestaurantDetailScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Menu Section */}
+      <View style={styles.menuSection}>
+        <View style={styles.sectionHeader}>
+          <Ionicons name="restaurant-outline" size={18} color={colors.text} />
+          <Text variant="label" style={styles.sectionTitle}>Order Now</Text>
+          <Badge label="Demo" variant="default" />
+        </View>
+
+        {DEMO_MENU.map((item) => (
+          <Card key={item.id} style={styles.menuCard}>
+            <View style={styles.menuItemRow}>
+              <Image source={{ uri: item.image }} style={styles.menuImage} />
+              <View style={styles.menuInfo}>
+                <View style={styles.menuTitleRow}>
+                  <Text variant="body" style={styles.menuName}>{item.name}</Text>
+                  {item.popular && <Badge label="Popular" variant="ai" />}
+                </View>
+                <Text variant="caption" color={colors.muted} numberOfLines={2}>
+                  {item.description}
+                </Text>
+                <Text variant="subtitle" style={styles.menuPrice}>
+                  ${item.price.toFixed(2)}
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={styles.orderButton}
+              onPress={() => handleOrderItem(item)}
+            >
+              <Ionicons name="cart" size={16} color={colors.bg} />
+              <Text variant="body" color={colors.bg} style={{ marginLeft: 4 }}>
+                Add to Order
+              </Text>
+            </TouchableOpacity>
+          </Card>
+        ))}
+      </View>
+
       {/* Posts Section Header */}
       <View style={styles.sectionHeader}>
         <Ionicons name="grid-outline" size={18} color={colors.text} />
@@ -194,7 +295,6 @@ export default function RestaurantDetailScreen() {
       <TouchableOpacity
         style={styles.postItem}
         onPress={() => {
-          // Navigate to feed with this post
           router.push({
             pathname: '/',
             params: { itemId: item.id.toString() },
@@ -223,6 +323,96 @@ export default function RestaurantDetailScreen() {
       </TouchableOpacity>
     );
   };
+
+  // Order Checkout Modal
+  const renderOrderModal = () => (
+    <Modal
+      visible={orderModalVisible}
+      animationType="slide"
+      transparent={true}
+      onRequestClose={handleCloseModal}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          {checkoutStep === 'confirm' && selectedItem && (
+            <>
+              <View style={styles.modalHeader}>
+                <Text variant="title">Confirm Order</Text>
+                <TouchableOpacity onPress={handleCloseModal}>
+                  <Ionicons name="close" size={24} color={colors.text} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.orderSummary}>
+                <Image source={{ uri: selectedItem.image }} style={styles.orderImage} />
+                <View style={styles.orderDetails}>
+                  <Text variant="subtitle">{selectedItem.name}</Text>
+                  <Text variant="body" color={colors.muted}>{name}</Text>
+                  <Text variant="title" style={styles.orderPrice}>
+                    ${selectedItem.price.toFixed(2)}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.paymentInfo}>
+                <View style={styles.paymentRow}>
+                  <Text variant="body">Subtotal</Text>
+                  <Text variant="body">${selectedItem.price.toFixed(2)}</Text>
+                </View>
+                <View style={styles.paymentRow}>
+                  <Text variant="body">Delivery Fee</Text>
+                  <Text variant="body">$1.99</Text>
+                </View>
+                <View style={styles.paymentRow}>
+                  <Text variant="body">Tax</Text>
+                  <Text variant="body">${(selectedItem.price * 0.08).toFixed(2)}</Text>
+                </View>
+                <View style={[styles.paymentRow, styles.totalRow]}>
+                  <Text variant="subtitle">Total</Text>
+                  <Text variant="subtitle">
+                    ${(selectedItem.price + 1.99 + selectedItem.price * 0.08).toFixed(2)}
+                  </Text>
+                </View>
+              </View>
+
+              <TouchableOpacity style={styles.confirmButton} onPress={handleConfirmOrder}>
+                <Text variant="body" color={colors.bg}>Place Order</Text>
+              </TouchableOpacity>
+            </>
+          )}
+
+          {checkoutStep === 'processing' && (
+            <View style={styles.processingContainer}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text variant="subtitle" style={styles.processingText}>
+                Processing your order...
+              </Text>
+            </View>
+          )}
+
+          {checkoutStep === 'success' && (
+            <View style={styles.successContainer}>
+              <View style={styles.successIcon}>
+                <Ionicons name="checkmark-circle" size={64} color={colors.lime} />
+              </View>
+              <Text variant="title" center style={styles.successTitle}>
+                Order Confirmed!
+              </Text>
+              <Text variant="body" color={colors.muted} center>
+                Your {selectedItem?.name} is being prepared.
+              </Text>
+              <Text variant="body" color={colors.muted} center style={{ marginTop: spacing.sm }}>
+                Estimated delivery: 15-25 min
+              </Text>
+              <TouchableOpacity style={styles.doneButton} onPress={handleCloseModal}>
+                <Text variant="body" color={colors.bg}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
 
   return (
     <Screen edges={['top']}>
@@ -266,6 +456,8 @@ export default function RestaurantDetailScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
+
+      {renderOrderModal()}
     </Screen>
   );
 }
@@ -375,6 +567,9 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontWeight: '500',
   },
+  menuSection: {
+    marginBottom: spacing.xl,
+  },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -386,6 +581,44 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     flex: 1,
+  },
+  menuCard: {
+    marginBottom: spacing.md,
+    padding: spacing.md,
+  },
+  menuItemRow: {
+    flexDirection: 'row',
+    marginBottom: spacing.sm,
+  },
+  menuImage: {
+    width: 80,
+    height: 80,
+    borderRadius: radius.md,
+    marginRight: spacing.md,
+  },
+  menuInfo: {
+    flex: 1,
+  },
+  menuTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.xxs,
+  },
+  menuName: {
+    fontWeight: '600',
+  },
+  menuPrice: {
+    color: colors.lime,
+    marginTop: spacing.xs,
+  },
+  orderButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm,
   },
   postItem: {
     flex: 1 / 3,
@@ -441,10 +674,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xxl,
     paddingHorizontal: spacing.xl,
   },
-  emptyEmoji: {
-    fontSize: 48,
-    marginBottom: spacing.md,
-  },
   emptySubtext: {
     marginTop: spacing.xs,
     marginBottom: spacing.lg,
@@ -456,5 +685,94 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderRadius: radius.pill,
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: colors.bg,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    padding: spacing.xl,
+    minHeight: 400,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+  },
+  orderSummary: {
+    flexDirection: 'row',
+    marginBottom: spacing.xl,
+  },
+  orderImage: {
+    width: 100,
+    height: 100,
+    borderRadius: radius.lg,
+    marginRight: spacing.lg,
+  },
+  orderDetails: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  orderPrice: {
+    color: colors.lime,
+    marginTop: spacing.sm,
+  },
+  paymentInfo: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    marginBottom: spacing.xl,
+  },
+  paymentRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  totalRow: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: spacing.sm,
+    marginTop: spacing.sm,
+    marginBottom: 0,
+  },
+  confirmButton: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+  },
+  processingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: 300,
+  },
+  processingText: {
+    marginTop: spacing.lg,
+  },
+  successContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: 300,
+  },
+  successIcon: {
+    marginBottom: spacing.lg,
+  },
+  successTitle: {
+    marginBottom: spacing.sm,
+  },
+  doneButton: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xxl,
+    marginTop: spacing.xl,
   },
 });
