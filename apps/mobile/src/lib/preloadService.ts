@@ -187,108 +187,99 @@ export const preloadService = {
             const { latitude, longitude } = location.coords;
             console.log(`[Preload] Got location: ${latitude}, ${longitude}`);
 
-            setStatus('Finding nearby restaurants...');
+            setStatus('Finding nearby content...');
             onProgress(30);
 
-            // Step 3: Fetch nearby restaurants (shared between feed and map)
-            const searchStart = Date.now();
-            const nearbyResponse = await searchApi.searchNearby(
-                latitude,
-                longitude,
-                NEARBY_RADIUS,
-                60 // Optimized to 60 (matches feed max + small buffer) for speed
-            );
-            console.log(`[Preload] Nearby search took ${Date.now() - searchStart}ms. Found ${nearbyResponse.restaurants.length}`);
+            // Step 3: Fetch nearby restaurants for map AND feed in parallel
+            const contentStart = Date.now();
+
+            const [feedResult, searchResult] = await Promise.allSettled([
+                // Load feed using new location-based API
+                (async () => {
+                    const feedStart = Date.now();
+                    const response = await mediaApi.fetchNearbyFeedByLocation(
+                        latitude,
+                        longitude,
+                        NEARBY_RADIUS,
+                        50
+                    );
+                    console.log(`[Preload] Location feed took ${Date.now() - feedStart}ms. Found ${response.feed?.length || 0} items`);
+
+                    // Validate feed items
+                    const validFeed = (response.feed || []).filter((item: any) => {
+                        if (item.type === 'video') {
+                            // Allow processing videos, filter out error videos
+                            return item.status !== 'error' && (item.playback_url || item.status !== 'ready');
+                        }
+                        return true;
+                    });
+
+                    return {
+                        feed: validFeed,
+                        placeIds: response.nearbyPlaceIds || [],
+                        raw: response.feed?.length || 0
+                    };
+                })(),
+
+                // Load nearby restaurants for map (still uses search API)
+                (async () => {
+                    const searchStart = Date.now();
+                    const response = await searchApi.searchNearby(
+                        latitude,
+                        longitude,
+                        NEARBY_RADIUS,
+                        60
+                    );
+                    console.log(`[Preload] Nearby search took ${Date.now() - searchStart}ms. Found ${response.restaurants.length}`);
+                    return response;
+                })(),
+            ]);
 
             setStatus('Loading content...');
             onProgress(50);
 
-            // Step 4: Load feed and map data in parallel
-            const contentStart = Date.now();
-            const placeIds = nearbyResponse.restaurants.map(r => r.google_place_id);
-            const limitedPlaceIds = placeIds.slice(0, 50); // Limit for feed
+            // Process feed result
+            let feedLoaded = false;
+            let feedPlaceIds: string[] = [];
+            if (feedResult.status === 'fulfilled') {
+                const { feed, placeIds } = feedResult.value;
+                feedPlaceIds = placeIds;
+                await feedStore.setFeed(feed, placeIds, 'nearby');
+                feedLoaded = true;
+                console.log(`[Preload] Feed ready: ${feed.length} items from ${placeIds.length} restaurants`);
+            }
 
-            const [feedResult, mapResult] = await Promise.allSettled([
-                // Load feed
-                (async () => {
-                    if (limitedPlaceIds.length === 0) return { feed: [], raw: 0 };
+            onProgress(70);
 
-                    // Fetch all chunks in parallel for speed
-                    const chunkStart = Date.now();
-                    const CHUNK_SIZE = 10;
-                    const chunks = [];
-                    for (let i = 0; i < limitedPlaceIds.length; i += CHUNK_SIZE) {
-                        chunks.push(limitedPlaceIds.slice(i, i + CHUNK_SIZE));
-                    }
+            // Process map result (get media summary for restaurants)
+            let mapLoaded = false;
+            let nearbyRestaurants: any[] = [];
+            if (searchResult.status === 'fulfilled') {
+                nearbyRestaurants = searchResult.value.restaurants;
+                const allPlaceIds = nearbyRestaurants.map((r: any) => r.google_place_id);
 
-                    // Load all chunks in parallel
-                    const chunkResults = await Promise.allSettled(
-                        chunks.map(chunk => mediaApi.fetchNearbyFeed(chunk, 10))
-                    );
-
-                    console.log(`[Preload] Feed chunks took ${Date.now() - chunkStart}ms`);
-
-                    let allFeedItems: any[] = [];
-                    for (const result of chunkResults) {
-                        if (result.status === 'fulfilled' && result.value.feed?.length > 0) {
-                            allFeedItems = [...allFeedItems, ...result.value.feed];
-                        }
-                    }
-
-                    // Validate and deduplicate
-                    const validFeed = allFeedItems.filter(item => {
-                        if (item.type === 'video') {
-                            return item.status !== 'error' && item.playback_url;
-                        }
-                        return true;
-                    });
-
-                    const seenIds = new Set<string>();
-                    const uniqueFeed = validFeed.filter(item => {
-                        const id = item.id?.toString() || item.cloudflare_video_id || JSON.stringify(item);
-                        if (seenIds.has(id)) return false;
-                        seenIds.add(id);
-                        return true;
-                    });
-
-                    return { feed: uniqueFeed, raw: allFeedItems.length };
-                })(),
-
-                // Load map media summary
-                (async () => {
-                    if (placeIds.length === 0) return {};
+                // Get media summary for map pins
+                try {
                     const mapStart = Date.now();
-                    const res = await mediaApi.getMediaSummary(placeIds);
+                    const mediaSummary = await mediaApi.getMediaSummary(allPlaceIds);
                     console.log(`[Preload] Map summary took ${Date.now() - mapStart}ms`);
-                    return res;
-                })(),
-            ]);
+
+                    await mapStore.setRestaurants(
+                        nearbyRestaurants,
+                        mediaSummary,
+                        latitude,
+                        longitude,
+                        2 // Default radius index (2 mi)
+                    );
+                    mapLoaded = true;
+                    console.log(`[Preload] Map ready: ${nearbyRestaurants.length} restaurants`);
+                } catch (e) {
+                    console.warn('[Preload] Map media summary failed:', e);
+                }
+            }
+
 
             console.log(`[Preload] Content load took ${Date.now() - contentStart}ms total`);
-
-            onProgress(85);
-
-            // Process feed result
-            if (feedResult.status === 'fulfilled') {
-                const { feed } = feedResult.value;
-                await feedStore.setFeed(feed, limitedPlaceIds, 'nearby');
-                feedLoaded = true;
-                console.log(`[Preload] Feed ready: ${feed.length} items`);
-            }
-
-            // Process map result
-            if (mapResult.status === 'fulfilled') {
-                const mediaSummary = mapResult.value;
-                await mapStore.setRestaurants(
-                    nearbyResponse.restaurants,
-                    mediaSummary,
-                    latitude,
-                    longitude,
-                    2 // Default radius index (2 mi)
-                );
-                mapLoaded = true;
-                console.log(`[Preload] Map ready: ${nearbyResponse.restaurants.length} restaurants`);
-            }
 
             setStatus('Ready!');
             onProgress(100);

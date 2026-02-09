@@ -318,96 +318,36 @@ export default function HomeScreen() {
       if (__DEV__) console.log(`[Feed] Got location: ${loc.coords.latitude}, ${loc.coords.longitude}`);
 
       setLoadingProgress(30);
-      setLoadingStatus('Finding nearby restaurants...');
+      setLoadingStatus('Finding nearby content...');
 
-      // Search for nearby restaurants
-      const nearbyResponse = await searchApi.searchNearby(
+      // NEW: Use the location-based API that queries videos directly by lat/lng/radius
+      // This bypasses Google Places search and ensures ALL nearby videos are returned
+      const response = await mediaApi.fetchNearbyFeedByLocation(
         loc.coords.latitude,
         loc.coords.longitude,
-        NEARBY_RADIUS,
-        100 // Limit search to 100 max
+        NEARBY_RADIUS, // Default ~3200m (2 miles)
+        50 // Limit to 50 items
       );
 
-      let placeIds = nearbyResponse.restaurants.map(r => r.google_place_id);
+      setLoadingProgress(80);
+      setLoadingStatus('Preparing your feed...');
 
-      // Limit to top 50 closest to avoid massive wait times/timeouts
-      if (placeIds.length > 50) {
-        if (__DEV__) console.log(`[Feed] Limiting processing to top 50 of ${placeIds.length} restaurants`);
-        placeIds = placeIds.slice(0, 50);
-      }
-
+      const placeIds = response.nearbyPlaceIds || [];
       setNearbyPlaceIds(placeIds);
-      setNearbyRestaurantCount(nearbyResponse.restaurants.length);
+      setNearbyRestaurantCount(response.totalNearbyRestaurants || 0);
 
-      // OPTIMIZATION: Seed restaurant cache immediately with the data we just got
-      // This prevents the "missing info" delay by avoiding redundant fetches
-      const newCache: Record<string, Restaurant> = {};
-      nearbyResponse.restaurants.forEach(r => {
-        if (r.google_place_id) {
-          newCache[r.google_place_id] = r;
-        }
-      });
-      setRestaurantCache(prev => ({ ...prev, ...newCache }));
+      if (__DEV__) console.log(`[Feed] Nearby feed has ${response.feed?.length || 0} items from ${placeIds.length} restaurants`);
 
-      if (__DEV__) console.log(`[Feed] Found ${nearbyResponse.restaurants.length} nearby restaurants, checking ${placeIds.length}`);
-
-      if (placeIds.length === 0) {
-        if (__DEV__) console.log('[Feed] No nearby restaurants, staying in nearby mode with empty state');
-        setFeed([]);
-        setFeedMode('nearby');
-        setLoading(false);
-        return;
-      }
-
-      setLoadingProgress(60);
-      setLoadingStatus(`Found ${placeIds.length} spots. Getting videos...`);
-
-      // Chunk place IDs to show real progress
-      const CHUNK_SIZE = 5;
-      const chunks = [];
-      for (let i = 0; i < placeIds.length; i += CHUNK_SIZE) {
-        chunks.push(placeIds.slice(i, i + CHUNK_SIZE));
-      }
-
-      let allFeedItems: any[] = [];
-      let processedCount = 0;
-
-      for (let i = 0; i < chunks.length; i++) {
-        const chunk = chunks[i];
-
-        try {
-          // Update status
-          const percentComplete = 60 + Math.floor((i / chunks.length) * 30); // 60% -> 90%
-          setLoadingProgress(percentComplete);
-          setLoadingStatus(`Checking ${chunk.length} spots (${i + 1}/${chunks.length})...`);
-
-          const response = await mediaApi.fetchNearbyFeed(chunk, 10); // Limit 10 per chunk
-          if (response.feed && response.feed.length > 0) {
-            allFeedItems = [...allFeedItems, ...response.feed];
-          }
-        } catch (err) {
-          console.warn(`[Feed] Failed to fetch chunk ${i}:`, err);
-        }
-      }
-
-      // Validating and deduplicating
-      const validFeed = allFeedItems.filter(item => {
+      // Validate feed items (exclude error videos without playback_url)
+      const validFeed = (response.feed || []).filter((item: any) => {
         if (item.type === 'video') {
-          return item.status !== 'error' && item.playback_url;
+          // Allow processing videos to show, but filter out error videos
+          return item.status !== 'error' && (item.playback_url || item.status !== 'ready');
         }
         return true;
       });
 
-      // Simple deduplication by ID
-      const uniqueFeed = validFeed.filter((item, index, self) =>
-        index === self.findIndex((t) => (
-          t.id === item.id && t.type === item.type
-        ))
-      );
-
-      if (__DEV__) console.log(`[Feed] Nearby feed has ${uniqueFeed.length} items (from ${validFeed.length} raw)`);
-
-      if (uniqueFeed.length === 0) {
+      if (validFeed.length === 0) {
         if (__DEV__) console.log('[Feed] No local content, staying in nearby mode with empty state');
         setFeed([]);
         setFeedMode('nearby');
@@ -415,36 +355,41 @@ export default function HomeScreen() {
         return;
       }
 
-      setLoadingStatus('Preparing your feed...');
-
-      // Give it a moment to show 100%
-      await new Promise(r => setTimeout(r, 500));
-
+      // Set the feed with deep-link preservation logic
       setFeed(prev => {
         // If we have a deep-linked item currently at the top (injected by handleExploreNavigation), preserve it
         if (params.videoDataId && prev.length > 0) {
-          // Check if the current top item matches the requested ID (string vs string)
           const currentTop = prev[0];
-          // Determine ID match (handle potential type mismatch or id property)
           const isMatch = String(currentTop.id) === String(params.videoDataId) ||
             (currentTop.type === 'video' && currentTop.cloudflare_video_id === params.videoDataId);
 
           if (isMatch) {
             console.log('[Feed] Preserving injected item at top of feed:', currentTop.id);
-            // Filter it out of uniqueFeed to avoid duplicates
-            const others = uniqueFeed.filter(item =>
+            const others = validFeed.filter((item: any) =>
               item.id !== currentTop.id &&
               !(item.type === currentTop.type && item.id.toString() === currentTop.id.toString())
             );
             return [currentTop, ...others];
           }
         }
-        return uniqueFeed;
+        return validFeed;
       });
       setFeedMode('nearby');
 
       // Cache the feed for instant loading next time
-      await feedStore.setFeed(uniqueFeed, placeIds, 'nearby');
+      await feedStore.setFeed(validFeed, placeIds, 'nearby');
+
+      // Prefetch restaurant data for the videos
+      const uniquePlaceIds = [...new Set(
+        validFeed
+          .filter((item: any) => item.google_place_id)
+          .map((item: any) => item.google_place_id)
+      )];
+      if (uniquePlaceIds.length > 0) {
+        fetchRestaurants(uniquePlaceIds as string[]);
+      }
+
+      setLoadingProgress(100);
     } catch (error: any) {
       console.error('[Feed] Location/nearby error:', error.message);
       // On error, stay in nearby mode but don't wipe if we have an injected item

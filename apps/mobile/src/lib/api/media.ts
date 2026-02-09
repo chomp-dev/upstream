@@ -35,6 +35,7 @@ export async function fetchFeed(
 /**
  * Fetch the feed of videos and image posts for nearby restaurants
  * @param placeIds - Array of google_place_ids for nearby restaurants
+ * @deprecated Use fetchNearbyFeedByLocation instead for better coverage
  */
 export async function fetchNearbyFeed(
   placeIds: string[],
@@ -57,6 +58,31 @@ export async function fetchNearbyFeed(
 
   if (!response.ok) {
     throw new Error(`Nearby feed fetch failed: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Fetch the feed of videos and image posts within a radius of a location
+ * This bypasses Google Places search and queries the database directly for better coverage
+ * @param lat - Latitude of the user's location
+ * @param lng - Longitude of the user's location
+ * @param radius - Search radius in meters (default: 3200m = ~2 miles)
+ */
+export async function fetchNearbyFeedByLocation(
+  lat: number,
+  lng: number,
+  radius: number = 3200,
+  limit: number = 50,
+  offset: number = 0
+): Promise<FeedResponse> {
+  const response = await fetch(
+    `${MEDIA_API_BASE}/api/feed/nearby-location?lat=${lat}&lng=${lng}&radius=${radius}&limit=${limit}&offset=${offset}`
+  );
+
+  if (!response.ok) {
+    throw new Error(`Nearby feed by location fetch failed: ${response.status}`);
   }
 
   return response.json();

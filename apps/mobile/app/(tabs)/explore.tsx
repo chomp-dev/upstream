@@ -1,431 +1,470 @@
 /**
- * Explore Tab - Grid/collage of feed items + search
+ * Explore Tab - AI Chat with Restaurant Search
+ * ChatGPT-style interface with simulated results for demo
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   View,
   StyleSheet,
   FlatList,
-  Image,
-  TouchableOpacity,
   TextInput,
-  ActivityIndicator,
-  Dimensions,
-  RefreshControl,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+  Linking,
+  Image,
 } from 'react-native';
-import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Screen, Text } from '../../src/ui';
+import { Screen, Text, Card } from '../../src/ui';
 import { colors, spacing, radius } from '../../src/theme';
-import { mediaApi } from '../../src/lib/api';
-import type { FeedItem } from '../../src/lib/api/types';
-import { navigationStore } from '../../src/lib/navigationStore';
 
-import { useContentDimensions } from '../../src/hooks/useContentDimensions';
+// Message types
+type MessageType = 'user' | 'assistant' | 'results';
 
-const GRID_GAP = 2;
-const NUM_COLUMNS = 2;
+interface ChatMessage {
+  id: string;
+  type: MessageType;
+  content: string;
+  results?: RestaurantResult[];
+  timestamp: Date;
+}
+
+interface RestaurantResult {
+  id: string;
+  name: string;
+  rating: number;
+  priceLevel: number;
+  distance: string;
+  address: string;
+  image: string;
+  cuisine: string;
+  deliveryTime: string;
+  deliveryFee: string;
+}
+
+// Simulated demo results - always returned regardless of query
+const DEMO_RESULTS: RestaurantResult[] = [
+  {
+    id: '1',
+    name: 'Kung Fu Tea',
+    rating: 4.5,
+    priceLevel: 1,
+    distance: '0.3 mi',
+    address: '512 E Green St, Champaign, IL',
+    image: 'https://images.unsplash.com/photo-1558857563-b371033873b8?w=400',
+    cuisine: 'Bubble Tea',
+    deliveryTime: '15-25 min',
+    deliveryFee: '$1.99',
+  },
+  {
+    id: '2',
+    name: 'Teamoji',
+    rating: 4.7,
+    priceLevel: 1,
+    distance: '0.5 mi',
+    address: '616 E Green St, Champaign, IL',
+    image: 'https://images.unsplash.com/photo-1525803377221-99c58b1e3fc6?w=400',
+    cuisine: 'Bubble Tea • Desserts',
+    deliveryTime: '20-30 min',
+    deliveryFee: '$2.49',
+  },
+  {
+    id: '3',
+    name: 'ShareTea',
+    rating: 4.3,
+    priceLevel: 2,
+    distance: '0.8 mi',
+    address: '703 S Wright St, Champaign, IL',
+    image: 'https://images.unsplash.com/photo-1571934811356-5cc061b6821f?w=400',
+    cuisine: 'Bubble Tea • Snacks',
+    deliveryTime: '25-35 min',
+    deliveryFee: '$0.99',
+  },
+];
+
+const DEMO_AI_RESPONSE = `I found 3 boba shops near you, sorted by price and distance. Here are your options:`;
 
 export default function ExploreScreen() {
-  const [feed, setFeed] = useState<FeedItem[]>([]);
-  const [filteredFeed, setFilteredFeed] = useState<FeedItem[]>([]);
-  // Search state
-  const [searchResults, setSearchResults] = useState<any[]>([]); // simplified type for now
-  const [isSearching, setIsSearching] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      id: 'welcome',
+      type: 'assistant',
+      content: `Hi! I'm your food discovery assistant. Ask me anything like:\n\n"Cheapest boba near me"\n"Best rated pizza"\n"Late night food open now"`,
+      timestamp: new Date(),
+    },
+  ]);
+  const [inputText, setInputText] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const flatListRef = useRef<FlatList>(null);
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const router = useRouter();
-  const { width } = useContentDimensions();
+  // Simulate AI response
+  const handleSend = () => {
+    if (!inputText.trim()) return;
 
-  const ITEM_WIDTH = (width - GRID_GAP * (NUM_COLUMNS + 1)) / NUM_COLUMNS;
-  const ITEM_HEIGHT = ITEM_WIDTH * 1.4;
+    const userMessage: ChatMessage = {
+      id: `user-${Date.now()}`,
+      type: 'user',
+      content: inputText.trim(),
+      timestamp: new Date(),
+    };
 
-  // ... loadFeed (unchanged) ...
-  const loadFeed = useCallback(async (isRefresh = false) => {
-    try {
-      if (isRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
+    setMessages(prev => [...prev, userMessage]);
+    setInputText('');
+    setIsTyping(true);
 
-      const data = await mediaApi.fetchFeed(50, 0);
+    // Simulate AI "thinking" delay
+    setTimeout(() => {
+      const aiMessage: ChatMessage = {
+        id: `ai-${Date.now()}`,
+        type: 'assistant',
+        content: DEMO_AI_RESPONSE,
+        timestamp: new Date(),
+      };
 
-      // Filter out error/deleted videos on client side
-      const validFeed = (data.feed || []).filter(item => {
-        if (item.type === 'video') {
-          return item.status !== 'error' && item.playback_url;
-        }
-        return true;
-      });
+      const resultsMessage: ChatMessage = {
+        id: `results-${Date.now()}`,
+        type: 'results',
+        content: '',
+        results: DEMO_RESULTS,
+        timestamp: new Date(),
+      };
 
-      setFeed(validFeed);
-      setFilteredFeed(validFeed);
-    } catch (error) {
-      console.error('Error loading explore feed:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+      setMessages(prev => [...prev, aiMessage, resultsMessage]);
+      setIsTyping(false);
+    }, 1500);
+  };
 
+  // Auto-scroll to bottom on new messages
   useEffect(() => {
-    loadFeed();
-  }, [loadFeed]);
-
-  /* Search loading state */
-  const [isSearchLoading, setIsSearchLoading] = useState(false);
-
-  // Handle Search
-  const performSearch = useCallback(async (text: string) => {
-    setSearchQuery(text);
-    if (text.trim().length > 2) {
-      setIsSearching(true);
-      setIsSearchLoading(true);
-      try {
-        // Import searchApi locally if needed or ensure it's imported at top
-        const { searchApi } = require('../../src/lib/api');
-        // Retrieve generic location if possible
-        const response = await searchApi.searchRestaurants(text);
-        setSearchResults(response.restaurants);
-      } catch (e) {
-        console.error('Explore search failed', e);
-      } finally {
-        setIsSearchLoading(false);
-      }
-    } else {
-      setIsSearching(false);
-      setSearchResults([]);
+    if (messages.length > 0) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
     }
-  }, []);
+  }, [messages]);
 
-
-
-  const getItemThumbnail = (item: FeedItem): string | undefined => {
-    if (item.type === 'video') {
-      return item.thumbnail_url;
-    }
-    if (item.type === 'tiktok_embed') {
-      return item.thumbnail_url;
-    }
-    // For image posts, use first image
-    return item.images?.[0];
+  const handleOrderPress = (restaurant: RestaurantResult) => {
+    // Demo: Open Google Maps
+    const url = `https://maps.google.com/?q=${encodeURIComponent(restaurant.address)}`;
+    Linking.openURL(url);
   };
 
-  const handleItemPress = (item: FeedItem, index: number) => {
-    // Navigate to home feed with just the item data to inject/show
-    // We do NOT pass scrollToIndex merely to scroll to an index that might not exist in the Home feed list.
-    // Instead, we pass videoDataId which forces injection at the TOP of the feed.
-    const dataId = `video-${Date.now()}`
-
-    if (__DEV__) console.log('[Explore] Navigating with item:', {
-      id: item.id,
-      title: item.title,
-    });
-
-    navigationStore.set(dataId, item);
-
-    router.push({
-      pathname: '/',
-      params: {
-        videoDataId: dataId
-      },
-    });
+  const renderPriceLevel = (level: number) => {
+    return '$'.repeat(level) + '$'.repeat(4 - level).split('').map(() => '').join('');
   };
 
-  // Handle Restaurant Press (from search)
-  const handleRestaurantPress = (restaurant: any) => {
-    // For now, just open maps? Or maybe filter feed? 
-    // Let's open maps to be consistent with Map screen behavior for now.
-    const { Platform, Linking } = require('react-native');
-    if (restaurant.lat && restaurant.lng) {
-      const url = Platform.select({
-        ios: `maps:0,0?q=${restaurant.lat},${restaurant.lng}`,
-        android: `geo:0,0?q=${restaurant.lat},${restaurant.lng}(${restaurant.name})`,
-        default: `https://maps.google.com/?q=${restaurant.lat},${restaurant.lng}`,
-      });
-      if (url) Linking.openURL(url);
-    }
-  };
-
-  const renderItem = ({ item, index }: { item: FeedItem; index: number }) => {
-    const thumbnail = getItemThumbnail(item);
-    const isProcessing = item.type === 'video' && item.status !== 'ready';
-
-    return (
-      <TouchableOpacity
-        style={[styles.gridItem, { width: ITEM_WIDTH, height: ITEM_HEIGHT }]}
-        onPress={() => handleItemPress(item, index)}
-        activeOpacity={0.8}
-      >
-        {thumbnail ? (
-          <Image source={{ uri: thumbnail }} style={styles.thumbnail} />
-        ) : (
-          <View style={styles.placeholderThumbnail}>
-            <Text style={styles.placeholderIcon}>
-              {item.type === 'video' ? '🎬' : '📷'}
-            </Text>
+  const renderMessage = ({ item }: { item: ChatMessage }) => {
+    if (item.type === 'user') {
+      return (
+        <View style={styles.userMessageContainer}>
+          <View style={styles.userBubble}>
+            <Text variant="body" color={colors.bg}>{item.content}</Text>
           </View>
-        )}
-
-        {/* Type indicator - Only show for TikTok */}
-        {item.type === 'tiktok_embed' && (
-          <View style={styles.typeIndicator}>
-            <Ionicons name="logo-tiktok" size={12} color="white" />
-          </View>
-        )}
-
-        {/* Processing overlay */}
-        {isProcessing && (
-          <View style={styles.processingOverlay}>
-            <ActivityIndicator size="small" color={colors.primary} />
-          </View>
-        )}
-
-        {/* Image count for carousels */}
-        {item.type === 'image_post' && item.images && item.images.length > 1 && (
-          <View style={styles.imageCount}>
-            <Text variant="caption" color={colors.text}>
-              1/{item.images.length}
-            </Text>
-          </View>
-        )}
-      </TouchableOpacity>
-    );
-  };
-
-  const renderRestaurantItem = ({ item }: { item: any }) => (
-    <TouchableOpacity
-      style={styles.searchResultItem}
-      onPress={() => handleRestaurantPress(item)}
-    >
-      <View style={styles.resultInfo}>
-        <Text variant="body" numberOfLines={1}>{item.name}</Text>
-        <Text variant="caption" color={colors.muted} numberOfLines={1}>
-          {item.formatted_address}
-        </Text>
-      </View>
-      <Ionicons name="chevron-forward" size={20} color={colors.muted} />
-    </TouchableOpacity>
-  );
-
-  if (loading && !isSearching) {
-    return (
-      <Screen edges={['top']}>
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text variant="bodySmall" color={colors.muted} style={{ marginTop: spacing.md }}>
-            Loading...
-          </Text>
         </View>
-      </Screen>
-    );
-  }
+      );
+    }
+
+    if (item.type === 'assistant') {
+      return (
+        <View style={styles.assistantMessageContainer}>
+          <View style={styles.avatarContainer}>
+            <Text style={styles.avatarText}>C</Text>
+          </View>
+          <View style={styles.assistantBubble}>
+            <Text variant="body">{item.content}</Text>
+          </View>
+        </View>
+      );
+    }
+
+    if (item.type === 'results' && item.results) {
+      return (
+        <View style={styles.resultsContainer}>
+          {item.results.map((restaurant) => (
+            <Card key={restaurant.id} style={styles.resultCard}>
+              <View style={styles.resultHeader}>
+                <Image
+                  source={{ uri: restaurant.image }}
+                  style={styles.resultImage}
+                />
+                <View style={styles.resultInfo}>
+                  <Text variant="subtitle" numberOfLines={1}>{restaurant.name}</Text>
+                  <View style={styles.ratingRow}>
+                    <Text style={styles.star}>★</Text>
+                    <Text variant="bodySmall">{restaurant.rating}</Text>
+                    <Text variant="bodySmall" color={colors.muted}> • </Text>
+                    <Text variant="bodySmall" color={colors.lime}>
+                      {'$'.repeat(restaurant.priceLevel)}
+                    </Text>
+                    <Text variant="bodySmall" color={colors.muted}> • {restaurant.distance}</Text>
+                  </View>
+                  <Text variant="caption" color={colors.muted}>{restaurant.cuisine}</Text>
+                </View>
+              </View>
+
+              <View style={styles.deliveryInfo}>
+                <View style={styles.deliveryBadge}>
+                  <Ionicons name="time-outline" size={14} color={colors.muted} />
+                  <Text variant="caption" color={colors.muted}> {restaurant.deliveryTime}</Text>
+                </View>
+                <View style={styles.deliveryBadge}>
+                  <Ionicons name="bicycle-outline" size={14} color={colors.muted} />
+                  <Text variant="caption" color={colors.muted}> {restaurant.deliveryFee}</Text>
+                </View>
+              </View>
+
+              <View style={styles.actionButtons}>
+                <TouchableOpacity
+                  style={styles.orderButton}
+                  onPress={() => handleOrderPress(restaurant)}
+                >
+                  <Text variant="body" color={colors.bg}>Order Now</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.saveButton}>
+                  <Ionicons name="bookmark-outline" size={20} color={colors.text} />
+                </TouchableOpacity>
+              </View>
+            </Card>
+          ))}
+        </View>
+      );
+    }
+
+    return null;
+  };
 
   return (
     <Screen edges={['top']}>
-      {/* Search header */}
-      <View style={styles.header}>
-        <Text variant="title" style={styles.title}>
-          Explore
-        </Text>
-        <View style={styles.searchContainer}>
-          <Ionicons name="search-outline" size={18} color={colors.muted} style={{ marginRight: spacing.sm }} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search restaurants..."
-            placeholderTextColor={colors.muted}
-            value={searchQuery}
-            onChangeText={performSearch}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => performSearch('')}>
-              <Ionicons name="close-circle" size={20} color={colors.muted} />
-            </TouchableOpacity>
-          )}
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={90}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <Text variant="title">Explore</Text>
+          <Text variant="caption" color={colors.muted}>AI-powered food discovery</Text>
         </View>
-      </View>
 
-      {/* Grid or Search List */}
-      {/* Grid or Search List */}
-      {isSearching ? (
-        isSearchLoading ? (
-          <View style={styles.centered}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        ) : (
-          <FlatList
-            key="search-list"
-            data={searchResults}
-            keyExtractor={(item) => item.id}
-            renderItem={renderRestaurantItem}
-            contentContainerStyle={styles.searchListContainer}
-            showsVerticalScrollIndicator={false}
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Text variant="body" color={colors.muted}>No restaurants found</Text>
-              </View>
-            }
-          />
-        )
-      ) : (
+        {/* Chat Messages */}
         <FlatList
-          key="feed-grid"
-          data={filteredFeed}
-          keyExtractor={(item) => `${item.type}-${item.id}`}
-          renderItem={renderItem}
-          numColumns={NUM_COLUMNS}
-          contentContainerStyle={styles.gridContainer}
-          columnWrapperStyle={styles.row}
+          ref={flatListRef}
+          data={messages}
+          keyExtractor={(item) => item.id}
+          renderItem={renderMessage}
+          contentContainerStyle={styles.messageList}
           showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => loadFeed(true)}
-              tintColor={colors.primary}
-              colors={[colors.primary]}
-            />
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyIcon}>🔍</Text>
-              <Text variant="subtitle" center>
-                No posts found
-              </Text>
-              <Text variant="bodySmall" color={colors.muted} center>
-                Be the first to share!
-              </Text>
-            </View>
-          }
         />
-      )}
+
+        {/* Typing Indicator */}
+        {isTyping && (
+          <View style={styles.typingContainer}>
+            <View style={styles.avatarContainer}>
+              <Text style={styles.avatarText}>C</Text>
+            </View>
+            <View style={styles.typingBubble}>
+              <Text variant="bodySmall" color={colors.muted}>Searching restaurants...</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Input Area */}
+        <View style={styles.inputContainer}>
+          <View style={styles.inputWrapper}>
+            <TextInput
+              style={styles.input}
+              placeholder="Ask about food near you..."
+              placeholderTextColor={colors.muted}
+              value={inputText}
+              onChangeText={setInputText}
+              onSubmitEditing={handleSend}
+              returnKeyType="send"
+              multiline
+              maxLength={500}
+            />
+            <TouchableOpacity
+              style={[styles.sendButton, inputText.trim() && styles.sendButtonActive]}
+              onPress={handleSend}
+              disabled={!inputText.trim()}
+            >
+              <Ionicons
+                name="arrow-up"
+                size={20}
+                color={inputText.trim() ? colors.bg : colors.muted}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   header: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.md,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  title: {
+  messageList: {
+    padding: spacing.lg,
+    paddingBottom: spacing.xl,
+  },
+  userMessageContainer: {
+    alignItems: 'flex-end',
     marginBottom: spacing.md,
   },
-  searchContainer: {
+  userBubble: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.lg,
+    borderBottomRightRadius: radius.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    maxWidth: '80%',
+  },
+  assistantMessageContainer: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: spacing.md,
+  },
+  avatarContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
     alignItems: 'center',
+    marginRight: spacing.sm,
+  },
+  avatarText: {
+    color: colors.bg,
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  assistantBubble: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
+    borderTopLeftRadius: radius.xs,
     paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    maxWidth: '80%',
     borderWidth: 1,
     borderColor: colors.border,
   },
-  searchInput: {
-    flex: 1,
-    height: 44,
-    color: colors.text,
-    fontSize: 16,
+  resultsContainer: {
+    marginLeft: 40,
+    marginBottom: spacing.md,
   },
-  clearButton: {
-    color: colors.muted,
-    fontSize: 16,
-    padding: spacing.xs,
-  },
-  gridContainer: {
-    paddingHorizontal: GRID_GAP,
-    paddingBottom: 120,
-  },
-  row: {
-    gap: GRID_GAP,
-    marginBottom: GRID_GAP,
-  },
-  gridItem: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    overflow: 'hidden',
-  },
-  thumbnail: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  placeholderThumbnail: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.card,
-  },
-  placeholderIcon: {
-    fontSize: 32,
-    opacity: 0.5,
-  },
-  typeIndicator: {
-    position: 'absolute',
-    top: spacing.sm,
-    right: spacing.sm,
-    backgroundColor: colors.overlay,
-    borderRadius: radius.sm,
-    padding: spacing.xxs,
-    paddingHorizontal: spacing.xs,
-  },
-  typeIcon: {
-    fontSize: 12,
-  },
-  processingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: colors.overlay,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  imageCount: {
-    position: 'absolute',
-    bottom: spacing.sm,
-    right: spacing.sm,
-    backgroundColor: colors.overlay,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.xs,
-    paddingVertical: spacing.xxs,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: 100,
-  },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: spacing.lg,
-  },
-  searchListContainer: {
-    padding: spacing.lg,
-    paddingBottom: 120,
-  },
-  searchResultItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    padding: spacing.md,
-    borderRadius: radius.md,
+  resultCard: {
     marginBottom: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
+    padding: spacing.md,
+  },
+  resultHeader: {
+    flexDirection: 'row',
+    marginBottom: spacing.sm,
+  },
+  resultImage: {
+    width: 60,
+    height: 60,
+    borderRadius: radius.md,
+    marginRight: spacing.md,
   },
   resultInfo: {
     flex: 1,
-    marginRight: spacing.sm,
+    justifyContent: 'center',
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+    marginBottom: 2,
+  },
+  star: {
+    color: '#FFD700',
+    marginRight: 4,
+  },
+  deliveryInfo: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  deliveryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  orderButton: {
+    flex: 1,
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+  },
+  saveButton: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    justifyContent: 'center',
+  },
+  typingContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
+  },
+  typingBubble: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  inputContainer: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: colors.bg,
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingLeft: spacing.md,
+    paddingRight: spacing.xs,
+    paddingVertical: spacing.xs,
+  },
+  input: {
+    flex: 1,
+    color: colors.text,
+    fontSize: 16,
+    maxHeight: 100,
+    paddingVertical: spacing.sm,
+  },
+  sendButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sendButtonActive: {
+    backgroundColor: colors.primary,
   },
 });

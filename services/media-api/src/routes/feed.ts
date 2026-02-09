@@ -176,6 +176,216 @@ feedRouter.post('/admin/verify-all-videos', async (req, res) => {
 });
 
 // ============================================================================
+// Location-Based Feed - Videos by lat/lng/radius (NEW - bypasses Google Places)
+// ============================================================================
+
+/**
+ * Get feed of videos and image posts within a radius of a location
+ * GET /api/feed/nearby-location?lat=40.11&lng=-88.23&radius=3200&limit=20&offset=0
+ * 
+ * This endpoint queries videos directly by joining with the restaurants table
+ * and calculating distance, bypassing the need for Google Places search results.
+ * This ensures ALL videos within the radius are returned, regardless of restaurant type.
+ */
+feedRouter.get('/nearby-location', async (req, res) => {
+  try {
+    const lat = parseFloat(req.query.lat as string);
+    const lng = parseFloat(req.query.lng as string);
+    const radius = parseInt(req.query.radius as string) || 3200; // Default 2 miles in meters
+    const limit = parseInt(req.query.limit as string) || 50;
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    // Validate required params
+    if (isNaN(lat) || isNaN(lng)) {
+      return res.status(400).json({
+        error: 'Missing or invalid lat/lng parameters',
+        feedMode: 'nearby',
+      });
+    }
+
+    console.log(`[Feed/NearbyLocation] Request: lat=${lat}, lng=${lng}, radius=${radius}m, limit=${limit}, offset=${offset}`);
+
+    // Fetch videos within radius by joining with restaurants table
+    // Uses Haversine formula to calculate distance in meters
+    const videosResult = await queryWithRetry(
+      `SELECT v.id, v.cloudflare_video_id, COALESCE(v.video_url, v.playback_url) as video_url, 
+              v.playback_url, v.thumbnail_url, v.status, v.duration, v.google_place_id, 
+              v.created_at, v.title, v.description,
+              u.name as username, u.avatar as user_avatar, u.auth0_id as user_id,
+              r.name as restaurant_name, r.lat as restaurant_lat, r.lng as restaurant_lng,
+              (6371000 * acos(
+                LEAST(1.0, GREATEST(-1.0,
+                  cos(radians($1)) * cos(radians(r.lat)) * cos(radians(r.lng) - radians($2)) 
+                  + sin(radians($1)) * sin(radians(r.lat))
+                ))
+              )) as distance_m
+       FROM videos v
+       INNER JOIN restaurants r ON v.google_place_id = r.google_place_id
+       LEFT JOIN users u ON v.user_id = u.auth0_id
+       WHERE v.status != 'error'
+         AND r.lat IS NOT NULL AND r.lng IS NOT NULL
+         AND (6371000 * acos(
+           LEAST(1.0, GREATEST(-1.0,
+             cos(radians($1)) * cos(radians(r.lat)) * cos(radians(r.lng) - radians($2)) 
+             + sin(radians($1)) * sin(radians(r.lat))
+           ))
+         )) <= $3
+       ORDER BY v.created_at DESC 
+       LIMIT $4 OFFSET $5`,
+      [lat, lng, radius, limit, offset]
+    );
+
+    console.log(`[Feed/NearbyLocation] Found ${videosResult.rows.length} videos within ${radius}m`);
+
+    // Fetch image posts within radius
+    const imagesResult = await queryWithRetry(
+      `SELECT i.id, i.images, i.google_place_id, i.created_at, i.title, i.description,
+              u.name as username, u.avatar as user_avatar, u.auth0_id as user_id,
+              r.name as restaurant_name,
+              (6371000 * acos(
+                LEAST(1.0, GREATEST(-1.0,
+                  cos(radians($1)) * cos(radians(r.lat)) * cos(radians(r.lng) - radians($2)) 
+                  + sin(radians($1)) * sin(radians(r.lat))
+                ))
+              )) as distance_m
+       FROM image_posts i
+       INNER JOIN restaurants r ON i.google_place_id = r.google_place_id
+       LEFT JOIN users u ON i.user_id = u.auth0_id
+       WHERE r.lat IS NOT NULL AND r.lng IS NOT NULL
+         AND (6371000 * acos(
+           LEAST(1.0, GREATEST(-1.0,
+             cos(radians($1)) * cos(radians(r.lat)) * cos(radians(r.lng) - radians($2)) 
+             + sin(radians($1)) * sin(radians(r.lat))
+           ))
+         )) <= $3
+       ORDER BY i.created_at DESC 
+       LIMIT $4 OFFSET $5`,
+      [lat, lng, radius, limit, offset]
+    );
+
+    console.log(`[Feed/NearbyLocation] Found ${imagesResult.rows.length} image posts within ${radius}m`);
+
+    // Fetch TikTok embeds within radius
+    let tiktokRows: any[] = [];
+    try {
+      const tiktokResult = await queryWithRetry(
+        `SELECT t.id, t.tiktok_url, t.embed_html, t.title, t.author_name, t.author_url, 
+                t.thumbnail_url, t.thumbnail_width, t.thumbnail_height, t.google_place_id, t.created_at,
+                r.name as restaurant_name
+         FROM tiktok_embeds t
+         INNER JOIN restaurants r ON t.google_place_id = r.google_place_id
+         WHERE r.lat IS NOT NULL AND r.lng IS NOT NULL
+           AND (6371000 * acos(
+             LEAST(1.0, GREATEST(-1.0,
+               cos(radians($1)) * cos(radians(r.lat)) * cos(radians(r.lng) - radians($2)) 
+               + sin(radians($1)) * sin(radians(r.lat))
+             ))
+           )) <= $3
+         ORDER BY t.created_at DESC 
+         LIMIT $4 OFFSET $5`,
+        [lat, lng, radius, limit, offset]
+      );
+      tiktokRows = tiktokResult.rows;
+      console.log(`[Feed/NearbyLocation] Found ${tiktokRows.length} TikTok embeds within ${radius}m`);
+    } catch (err: any) {
+      console.log('[Feed/NearbyLocation] TikTok embeds skipped:', err.message);
+    }
+
+    // Combine and sort by created_at
+    const feed = [
+      ...videosResult.rows.map((v: any) => ({ type: 'video', ...v })),
+      ...imagesResult.rows.map((i: any) => ({
+        type: 'image_post',
+        ...i,
+        images: Array.isArray(i.images) ? i.images.filter((url: string) => !!url) : []
+      })),
+      ...tiktokRows
+        .filter((t: any) => t && t.id && t.tiktok_url)
+        .map((t: any) => ({ type: 'tiktok_embed', ...t })),
+    ].sort((a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+
+    // Get unique place_ids
+    const matchedPlaceIds = [...new Set(feed.map((item: any) => item.google_place_id).filter(Boolean))];
+
+    res.json({
+      feed,
+      hasMore: feed.length === limit,
+      feedMode: 'nearby',
+      nearbyPlaceIds: matchedPlaceIds,
+      totalNearbyRestaurants: matchedPlaceIds.length,
+    });
+
+    // Background validation - prioritize processing videos
+    const videosToCheck = videosResult.rows.filter((v: any) => v.cloudflare_video_id);
+
+    // Sort to check non-ready videos first (processing videos)
+    videosToCheck.sort((a: any, b: any) => {
+      if (a.status !== 'ready' && b.status === 'ready') return -1;
+      if (a.status === 'ready' && b.status !== 'ready') return 1;
+      return 0;
+    });
+
+    if (videosToCheck.length > 0) {
+      Promise.all(videosToCheck.map(async (video: any) => {
+        try {
+          const cloudflareVideo = await getVideo(video.cloudflare_video_id);
+          const newPlaybackUrl = cloudflareVideo.playback?.hls || cloudflareVideo.playback?.dash || null;
+          const durationInt = cloudflareVideo.duration ? Math.round(cloudflareVideo.duration) : null;
+
+          if (cloudflareVideo.status !== video.status ||
+            !video.playback_url ||
+            video.duration !== durationInt) {
+
+            console.log(`[Feed/NearbyLocation] Syncing video ${video.cloudflare_video_id}: ${video.status} -> ${cloudflareVideo.status}`);
+
+            await pool.query(
+              `UPDATE videos 
+                 SET status = $1, 
+                     playback_url = $2, 
+                     thumbnail_url = $3,
+                     duration = $4
+                 WHERE cloudflare_video_id = $5`,
+              [
+                cloudflareVideo.status,
+                newPlaybackUrl,
+                cloudflareVideo.thumbnail || null,
+                durationInt,
+                video.cloudflare_video_id,
+              ]
+            );
+          }
+        } catch (error: any) {
+          const is404 = error?.statusCode === 404 ||
+            error?.message?.includes('404') ||
+            error?.message?.includes('not found') ||
+            error?.statusCode === 400;
+
+          if (is404) {
+            console.log(`[Feed/NearbyLocation] Video ${video.cloudflare_video_id} deleted, marking as error`);
+            await pool.query(
+              `UPDATE videos SET status = 'error' WHERE cloudflare_video_id = $1`,
+              [video.cloudflare_video_id]
+            );
+          } else {
+            console.warn(`[Feed/NearbyLocation] Status check failed for ${video.cloudflare_video_id}:`, error?.message);
+          }
+        }
+      })).catch(err => console.error('[Feed/NearbyLocation] Background validation error:', err));
+    }
+
+  } catch (error: any) {
+    console.error('[Feed/NearbyLocation] Error:', error.message, error.stack);
+    res.status(500).json({
+      error: 'Failed to fetch nearby feed by location',
+      details: error.message,
+      code: error.code
+    });
+  }
+});
+
+// ============================================================================
 // Location-Based Feed - Videos from nearby restaurants
 // ============================================================================
 
@@ -390,7 +600,7 @@ feedRouter.get('/', async (req, res) => {
       [limit, offset]
     );
 
-    console.log(`[Feed] Found ${videosResult.rows.length} videos. Statuses: ${videosResult.rows.map(v => `${v.id}:${v.status}`).join(', ')}`);
+    console.log(`[Feed] Found ${videosResult.rows.length} videos. Statuses: ${videosResult.rows.map((v: any) => `${v.id}:${v.status}`).join(', ')}`);
 
     // Check and update status for ALL videos to handle manual Cloudflare deletions
     // We run this in the background (no await) to keep the feed fast
