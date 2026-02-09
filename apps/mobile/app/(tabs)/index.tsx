@@ -40,8 +40,9 @@ type ViewMode = 'feed' | 'explore';
 const NEARBY_RADIUS = 3200;
 
 // Grid constants for explore view
+// Grid constants for explore view
 const GRID_GAP = 2;
-const NUM_COLUMNS = 3;
+const NUM_COLUMNS = 2;
 
 export default function HomeScreen() {
   const [feed, setFeed] = useState<FeedItem[]>([]);
@@ -71,6 +72,7 @@ export default function HomeScreen() {
 
   // View mode state (feed vs explore grid)
   const [viewMode, setViewMode] = useState<ViewMode>('feed');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // ============================================================================
   // Handle videoDataId param (for navigating from profile/explore to specific post)
@@ -721,17 +723,35 @@ export default function HomeScreen() {
   return (
     <Screen safe={false}>
       {/* Header Controls (View Toggle) */}
+      {/* Header Controls (View Toggle & Search) */}
       <View style={styles.headerControls}>
-        <TouchableOpacity
-          style={styles.viewToggle}
-          onPress={() => setViewMode(prev => prev === 'feed' ? 'explore' : 'feed')}
-        >
-          <Ionicons
-            name={viewMode === 'feed' ? 'grid-outline' : 'albums-outline'}
-            size={24}
-            color="white"
-          />
-        </TouchableOpacity>
+        <View style={styles.headerRow}>
+          <TouchableOpacity
+            style={styles.viewToggle}
+            onPress={() => setViewMode(prev => prev === 'feed' ? 'explore' : 'feed')}
+          >
+            <Ionicons
+              name={viewMode === 'feed' ? 'grid-outline' : 'albums-outline'}
+              size={24}
+              color="white"
+            />
+          </TouchableOpacity>
+
+          {viewMode === 'explore' ? (
+            <View style={styles.searchContainer}>
+              <Ionicons name="search" size={20} color="rgba(255,255,255,0.8)" style={styles.searchIcon} />
+              <Text color="rgba(255,255,255,0.8)" style={styles.searchText}>Search restaurants...</Text>
+            </View>
+          ) : (
+            <View style={{ flex: 1 }} />
+          )}
+
+          {feedMode === 'nearby' && (
+            <TouchableOpacity style={styles.modeBadge} onPress={switchToDemo}>
+              <Text variant="caption" color="white" style={{ fontWeight: 'bold' }}>Nearby</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {viewMode === 'feed' ? (
@@ -862,6 +882,52 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  headerControls: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 40,
+    left: 20,
+    right: 20,
+    zIndex: 100,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  viewToggle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  searchContainer: {
+    flex: 1,
+    height: 40,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 15,
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchText: {
+    opacity: 0.8,
+  },
+  modeBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    marginLeft: 8,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -952,22 +1018,6 @@ const styles = StyleSheet.create({
   },
   star: {
     fontSize: 14,
-  },
-  headerControls: {
-    position: 'absolute',
-    top: 50, // Safe area aware
-    left: spacing.lg,
-    zIndex: 100,
-  },
-  viewToggle: {
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
   },
   gridContainer: {
     paddingHorizontal: GRID_GAP,

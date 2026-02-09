@@ -36,29 +36,29 @@ interface MenuItem {
   popular?: boolean;
 }
 
-// Simulated menu items for demo
+// Simulated menu items for demo (Distinct from chat examples)
 const DEMO_MENU: MenuItem[] = [
   {
     id: '1',
-    name: 'Classic Milk Tea',
-    description: 'House special black milk tea with tapioca pearls',
-    price: 5.99,
-    image: 'https://images.unsplash.com/photo-1558857563-b371033873b8?w=300',
+    name: 'Spicy Popcorn Chicken',
+    description: 'Crispy fried chicken with basil and spicy seasoning',
+    price: 8.99,
+    image: 'https://images.unsplash.com/photo-1626082927389-d52b8f846d88?w=300',
     popular: true,
   },
   {
     id: '2',
-    name: 'Taro Milk Tea',
-    description: 'Creamy taro flavor with chewy boba',
-    price: 6.49,
-    image: 'https://images.unsplash.com/photo-1525803377221-99c58b1e3fc6?w=300',
+    name: 'Passion Fruit Green Tea',
+    description: 'Refreshing jasmine green tea with fresh passion fruit pulp',
+    price: 5.75,
+    image: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=300',
   },
   {
     id: '3',
-    name: 'Brown Sugar Boba',
-    description: 'Fresh milk with brown sugar syrup and warm boba',
-    price: 6.99,
-    image: 'https://images.unsplash.com/photo-1571934811356-5cc061b6821f?w=300',
+    name: 'Matcha Red Bean Slush',
+    description: 'Premium matcha blended with ice and sweet red beans',
+    price: 6.95,
+    image: 'https://images.unsplash.com/photo-1546173159-315724a31696?w=300',
     popular: true,
   },
 ];
