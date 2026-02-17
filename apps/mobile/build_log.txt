@@ -1,0 +1,92 @@
+env: load .env
+env: export EXPO_PUBLIC_MEDIA_API_BASE EXPO_PUBLIC_SEARCH_API_BASE EXPO_PUBLIC_AUTH0_DOMAIN EXPO_PUBLIC_AUTH0_CLIENT_ID EXPO_PUBLIC_AUTH0_AUDIENCE EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_KEY
+
+Using (experimental) base path: /demo
+Starting Metro Bundler
+Static rendering is enabled. Learn more: https://docs.expo.dev/router/reference/static-rendering/
+Web Bundling failed 190ms node_modules/expo-router/entry.js (1 module)
+SyntaxError: ../../node_modules/expo-router/entry.js: Cannot find module 'babel-plugin-transform-define'
+Require stack:
+- /Users/haoranxu/Desktop/upstream/node_modules/@babel/core/lib/config/files/plugins.js
+- /Users/haoranxu/Desktop/upstream/node_modules/@babel/core/lib/config/files/index.js
+- /Users/haoranxu/Desktop/upstream/node_modules/@babel/core/lib/index.js
+- /Users/haoranxu/Desktop/upstream/node_modules/@expo/metro-config/build/transform-worker/metro-transform-worker.js
+- /Users/haoranxu/Desktop/upstream/node_modules/@expo/metro-config/build/transform-worker/transform-worker.js
+- /Users/haoranxu/Desktop/upstream/node_modules/metro/src/DeltaBundler/Worker.flow.js
+- /Users/haoranxu/Desktop/upstream/node_modules/metro/src/DeltaBundler/Worker.js
+- /Users/haoranxu/Desktop/upstream/node_modules/jest-worker/build/workers/processChild.js
+
+Make sure that all the Babel plugins and presets you are using
+are defined as dependencies or devDependencies in your package.json
+file. It's possible that the missing plugin is loaded by a preset
+you are using that forgot to add the plugin to its dependencies: you
+can workaround this problem by explicitly adding the missing package
+to your top-level package.json.
+
+Error: Cannot find module 'babel-plugin-transform-define'
+Require stack:
+- /Users/haoranxu/Desktop/upstream/node_modules/@babel/core/lib/config/files/plugins.js
+- /Users/haoranxu/Desktop/upstream/node_modules/@babel/core/lib/config/files/index.js
+- /Users/haoranxu/Desktop/upstream/node_modules/@babel/core/lib/index.js
+- /Users/haoranxu/Desktop/upstream/node_modules/@expo/metro-config/build/transform-worker/metro-transform-worker.js
+- /Users/haoranxu/Desktop/upstream/node_modules/@expo/metro-config/build/transform-worker/transform-worker.js
+- /Users/haoranxu/Desktop/upstream/node_modules/metro/src/DeltaBundler/Worker.flow.js
+- /Users/haoranxu/Desktop/upstream/node_modules/metro/src/DeltaBundler/Worker.js
+- /Users/haoranxu/Desktop/upstream/node_modules/jest-worker/build/workers/processChild.js
+
+Make sure that all the Babel plugins and presets you are using
+are defined as dependencies or devDependencies in your package.json
+file. It's possible that the missing plugin is loaded by a preset
+you are using that forgot to add the plugin to its dependencies: you
+can workaround this problem by explicitly adding the missing package
+to your top-level package.json.
+
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at resolve (node:internal/modules/helpers:157:19)
+    at tryRequireResolve (/Users/haoranxu/Desktop/upstream/node_modules/@babel/core/lib/config/files/plugins.js:128:11)
+    at resolveStandardizedNameForRequire (/Users/haoranxu/Desktop/upstream/node_modules/@babel/core/lib/config/files/plugins.js:162:19)
+    at resolveStandardizedName (/Users/haoranxu/Desktop/upstream/node_modules/@babel/core/lib/config/files/plugins.js:183:12)
+    at loadPlugin (/Users/haoranxu/Desktop/upstream/node_modules/@babel/core/lib/config/files/plugins.js:56:7)
+    at loadPlugin.next (<anonymous>)
+    at createDescriptor (/Users/haoranxu/Desktop/upstream/node_modules/@babel/core/lib/config/config-descriptors.js:140:16)
+    at createDescriptor.next (<anonymous>)
+    at evaluateSync (/Users/haoranxu/Desktop/upstream/node_modules/gensync/index.js:251:28)
+    at /Users/haoranxu/Desktop/upstream/node_modules/gensync/index.js:31:34
+    at Array.map (<anonymous>)
+    at Function.sync (/Users/haoranxu/Desktop/upstream/node_modules/gensync/index.js:31:22)
+    at Function.all (/Users/haoranxu/Desktop/upstream/node_modules/gensync/index.js:210:24)
+    at Generator.next (<anonymous>)
+    at createDescriptors (/Users/haoranxu/Desktop/upstream/node_modules/@babel/core/lib/config/config-descriptors.js:102:41)
+    at createDescriptors.next (<anonymous>)
+    at createPluginDescriptors (/Users/haoranxu/Desktop/upstream/node_modules/@babel/core/lib/config/config-descriptors.js:99:17)
+    at createPluginDescriptors.next (<anonymous>)
+    at /Users/haoranxu/Desktop/upstream/node_modules/@babel/core/lib/gensync-utils/functional.js:22:27
+    at Generator.next (<anonymous>)
+    at mergeChainOpts (/Users/haoranxu/Desktop/upstream/node_modules/@babel/core/lib/config/config-chain.js:349:34)
+    at mergeChainOpts.next (<anonymous>)
+    at chainWalker (/Users/haoranxu/Desktop/upstream/node_modules/@babel/core/lib/config/config-chain.js:316:14)
+    at chainWalker.next (<anonymous>)
+    at loadFileChain (/Users/haoranxu/Desktop/upstream/node_modules/@babel/core/lib/config/config-chain.js:191:24)
+    at loadFileChain.next (<anonymous>)
+    at mergeExtendsChain (/Users/haoranxu/Desktop/upstream/node_modules/@babel/core/lib/config/config-chain.js:328:28)
+    at mergeExtendsChain.next (<anonymous>)
+    at chainWalker (/Users/haoranxu/Desktop/upstream/node_modules/@babel/core/lib/config/config-chain.js:312:20)
+    at chainWalker.next (<anonymous>)
+    at buildRootChain (/Users/haoranxu/Desktop/upstream/node_modules/@babel/core/lib/config/config-chain.js:56:36)
+    at buildRootChain.next (<anonymous>)
+    at loadPrivatePartialConfig (/Users/haoranxu/Desktop/upstream/node_modules/@babel/core/lib/config/partial.js:72:62)
+    at loadPrivatePartialConfig.next (<anonymous>)
+    at loadFullConfig (/Users/haoranxu/Desktop/upstream/node_modules/@babel/core/lib/config/full.js:36:46)
+    at loadFullConfig.next (<anonymous>)
+    at transform (/Users/haoranxu/Desktop/upstream/node_modules/@babel/core/lib/transform.js:20:44)
+    at transform.next (<anonymous>)
+    at evaluateSync (/Users/haoranxu/Desktop/upstream/node_modules/gensync/index.js:251:28)
+    at sync (/Users/haoranxu/Desktop/upstream/node_modules/gensync/index.js:89:14)
+    at stopHiding - secret - don't use this - v1 (/Users/haoranxu/Desktop/upstream/node_modules/@babel/core/lib/errors/rewrite-stack-trace.js:47:12)
+    at Object.transformSync (/Users/haoranxu/Desktop/upstream/node_modules/@babel/core/lib/transform.js:42:76)
+    at parseWithBabel (/Users/haoranxu/Desktop/upstream/node_modules/@expo/metro-config/build/transformSync.js:75:18)
+    at transformSync (/Users/haoranxu/Desktop/upstream/node_modules/@expo/metro-config/build/transformSync.js:64:12)
+    at Object.transform (/Users/haoranxu/Desktop/upstream/node_modules/@expo/metro-config/build/babel-transformer.js:127:58)
+    at transformJSWithBabel (/Users/haoranxu/Desktop/upstream/node_modules/@expo/metro-config/build/transform-worker/metro-transform-worker.js:468:47)
+    at Object.transform (/Users/haoranxu/Desktop/upstream/node_modules/@expo/metro-config/build/transform-worker/metro-transform-worker.js:583:12)
+    at Object.transform (/Users/haoranxu/Desktop/upstream/node_modules/@expo/metro-config/build/transform-worker/transform-worker.js:178:19)

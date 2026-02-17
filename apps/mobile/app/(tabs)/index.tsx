@@ -766,6 +766,7 @@ export default function HomeScreen() {
           snapToInterval={SCREEN_HEIGHT}
           snapToAlignment="start"
           decelerationRate="fast"
+          disableIntervalMomentum={true}
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
           getItemLayout={(_, index) => ({
