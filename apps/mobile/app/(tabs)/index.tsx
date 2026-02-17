@@ -59,6 +59,11 @@ export default function HomeScreen() {
   const ITEM_WIDTH = (width - GRID_GAP * (NUM_COLUMNS + 1)) / NUM_COLUMNS;
   const ITEM_HEIGHT = ITEM_WIDTH * 1.4;
 
+  // Web: force one-at-a-time snapping on each feed item
+  const feedItemStyle = Platform.OS === 'web'
+    ? { height: SCREEN_HEIGHT, scrollSnapAlign: 'start', scrollSnapStop: 'always' } as any
+    : { height: SCREEN_HEIGHT };
+
   // Loading state
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingStatus, setLoadingStatus] = useState('Initializing...');
@@ -800,7 +805,7 @@ export default function HomeScreen() {
 
             if (item.type === 'video') {
               return (
-                <View style={{ height: SCREEN_HEIGHT }}>
+                <View style={feedItemStyle}>
                   <VideoPlayer
                     videoId={item.cloudflare_video_id}
                     playbackUrl={item.playback_url}
@@ -823,7 +828,7 @@ export default function HomeScreen() {
             }
             if (item.type === 'image_post') {
               return (
-                <View style={{ height: SCREEN_HEIGHT }}>
+                <View style={feedItemStyle}>
                   <ImagePostViewer
                     images={item.images || []}
                     restaurant={restaurant}
@@ -841,7 +846,7 @@ export default function HomeScreen() {
             }
             if (item.type === 'tiktok_embed') {
               return (
-                <View style={{ height: SCREEN_HEIGHT }}>
+                <View style={feedItemStyle}>
                   <TikTokEmbed
                     embedHtml={item.embed_html || ''}
                     thumbnailUrl={item.thumbnail_url}
