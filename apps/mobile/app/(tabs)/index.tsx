@@ -749,11 +749,6 @@ export default function HomeScreen() {
             </View>
           )}
 
-          {feedMode === 'nearby' && (
-            <TouchableOpacity style={styles.modeBadge} onPress={switchToDemo}>
-              <Text variant="caption" color="white" style={{ fontWeight: 'bold' }}>Nearby</Text>
-            </TouchableOpacity>
-          )}
         </View>
       </View>
 
@@ -997,15 +992,6 @@ const styles = StyleSheet.create({
     flex: 1, // Ensure text takes available space
     opacity: 0.9,
     fontSize: 15,
-  },
-  modeBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    marginLeft: 'auto', // Push to the right
   },
   gridContainer: {
     paddingHorizontal: GRID_GAP,
