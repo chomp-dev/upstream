@@ -2,6 +2,18 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Agent Workflow
+
+All agents working in this codebase must follow the three-phase protocol defined in `AGENTS.md` before writing any code:
+
+1. **Context Mining** — Read `CLAUDE.md` and `MISTAKES.md` fully. Locate and read the files the task actually touches. Understand existing patterns before introducing new ones.
+2. **Planning** — Write out what files will change, what the approach is, what risks exist, and whether a utility already exists for the problem.
+3. **Action** — Make minimal, focused changes. Stay consistent with surrounding patterns. Log any new mistakes to `MISTAKES.md` immediately upon discovery.
+
+**Before starting any task:**
+- Read `AGENTS.md` for the full protocol and a quick-reference table of where things live in the monorepo.
+- Read `MISTAKES.md` for known pitfalls specific to this codebase — including Auth0/Supabase token coupling, video lifecycle assumptions, TypeScript path alias usage, loose coupling between services, and more.
+
 ## Project Overview
 
 **Chomp** is a TikTok-style food discovery app. It is a monorepo with three main parts:

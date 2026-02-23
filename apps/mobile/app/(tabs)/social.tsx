@@ -49,8 +49,12 @@ export default function SocialScreen() {
           <Text variant="title" center style={{ marginBottom: spacing.xxl }}>
             Login to Chomp
           </Text>
-          <Pressable style={styles.loginButton} onPress={login}>
+          <Pressable style={styles.loginButton} onPress={() => login()}>
             <Text variant="subtitle" color={'#000'}>Sign In / Sign Up</Text>
+          </Pressable>
+          <Pressable style={styles.appleLoginButton} onPress={() => login('apple')}>
+            <Ionicons name="logo-apple" size={18} color={colors.text} />
+            <Text variant="subtitle" color={colors.text}>Continue with Apple</Text>
           </Pressable>
         </View>
       </Screen>
@@ -604,6 +608,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md,
     borderRadius: radius.pill,
+  },
+  appleLoginButton: {
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   // Messages Section
   messagesList: {

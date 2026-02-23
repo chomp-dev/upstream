@@ -9,6 +9,8 @@ import { searchRouter } from './routes/search';
 import { usersRouter } from './routes/users';
 import { tiktokRouter } from './routes/tiktok';
 import { commentsRouter } from './routes/comments';
+import { reportsRouter } from './routes/reports';
+import { adminRouter } from './routes/admin';
 import { initDb } from './db';
 
 dotenv.config();
@@ -61,6 +63,8 @@ app.use('/api/v1/search', searchRouter); // Alias for compatibility
 app.use('/api/users', usersRouter);
 app.use('/api/tiktok', tiktokRouter);
 app.use('/api/comments', commentsRouter);
+app.use('/api/reports', reportsRouter);
+app.use('/api/admin', adminRouter);
 
 // Root route for diagnostic testing
 app.get('/', (req, res) => {

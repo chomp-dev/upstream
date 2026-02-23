@@ -25,7 +25,7 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Chomp needs camera access to record videos.",
         "NSMicrophoneUsageDescription": "Chomp needs microphone access to record audio.",
-        "NSPhotoLibraryUsageDescription": "Chomp needs photo library access to upload media.",
+        "NSPhotoLibraryUsageDescription": "Chomp needs photo library access so you can select photos and videos to share food discoveries, such as posting a photo of your meal at a restaurant.",
         "NSLocationWhenInUseUsageDescription": "Chomp needs your location to find nearby restaurants.",
         "ITSAppUsesNonExemptEncryption": false
       }

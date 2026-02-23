@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Button } from 'react-native';
+import { View, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Button, Alert } from 'react-native';
 import { Image } from 'expo-image';
 import { useAuth } from '../src/context/auth';
 import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
@@ -29,6 +29,8 @@ interface PostItem {
 }
 
 import { navigationStore } from '../src/lib/navigationStore';
+import { blockUser } from '../src/lib/api/media';
+import { blockedUsersStore } from '../src/lib/blockedUsersStore';
 
 export default function ProfileScreen() {
     const { user, logout, supabase, login } = useAuth();
@@ -191,6 +193,31 @@ export default function ProfileScreen() {
         }
     };
 
+    const handleBlockUser = async () => {
+        if (!user || !targetUserId || user.sub === targetUserId) return;
+        Alert.alert(
+            'Block user',
+            'This will immediately remove their content from your feed.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Block',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await blockUser(user.sub, targetUserId, 'Blocked from profile');
+                            await blockedUsersStore.add(user.sub, targetUserId);
+                            Alert.alert('Blocked', 'User blocked. Their content will no longer appear in your feed.');
+                            router.back();
+                        } catch (error) {
+                            Alert.alert('Error', 'Failed to block user.');
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
     const renderProfileHeader = () => (
         <View style={styles.section}>
             {/* Profile header */}
@@ -247,6 +274,12 @@ export default function ProfileScreen() {
                             }}
                         >
                             <Ionicons name="chatbubble-outline" size={18} color={colors.text} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.messageButton}
+                            onPress={handleBlockUser}
+                        >
+                            <Ionicons name="ban-outline" size={18} color={colors.text} />
                         </TouchableOpacity>
                     </View>
                 )}

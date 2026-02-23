@@ -8,7 +8,7 @@ import { syncUser } from '../lib/api/user';
 interface AuthContextType {
     user: User | null;
     isLoading: boolean;
-    login: () => Promise<void>;
+    login: (providerOrEvent?: any) => Promise<void>;
     logout: (params?: { logoutParams?: { returnTo?: string } }) => Promise<void>;
     accessToken: string | null;
     supabase: SupabaseClient;
@@ -34,15 +34,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [supabaseClient, setSupabaseClient] = useState<SupabaseClient>(publicSupabase);
     const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-    const login = async () => {
+    const login = async (providerOrEvent?: any) => {
         console.log('Login triggered');
-        const options = {
+        const provider: 'default' | 'apple' = providerOrEvent === 'apple' ? 'apple' : 'default';
+        const options: Record<string, any> = {
             scope: 'openid profile email offline_access',
             audience: process.env.EXPO_PUBLIC_AUTH0_AUDIENCE,
             redirectUrl: Platform.OS === 'web'
                 ? 'https://www.usechomp.com/demo/social'
                 : undefined
         };
+        // Keep Apple auth routed through Auth0 so policy/privacy are centrally managed.
+        if (provider === 'apple') {
+            options.connection = 'apple';
+        }
 
         try {
             await authorize(options);

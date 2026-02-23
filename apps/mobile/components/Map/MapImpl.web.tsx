@@ -1,12 +1,10 @@
-import React, { useEffect, useRef, useState, ReactElement } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     View,
     StyleSheet,
     ActivityIndicator,
     TouchableOpacity,
     Text as RNText,
-    Platform,
-    Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -227,7 +225,14 @@ const MapComponent = ({
                     position: { lat: restaurant.lat, lng: restaurant.lng },
                     map,
                     title: restaurant.name,
-                    content: container,
+                    icon: {
+                        path: window.google.maps.SymbolPath.CIRCLE,
+                        scale: 10,
+                        fillColor: '#eeb57e',
+                        fillOpacity: 1,
+                        strokeColor: '#3A3A3C',
+                        strokeWeight: 2,
+                    },
                 });
                 marker.addListener('click', () => {
                     onSelectRestaurant(restaurant);

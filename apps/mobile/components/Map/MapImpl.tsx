@@ -127,8 +127,6 @@ export default function MapImpl({
                 showsUserLocation
                 showsMyLocationButton
                 customMapStyle={darkMapStyle}
-                // Disable Apple Maps native clustering
-                clusteringEnabled={false}
                 onPress={() => onSelectRestaurant(null)}
             >
                 {/* Radius circle visualization */}

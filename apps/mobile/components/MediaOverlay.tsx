@@ -9,6 +9,8 @@ import { colors, spacing, radius } from '../src/theme';
 import { Text } from '../src/ui';
 import { useAuth } from '../src/context/auth';
 import { useCommentSheet } from '../src/context/commentSheet';
+import { blockUser, reportContent } from '../src/lib/api/media';
+import { blockedUsersStore } from '../src/lib/blockedUsersStore';
 
 interface MediaOverlayProps {
     height: number;
@@ -299,6 +301,73 @@ export function MediaOverlay({
         }
     };
 
+    const handleReport = async () => {
+        if (!authUser) {
+            login();
+            return;
+        }
+        const contentType = videoUrl ? 'video' : 'image_post';
+        const contentId = videoUrl || imagePostId?.toString();
+        if (!contentId) return;
+
+        Alert.alert(
+            'Report content',
+            'Report this post for objectionable or abusive content?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Report',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await reportContent({
+                                reporterUserId: authUser.sub,
+                                reportedUserId: user?.userId,
+                                contentType,
+                                contentId,
+                                reason: 'inappropriate',
+                            });
+                            Alert.alert('Reported', 'Thanks. We review reports within 24 hours.');
+                        } catch (error) {
+                            Alert.alert('Error', 'Failed to submit report.');
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+    const handleBlock = async () => {
+        if (!authUser) {
+            login();
+            return;
+        }
+        if (!user?.userId || user.userId === authUser.sub) return;
+        const blockedUserId = user.userId;
+        const blockedUsername = user.username;
+
+        Alert.alert(
+            'Block user',
+            `Block @${blockedUsername}? Their content will be removed from your feed immediately.`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Block',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await blockUser(authUser.sub, blockedUserId, 'Blocked from media overlay');
+                            await blockedUsersStore.add(authUser.sub, blockedUserId);
+                            Alert.alert('Blocked', 'This user has been blocked and reported to moderation.');
+                        } catch (error) {
+                            Alert.alert('Error', 'Failed to block user.');
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     const formatCount = (count: number): string => {
         if (count >= 1000000) {
             return `${(count / 1000000).toFixed(1)}M`;
@@ -400,6 +469,18 @@ export function MediaOverlay({
                         <Ionicons name="chatbubble-ellipses" size={32} color="white" style={styles.shadowIcon} />
                         <Text style={styles.actionCount}>{formatCount(commentsCount)}</Text>
                     </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.actionButton} activeOpacity={0.7} onPress={handleReport}>
+                        <Ionicons name="flag-outline" size={30} color="white" style={styles.shadowIcon} />
+                        <Text style={styles.actionCount}>Report</Text>
+                    </TouchableOpacity>
+
+                    {user?.userId && authUser?.sub !== user.userId && (
+                        <TouchableOpacity style={styles.actionButton} activeOpacity={0.7} onPress={handleBlock}>
+                            <Ionicons name="ban-outline" size={30} color="white" style={styles.shadowIcon} />
+                            <Text style={styles.actionCount}>Block</Text>
+                        </TouchableOpacity>
+                    )}
 
                     {/* Bookmark - Hidden for now, will implement later
                     <TouchableOpacity style={styles.actionButton} activeOpacity={0.7} onPress={handleSave}>

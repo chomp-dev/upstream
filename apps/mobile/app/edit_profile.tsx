@@ -9,11 +9,11 @@ import * as ImagePicker from 'expo-image-picker';
 import { Screen, Text } from '../src/ui';
 import { colors, spacing, radius } from '../src/theme';
 import { useAuth } from '../src/context/auth';
-import { getImageUploadUrl, uploadImageToCloudflare } from '../src/lib/api/media';
+import { deleteAccount, getImageUploadUrl, uploadImageToCloudflare } from '../src/lib/api/media';
 
 export default function EditProfileScreen() {
     const router = useRouter();
-    const { user, supabase } = useAuth();
+    const { user, supabase, logout } = useAuth();
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -130,6 +130,33 @@ export default function EditProfileScreen() {
         }
     };
 
+    const handleDeleteAccount = async () => {
+        if (!user) return;
+        Alert.alert(
+            'Delete account',
+            'This action is permanent. Your profile and media will be removed from Chomp.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete account',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            setSaving(true);
+                            await deleteAccount(user.sub);
+                            await logout({ logoutParams: { returnTo: 'https://www.usechomp.com/demo/' } });
+                        } catch (error) {
+                            console.error('[Profile] Delete account error:', error);
+                            Alert.alert('Error', 'Failed to delete account. Please try again.');
+                        } finally {
+                            setSaving(false);
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     if (loading) {
         return (
             <Screen safe>
@@ -219,6 +246,14 @@ export default function EditProfileScreen() {
                     ) : (
                         <Text variant="subtitle" color={colors.bg}>Save Profile</Text>
                     )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    style={[styles.deleteButton, saving && styles.saveButtonDisabled]}
+                    onPress={handleDeleteAccount}
+                    disabled={saving}
+                >
+                    <Text variant="subtitle" color={colors.text}>Delete Account</Text>
                 </TouchableOpacity>
             </View>
         </Screen>
@@ -318,5 +353,14 @@ const styles = StyleSheet.create({
     },
     saveButtonDisabled: {
         opacity: 0.7,
+    },
+    deleteButton: {
+        marginTop: spacing.md,
+        backgroundColor: colors.surface,
+        borderRadius: radius.pill,
+        paddingVertical: spacing.md,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#D66A6A',
     },
 });

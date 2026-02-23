@@ -27,10 +27,12 @@ import { ImagePostViewer } from '../../components/ImagePostViewer';
 import { TikTokEmbed } from '../../components/TikTokEmbed';
 import { mediaApi, searchApi } from '../../src/lib/api';
 import type { FeedItem, Restaurant } from '../../src/lib/api/types';
+import { useAuth } from '../../src/context/auth';
 
 import { useContentDimensions } from '../../src/hooks/useContentDimensions';
 import { feedStore } from '../../src/lib/feedStore';
 import { navigationStore } from '../../src/lib/navigationStore';
+import { blockedUsersStore } from '../../src/lib/blockedUsersStore';
 
 // Feed mode types
 type FeedMode = 'loading' | 'nearby' | 'demo';
@@ -45,6 +47,7 @@ const GRID_GAP = 2;
 const NUM_COLUMNS = 2;
 
 export default function HomeScreen() {
+  const { user } = useAuth();
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -78,6 +81,51 @@ export default function HomeScreen() {
   // View mode state (feed vs explore grid)
   const [viewMode, setViewMode] = useState<ViewMode>('feed');
   const [searchQuery, setSearchQuery] = useState('');
+  const [blockedUserIds, setBlockedUserIds] = useState<string[]>([]);
+
+  const applySafetyFilters = useCallback((items: FeedItem[]): FeedItem[] => {
+    const blockedSet = new Set(blockedUserIds);
+    return (items || []).filter((item: any) => {
+      if (item.user_id && blockedSet.has(item.user_id)) return false;
+      if (item.type === 'video') {
+        return item.status !== 'error' && (item.playback_url || item.status !== 'ready');
+      }
+      return true;
+    });
+  }, [blockedUserIds]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const unsubscribe = blockedUsersStore.subscribe((blockedIds) => {
+      if (!cancelled) {
+        setBlockedUserIds(blockedIds);
+      }
+    });
+
+    const hydrateBlockedUsers = async () => {
+      if (!user?.sub) {
+        setBlockedUserIds([]);
+        return;
+      }
+      const cached = await blockedUsersStore.getBlockedUserIds(user.sub);
+      if (!cancelled) setBlockedUserIds(cached);
+      try {
+        const latest = await blockedUsersStore.refresh(user.sub);
+        if (!cancelled) setBlockedUserIds(latest);
+      } catch (error) {
+        console.warn('[Feed] Failed to refresh blocked users:', error);
+      }
+    };
+    hydrateBlockedUsers();
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [user?.sub]);
+
+  useEffect(() => {
+    setFeed((prev) => applySafetyFilters(prev));
+  }, [applySafetyFilters]);
 
   // ============================================================================
   // Handle videoDataId param (for navigating from profile/explore to specific post)
@@ -259,7 +307,7 @@ export default function HomeScreen() {
         // NOW set feed - cache is already populated
         console.log('[Feed] About to setFeed with', cached.feed.length, 'items');
         console.log('[Feed] First feed item google_place_id:', cached.feed[0]?.google_place_id);
-        setFeed(cached.feed);
+        setFeed(applySafetyFilters(cached.feed));
         setNearbyPlaceIds(cached.nearbyPlaceIds);
         setFeedMode(cached.feedMode);
         setLoading(false);
@@ -290,7 +338,7 @@ export default function HomeScreen() {
           const freshCache = await feedStore.getFeed();
           if (freshCache && freshCache.feed.length > 0) {
             if (__DEV__) console.log('[Feed] Preload finished, using fresh cache:', freshCache.feed.length, 'items');
-            setFeed(freshCache.feed);
+            setFeed(applySafetyFilters(freshCache.feed));
             setNearbyPlaceIds(freshCache.nearbyPlaceIds);
             setFeedMode(freshCache.feedMode);
             setLoading(false);
@@ -346,7 +394,9 @@ export default function HomeScreen() {
         loc.coords.latitude,
         loc.coords.longitude,
         NEARBY_RADIUS, // Default ~3200m (2 miles)
-        50 // Limit to 50 items
+        50, // Limit to 50 items
+        0,
+        user?.sub
       );
 
       setLoadingProgress(80);
@@ -359,13 +409,7 @@ export default function HomeScreen() {
       if (__DEV__) console.log(`[Feed] Nearby feed has ${response.feed?.length || 0} items from ${placeIds.length} restaurants`);
 
       // Validate feed items (exclude error videos without playback_url)
-      const validFeed = (response.feed || []).filter((item: any) => {
-        if (item.type === 'video') {
-          // Allow processing videos to show, but filter out error videos
-          return item.status !== 'error' && (item.playback_url || item.status !== 'ready');
-        }
-        return true;
-      });
+      const validFeed = applySafetyFilters(response.feed || []);
 
       if (validFeed.length === 0) {
         if (__DEV__) console.log('[Feed] No local content, staying in nearby mode with empty state');
@@ -421,7 +465,7 @@ export default function HomeScreen() {
     } finally {
       setLoading(false);
     }
-  }, [params.videoDataId]);  // Add param dependency to ensure closure has latest param
+  }, [params.videoDataId, applySafetyFilters, user?.sub]);  // Add param dependency to ensure closure has latest param
 
   const loadDemoFeed = useCallback(async () => {
     try {
@@ -429,15 +473,8 @@ export default function HomeScreen() {
         setLoading(true);
       }
 
-      const data = await mediaApi.fetchFeed();
-
-      // Filter out error/deleted videos
-      const validFeed = (data.feed || []).filter(item => {
-        if (item.type === 'video') {
-          return item.status !== 'error' && item.playback_url;
-        }
-        return true;
-      });
+      const data = await mediaApi.fetchFeed(20, 0, user?.sub);
+      const validFeed = applySafetyFilters(data.feed || []);
 
       setFeed(validFeed);
       setFeedMode('demo');
@@ -456,7 +493,7 @@ export default function HomeScreen() {
     } finally {
       setLoading(false);
     }
-  }, [feedMode]);
+  }, [feedMode, applySafetyFilters, user?.sub]);
 
   const switchToNearby = useCallback(async () => {
     if (!locationAvailable || nearbyPlaceIds.length === 0) {
@@ -466,13 +503,8 @@ export default function HomeScreen() {
       // We already have place IDs, just fetch the feed
       setLoading(true);
       try {
-        const nearbyFeedResponse = await mediaApi.fetchNearbyFeed(nearbyPlaceIds);
-        const validFeed = (nearbyFeedResponse.feed || []).filter(item => {
-          if (item.type === 'video') {
-            return item.status !== 'error' && item.playback_url;
-          }
-          return true;
-        });
+        const nearbyFeedResponse = await mediaApi.fetchNearbyFeed(nearbyPlaceIds, 20, 0, user?.sub);
+        const validFeed = applySafetyFilters(nearbyFeedResponse.feed || []);
 
         if (validFeed.length > 0) {
           setFeed(validFeed);
@@ -488,7 +520,7 @@ export default function HomeScreen() {
         setLoading(false);
       }
     }
-  }, [locationAvailable, nearbyPlaceIds, loadNearbyFeed]);
+  }, [locationAvailable, nearbyPlaceIds, loadNearbyFeed, applySafetyFilters, user?.sub]);
 
   const switchToDemo = useCallback(async () => {
     await loadDemoFeed();
@@ -510,7 +542,7 @@ export default function HomeScreen() {
       const cached = await feedStore.getFeed();
       if (cached && cached.feed.length > 0) {
         if (__DEV__) console.log('[Feed] Using preloaded/cached feed:', cached.feed.length, 'items');
-        setFeed(cached.feed);
+        setFeed(applySafetyFilters(cached.feed));
         setNearbyPlaceIds(cached.nearbyPlaceIds);
         setFeedMode(cached.feedMode);
         setLoading(false);
@@ -523,7 +555,7 @@ export default function HomeScreen() {
     };
 
     init();
-  }, []); // Empty deps - only run on mount
+  }, [applySafetyFilters]); // Empty deps - only run on mount
 
   // Handle navigation from Explore - scroll to specific item AND inject if needed
   useEffect(() => {

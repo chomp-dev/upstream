@@ -7,7 +7,10 @@ import { Platform } from 'react-native';
 import { MEDIA_API_BASE } from '../env';
 export const BASE_URL = MEDIA_API_BASE;
 import type {
+  BlockedUser,
+  ComplianceStatus,
   FeedResponse,
+  ModerationReportRequest,
   UploadVideoResponse,
   UploadImagesResponse,
   ImageUploadUrlResponse,
@@ -19,10 +22,18 @@ import type {
  */
 export async function fetchFeed(
   limit: number = 20,
-  offset: number = 0
+  offset: number = 0,
+  currentUserId?: string
 ): Promise<FeedResponse> {
+  const params = new URLSearchParams({
+    limit: String(limit),
+    offset: String(offset),
+  });
+  if (currentUserId) {
+    params.set('current_user_id', currentUserId);
+  }
   const response = await fetch(
-    `${MEDIA_API_BASE}/api/feed?limit=${limit}&offset=${offset}`
+    `${MEDIA_API_BASE}/api/feed?${params.toString()}`
   );
 
   if (!response.ok) {
@@ -40,7 +51,8 @@ export async function fetchFeed(
 export async function fetchNearbyFeed(
   placeIds: string[],
   limit: number = 20,
-  offset: number = 0
+  offset: number = 0,
+  currentUserId?: string
 ): Promise<FeedResponse> {
   if (placeIds.length === 0) {
     return {
@@ -52,8 +64,17 @@ export async function fetchNearbyFeed(
     };
   }
 
+  const params = new URLSearchParams({
+    place_ids: placeIds.join(','),
+    limit: String(limit),
+    offset: String(offset),
+  });
+  if (currentUserId) {
+    params.set('current_user_id', currentUserId);
+  }
+
   const response = await fetch(
-    `${MEDIA_API_BASE}/api/feed/nearby?place_ids=${placeIds.join(',')}&limit=${limit}&offset=${offset}`
+    `${MEDIA_API_BASE}/api/feed/nearby?${params.toString()}`
   );
 
   if (!response.ok) {
@@ -75,10 +96,22 @@ export async function fetchNearbyFeedByLocation(
   lng: number,
   radius: number = 3200,
   limit: number = 50,
-  offset: number = 0
+  offset: number = 0,
+  currentUserId?: string
 ): Promise<FeedResponse> {
+  const params = new URLSearchParams({
+    lat: String(lat),
+    lng: String(lng),
+    radius: String(radius),
+    limit: String(limit),
+    offset: String(offset),
+  });
+  if (currentUserId) {
+    params.set('current_user_id', currentUserId);
+  }
+
   const response = await fetch(
-    `${MEDIA_API_BASE}/api/feed/nearby-location?lat=${lat}&lng=${lng}&radius=${radius}&limit=${limit}&offset=${offset}`
+    `${MEDIA_API_BASE}/api/feed/nearby-location?${params.toString()}`
   );
 
   if (!response.ok) {
@@ -481,4 +514,92 @@ export async function updateUserProfile(
   }
 
   return response.json();
+}
+
+export async function getComplianceStatus(auth0Id: string): Promise<ComplianceStatus> {
+  const response = await fetch(`${MEDIA_API_BASE}/api/users/${encodeURIComponent(auth0Id)}/compliance`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch compliance status');
+  }
+  return response.json();
+}
+
+export async function acceptTerms(auth0Id: string, version: string): Promise<void> {
+  const response = await fetch(`${MEDIA_API_BASE}/api/users/${encodeURIComponent(auth0Id)}/accept-terms`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-auth0-id': auth0Id,
+    },
+    body: JSON.stringify({ version }),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || 'Failed to accept terms');
+  }
+}
+
+export async function reportContent(payload: ModerationReportRequest): Promise<void> {
+  const response = await fetch(`${MEDIA_API_BASE}/api/reports`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || 'Failed to report content');
+  }
+}
+
+export async function blockUser(blockerUserId: string, blockedUserId: string, reason?: string): Promise<void> {
+  const response = await fetch(`${MEDIA_API_BASE}/api/users/${encodeURIComponent(blockerUserId)}/block`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-auth0-id': blockerUserId,
+    },
+    body: JSON.stringify({ blockedUserId, reason }),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || 'Failed to block user');
+  }
+}
+
+export async function unblockUser(blockerUserId: string, blockedUserId: string): Promise<void> {
+  const response = await fetch(
+    `${MEDIA_API_BASE}/api/users/${encodeURIComponent(blockerUserId)}/block/${encodeURIComponent(blockedUserId)}`,
+    {
+      method: 'DELETE',
+      headers: {
+        'x-auth0-id': blockerUserId,
+      },
+    }
+  );
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || 'Failed to unblock user');
+  }
+}
+
+export async function getBlockedUsers(userId: string): Promise<BlockedUser[]> {
+  const response = await fetch(`${MEDIA_API_BASE}/api/users/${encodeURIComponent(userId)}/blocks`, {
+    headers: { 'x-auth0-id': userId },
+  });
+  if (!response.ok) {
+    throw new Error('Failed to fetch blocked users');
+  }
+  const data = await response.json();
+  return data.blockedUsers || [];
+}
+
+export async function deleteAccount(auth0Id: string): Promise<void> {
+  const response = await fetch(`${MEDIA_API_BASE}/api/users/${encodeURIComponent(auth0Id)}`, {
+    method: 'DELETE',
+    headers: { 'x-auth0-id': auth0Id },
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || 'Failed to delete account');
+  }
 }

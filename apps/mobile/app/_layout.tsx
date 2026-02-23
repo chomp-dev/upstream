@@ -9,6 +9,7 @@ import { AuthProvider } from '../src/context/auth';
 import { CommentSheetProvider } from '../src/context/commentSheet';
 import * as SplashScreen from 'expo-splash-screen';
 import { preloadService } from '../src/lib/preloadService';
+import { ComplianceGate } from '../components/ComplianceGate';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync().catch(() => {
@@ -68,7 +69,9 @@ export default function RootLayout() {
     >
       <AuthProvider>
         <CommentSheetProvider>
-          {content}
+          <ComplianceGate>
+            {content}
+          </ComplianceGate>
         </CommentSheetProvider>
       </AuthProvider>
     </Auth0Provider>

@@ -112,7 +112,58 @@ export async function initDb() {
         BEGIN
           ALTER TABLE tiktok_embeds ADD COLUMN user_id TEXT;
         EXCEPTION WHEN duplicate_column THEN NULL; END;
+
+        -- User safety/compliance columns
+        BEGIN
+          ALTER TABLE users ADD COLUMN terms_accepted_at TIMESTAMP WITH TIME ZONE;
+        EXCEPTION WHEN duplicate_column THEN NULL; END;
+
+        BEGIN
+          ALTER TABLE users ADD COLUMN terms_version TEXT;
+        EXCEPTION WHEN duplicate_column THEN NULL; END;
+
+        BEGIN
+          ALTER TABLE users ADD COLUMN is_suspended BOOLEAN NOT NULL DEFAULT FALSE;
+        EXCEPTION WHEN duplicate_column THEN NULL; END;
+
+        BEGIN
+          ALTER TABLE users ADD COLUMN suspended_reason TEXT;
+        EXCEPTION WHEN duplicate_column THEN NULL; END;
+
+        BEGIN
+          ALTER TABLE users ADD COLUMN is_removed BOOLEAN NOT NULL DEFAULT FALSE;
+        EXCEPTION WHEN duplicate_column THEN NULL; END;
+
+        BEGIN
+          ALTER TABLE users ADD COLUMN account_deleted_at TIMESTAMP WITH TIME ZONE;
+        EXCEPTION WHEN duplicate_column THEN NULL; END;
       END $$;
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS reports (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        reporter_user_id TEXT NOT NULL REFERENCES users(auth0_id) ON DELETE CASCADE,
+        reported_user_id TEXT REFERENCES users(auth0_id) ON DELETE SET NULL,
+        content_type TEXT NOT NULL,
+        content_id TEXT NOT NULL,
+        reason TEXT NOT NULL,
+        description TEXT,
+        status TEXT NOT NULL DEFAULT 'pending',
+        reviewed_by TEXT REFERENCES users(auth0_id) ON DELETE SET NULL,
+        reviewed_at TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_blocks (
+        blocker_user_id TEXT NOT NULL REFERENCES users(auth0_id) ON DELETE CASCADE,
+        blocked_user_id TEXT NOT NULL REFERENCES users(auth0_id) ON DELETE CASCADE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        PRIMARY KEY (blocker_user_id, blocked_user_id),
+        CHECK (blocker_user_id <> blocked_user_id)
+      )
     `);
 
     // Create indexes for google_place_id
@@ -122,6 +173,14 @@ export async function initDb() {
 
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_image_posts_google_place_id ON image_posts (google_place_id);
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_reports_status_created_at ON reports (status, created_at DESC);
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_user_blocks_blocked_user_id ON user_blocks (blocked_user_id);
     `);
 
     console.log('✅ Database tables initialized with google_place_id support');

@@ -78,6 +78,29 @@ export interface MediaSummaryResponse {
   };
 }
 
+export interface ComplianceStatus {
+  acceptedTerms: boolean;
+  termsAcceptedAt?: string | null;
+  termsVersion?: string | null;
+  isSuspended?: boolean;
+  isRemoved?: boolean;
+  accountDeletedAt?: string | null;
+}
+
+export interface BlockedUser {
+  blocked_user_id: string;
+  created_at: string;
+}
+
+export interface ModerationReportRequest {
+  reporterUserId: string;
+  reportedUserId?: string;
+  contentType: 'video' | 'image_post' | 'comment' | 'user';
+  contentId: string;
+  reason: 'spam' | 'harassment' | 'inappropriate' | 'hate' | 'other';
+  description?: string;
+}
+
 // ============================================================================
 // Search API Types (from searchMVP)
 // ============================================================================

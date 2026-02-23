@@ -194,6 +194,9 @@ feedRouter.get('/nearby-location', async (req, res) => {
     const radius = parseInt(req.query.radius as string) || 3200; // Default 2 miles in meters
     const limit = parseInt(req.query.limit as string) || 50;
     const offset = parseInt(req.query.offset as string) || 0;
+    const currentUserId = typeof req.query.current_user_id === 'string'
+      ? req.query.current_user_id.trim()
+      : null;
 
     // Validate required params
     if (isNaN(lat) || isNaN(lng)) {
@@ -223,6 +226,13 @@ feedRouter.get('/nearby-location', async (req, res) => {
        INNER JOIN restaurants r ON v.google_place_id = r.google_place_id
        LEFT JOIN users u ON v.user_id = u.auth0_id
        WHERE v.status != 'error'
+         AND COALESCE(u.is_suspended, FALSE) = FALSE
+         AND COALESCE(u.is_removed, FALSE) = FALSE
+         AND u.account_deleted_at IS NULL
+         AND ($6::text IS NULL OR NOT EXISTS (
+           SELECT 1 FROM user_blocks ub
+           WHERE ub.blocker_user_id = $6 AND ub.blocked_user_id = v.user_id
+         ))
          AND r.lat IS NOT NULL AND r.lng IS NOT NULL
          AND (6371000 * acos(
            LEAST(1.0, GREATEST(-1.0,
@@ -232,7 +242,7 @@ feedRouter.get('/nearby-location', async (req, res) => {
          )) <= $3
        ORDER BY v.created_at DESC 
        LIMIT $4 OFFSET $5`,
-      [lat, lng, radius, limit, offset]
+      [lat, lng, radius, limit, offset, currentUserId]
     );
 
     console.log(`[Feed/NearbyLocation] Found ${videosResult.rows.length} videos within ${radius}m`);
@@ -252,6 +262,13 @@ feedRouter.get('/nearby-location', async (req, res) => {
        INNER JOIN restaurants r ON i.google_place_id = r.google_place_id
        LEFT JOIN users u ON i.user_id = u.auth0_id
        WHERE r.lat IS NOT NULL AND r.lng IS NOT NULL
+         AND COALESCE(u.is_suspended, FALSE) = FALSE
+         AND COALESCE(u.is_removed, FALSE) = FALSE
+         AND u.account_deleted_at IS NULL
+         AND ($6::text IS NULL OR NOT EXISTS (
+           SELECT 1 FROM user_blocks ub
+           WHERE ub.blocker_user_id = $6 AND ub.blocked_user_id = i.user_id
+         ))
          AND (6371000 * acos(
            LEAST(1.0, GREATEST(-1.0,
              cos(radians($1)) * cos(radians(r.lat)) * cos(radians(r.lng) - radians($2)) 
@@ -260,7 +277,7 @@ feedRouter.get('/nearby-location', async (req, res) => {
          )) <= $3
        ORDER BY i.created_at DESC 
        LIMIT $4 OFFSET $5`,
-      [lat, lng, radius, limit, offset]
+      [lat, lng, radius, limit, offset, currentUserId]
     );
 
     console.log(`[Feed/NearbyLocation] Found ${imagesResult.rows.length} image posts within ${radius}m`);
@@ -274,7 +291,15 @@ feedRouter.get('/nearby-location', async (req, res) => {
                 r.name as restaurant_name
          FROM tiktok_embeds t
          INNER JOIN restaurants r ON t.google_place_id = r.google_place_id
+         LEFT JOIN users u ON t.user_id = u.auth0_id
          WHERE r.lat IS NOT NULL AND r.lng IS NOT NULL
+           AND COALESCE(u.is_suspended, FALSE) = FALSE
+           AND COALESCE(u.is_removed, FALSE) = FALSE
+           AND u.account_deleted_at IS NULL
+           AND ($6::text IS NULL OR NOT EXISTS (
+             SELECT 1 FROM user_blocks ub
+             WHERE ub.blocker_user_id = $6 AND ub.blocked_user_id = t.user_id
+           ))
            AND (6371000 * acos(
              LEAST(1.0, GREATEST(-1.0,
                cos(radians($1)) * cos(radians(r.lat)) * cos(radians(r.lng) - radians($2)) 
@@ -283,7 +308,7 @@ feedRouter.get('/nearby-location', async (req, res) => {
            )) <= $3
          ORDER BY t.created_at DESC 
          LIMIT $4 OFFSET $5`,
-        [lat, lng, radius, limit, offset]
+        [lat, lng, radius, limit, offset, currentUserId]
       );
       tiktokRows = tiktokResult.rows;
       console.log(`[Feed/NearbyLocation] Found ${tiktokRows.length} TikTok embeds within ${radius}m`);
@@ -400,6 +425,9 @@ feedRouter.get('/nearby', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit as string) || 20;
     const offset = parseInt(req.query.offset as string) || 0;
+    const currentUserId = typeof req.query.current_user_id === 'string'
+      ? req.query.current_user_id.trim()
+      : null;
 
     // Parse place_ids from query string (comma-separated or repeated params)
     let placeIds: string[] = [];
@@ -433,10 +461,17 @@ feedRouter.get('/nearby', async (req, res) => {
        FROM videos v
        LEFT JOIN users u ON v.user_id = u.auth0_id
        WHERE v.status != 'error' 
+         AND COALESCE(u.is_suspended, FALSE) = FALSE
+         AND COALESCE(u.is_removed, FALSE) = FALSE
+         AND u.account_deleted_at IS NULL
+         AND ($4::text IS NULL OR NOT EXISTS (
+           SELECT 1 FROM user_blocks ub
+           WHERE ub.blocker_user_id = $4 AND ub.blocked_user_id = v.user_id
+         ))
          AND v.google_place_id = ANY($1)
        ORDER BY v.created_at DESC 
        LIMIT $2 OFFSET $3`,
-      [placeIds, limit, offset]
+      [placeIds, limit, offset, currentUserId]
     );
 
     console.log(`[Feed/Nearby] Found ${videosResult.rows.length} videos for nearby restaurants`);
@@ -448,9 +483,16 @@ feedRouter.get('/nearby', async (req, res) => {
        FROM image_posts i
        LEFT JOIN users u ON i.user_id = u.auth0_id
        WHERE i.google_place_id = ANY($1)
+         AND COALESCE(u.is_suspended, FALSE) = FALSE
+         AND COALESCE(u.is_removed, FALSE) = FALSE
+         AND u.account_deleted_at IS NULL
+         AND ($4::text IS NULL OR NOT EXISTS (
+           SELECT 1 FROM user_blocks ub
+           WHERE ub.blocker_user_id = $4 AND ub.blocked_user_id = i.user_id
+         ))
        ORDER BY i.created_at DESC 
        LIMIT $2 OFFSET $3`,
-      [placeIds, limit, offset]
+      [placeIds, limit, offset, currentUserId]
     );
 
     console.log(`[Feed/Nearby] Found ${imagesResult.rows.length} image posts for nearby restaurants`);
@@ -459,13 +501,21 @@ feedRouter.get('/nearby', async (req, res) => {
     let tiktokRows: any[] = [];
     try {
       const tiktokResult = await queryWithRetry(
-        `SELECT id, tiktok_url, embed_html, title, author_name, author_url, thumbnail_url, 
-                thumbnail_width, thumbnail_height, google_place_id, created_at
-         FROM tiktok_embeds 
+        `SELECT t.id, t.tiktok_url, t.embed_html, t.title, t.author_name, t.author_url, t.thumbnail_url, 
+                t.thumbnail_width, t.thumbnail_height, t.google_place_id, t.created_at
+         FROM tiktok_embeds t
+         LEFT JOIN users u ON t.user_id = u.auth0_id
          WHERE google_place_id = ANY($1)
-         ORDER BY created_at DESC 
+           AND COALESCE(u.is_suspended, FALSE) = FALSE
+           AND COALESCE(u.is_removed, FALSE) = FALSE
+           AND u.account_deleted_at IS NULL
+           AND ($4::text IS NULL OR NOT EXISTS (
+             SELECT 1 FROM user_blocks ub
+             WHERE ub.blocker_user_id = $4 AND ub.blocked_user_id = t.user_id
+           ))
+         ORDER BY t.created_at DESC 
          LIMIT $2 OFFSET $3`,
-        [placeIds, limit, offset]
+        [placeIds, limit, offset, currentUserId]
       );
       tiktokRows = tiktokResult.rows;
       console.log(`[Feed/Nearby] Found ${tiktokRows.length} TikTok embeds for nearby restaurants`);
@@ -585,6 +635,9 @@ feedRouter.get('/', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit as string) || 20;
     const offset = parseInt(req.query.offset as string) || 0;
+    const currentUserId = typeof req.query.current_user_id === 'string'
+      ? req.query.current_user_id.trim()
+      : null;
 
     // Fetch videos - exclude error/deleted videos
     // Fetch videos - exclude error/deleted videos
@@ -595,9 +648,16 @@ feedRouter.get('/', async (req, res) => {
        FROM videos v
        LEFT JOIN users u ON v.user_id = u.auth0_id
        WHERE v.status != 'error'
+         AND COALESCE(u.is_suspended, FALSE) = FALSE
+         AND COALESCE(u.is_removed, FALSE) = FALSE
+         AND u.account_deleted_at IS NULL
+         AND ($3::text IS NULL OR NOT EXISTS (
+           SELECT 1 FROM user_blocks ub
+           WHERE ub.blocker_user_id = $3 AND ub.blocked_user_id = v.user_id
+         ))
        ORDER BY v.created_at DESC 
        LIMIT $1 OFFSET $2`,
-      [limit, offset]
+      [limit, offset, currentUserId]
     );
 
     console.log(`[Feed] Found ${videosResult.rows.length} videos. Statuses: ${videosResult.rows.map((v: any) => `${v.id}:${v.status}`).join(', ')}`);
@@ -667,21 +727,36 @@ feedRouter.get('/', async (req, res) => {
               u.name as username, u.avatar as user_avatar, u.auth0_id as user_id
        FROM image_posts i
        LEFT JOIN users u ON i.user_id = u.auth0_id
+       WHERE COALESCE(u.is_suspended, FALSE) = FALSE
+         AND COALESCE(u.is_removed, FALSE) = FALSE
+         AND u.account_deleted_at IS NULL
+         AND ($3::text IS NULL OR NOT EXISTS (
+           SELECT 1 FROM user_blocks ub
+           WHERE ub.blocker_user_id = $3 AND ub.blocked_user_id = i.user_id
+         ))
        ORDER BY i.created_at DESC 
        LIMIT $1 OFFSET $2`,
-      [limit, offset]
+      [limit, offset, currentUserId]
     );
 
     // Fetch TikTok embeds (with graceful fallback if table doesn't exist)
     let tiktokRows: any[] = [];
     try {
       const tiktokResult = await queryWithRetry(
-        `SELECT id, tiktok_url, embed_html, title, author_name, author_url, thumbnail_url, 
-                thumbnail_width, thumbnail_height, google_place_id, created_at
-         FROM tiktok_embeds 
-         ORDER BY created_at DESC 
+        `SELECT t.id, t.tiktok_url, t.embed_html, t.title, t.author_name, t.author_url, t.thumbnail_url, 
+                t.thumbnail_width, t.thumbnail_height, t.google_place_id, t.created_at
+         FROM tiktok_embeds t
+         LEFT JOIN users u ON t.user_id = u.auth0_id
+         WHERE COALESCE(u.is_suspended, FALSE) = FALSE
+           AND COALESCE(u.is_removed, FALSE) = FALSE
+           AND u.account_deleted_at IS NULL
+           AND ($3::text IS NULL OR NOT EXISTS (
+             SELECT 1 FROM user_blocks ub
+             WHERE ub.blocker_user_id = $3 AND ub.blocked_user_id = t.user_id
+           ))
+         ORDER BY t.created_at DESC 
          LIMIT $1 OFFSET $2`,
-        [limit, offset]
+        [limit, offset, currentUserId]
       );
       tiktokRows = tiktokResult.rows;
     } catch (err: any) {
