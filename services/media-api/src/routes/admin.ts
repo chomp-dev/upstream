@@ -14,6 +14,15 @@ const ResolveReportSchema = z.object({
   note: z.string().max(1000).optional(),
 });
 
+function formatZodError(error: z.ZodError): string {
+  return error.errors
+    .map((entry) => {
+      const path = entry.path?.length ? `${entry.path.join('.')}: ` : '';
+      return `${path}${entry.message}`;
+    })
+    .join('; ');
+}
+
 adminRouter.post('/reports/:id/resolve', async (req, res) => {
   try {
     const { id } = req.params;
@@ -79,7 +88,7 @@ adminRouter.post('/reports/:id/resolve', async (req, res) => {
   } catch (error: any) {
     await pool.query('ROLLBACK');
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: error.errors });
+      return res.status(400).json({ error: formatZodError(error) });
     }
     console.error('[Admin] Failed to resolve report:', error?.message);
     res.status(500).json({ error: 'Failed to resolve report' });

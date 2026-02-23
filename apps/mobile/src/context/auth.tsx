@@ -34,6 +34,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [supabaseClient, setSupabaseClient] = useState<SupabaseClient>(publicSupabase);
     const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+    const applyCredentials = useCallback((credentials: any) => {
+        if (!credentials?.idToken) {
+            return false;
+        }
+        setAccessToken(credentials.accessToken || null);
+        const authenticatedClient = createSupabaseClient(credentials.idToken);
+        setSupabaseClient(authenticatedClient);
+        return true;
+    }, []);
+
     const login = async (providerOrEvent?: any) => {
         console.log('Login triggered');
         const provider: 'default' | 'apple' = providerOrEvent === 'apple' ? 'apple' : 'default';
@@ -50,7 +60,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         try {
-            await authorize(options);
+            const credentials = await authorize(options);
+            const applied = applyCredentials(credentials);
+            if (!applied) {
+                console.warn('[Auth] authorize() returned without idToken');
+            }
         } catch (e: any) {
             console.error('Login failed', e);
             if (Platform.OS === 'web') {
@@ -93,10 +107,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             try {
                 const credentials = await getCredentials('openid profile email offline_access');
 
-                if (credentials?.idToken) {
-                    setAccessToken(credentials.accessToken);
-                    const authenticatedClient = createSupabaseClient(credentials.idToken);
-                    setSupabaseClient(authenticatedClient);
+                if (applyCredentials(credentials)) {
                     console.log('Token refreshed successfully');
                 }
             } catch (credError: any) {
@@ -105,12 +116,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     console.warn('[Auth] User not logged in, skipping token refresh');
                     return;
                 }
+                if (
+                    credError?.message?.includes('NO_REFRESH_TOKEN') ||
+                    credError?.code === 'NO_REFRESH_TOKEN' ||
+                    credError?.error === 'NO_REFRESH_TOKEN'
+                ) {
+                    console.warn('[Auth] No refresh token available yet, skipping refresh');
+                    return;
+                }
                 throw credError;
             }
         } catch (error) {
             console.error('Failed to refresh token:', error);
         }
-    }, [user, getCredentials]);
+    }, [user, getCredentials, applyCredentials]);
 
     // Initialize session and set up auto-refresh
     useEffect(() => {
@@ -120,10 +139,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     try {
                         const credentials = await getCredentials('openid profile email offline_access');
 
-                        if (credentials?.idToken) {
-                            setAccessToken(credentials.accessToken);
-                            const authenticatedClient = createSupabaseClient(credentials.idToken);
-                            setSupabaseClient(authenticatedClient);
+                        if (applyCredentials(credentials)) {
                             console.log('Supabase client initialized with Auth0 token');
 
                             // Refresh token every 5 minutes to prevent expiry
@@ -138,6 +154,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         // Handle login_required gracefully
                         if (credError?.message?.includes('login_required') || credError?.error === 'login_required') {
                             console.warn('[Auth] User not fully logged in yet');
+                            return;
+                        }
+                        if (
+                            credError?.message?.includes('NO_REFRESH_TOKEN') ||
+                            credError?.code === 'NO_REFRESH_TOKEN' ||
+                            credError?.error === 'NO_REFRESH_TOKEN'
+                        ) {
+                            console.warn('[Auth] No refresh token in storage yet');
                             return;
                         }
                         throw credError;
@@ -162,7 +186,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 clearInterval(refreshIntervalRef.current);
             }
         };
-    }, [user, auth0Loading, getCredentials, refreshToken]);
+    }, [user, auth0Loading, getCredentials, refreshToken, applyCredentials]);
 
     // Sync user to backend
     useEffect(() => {

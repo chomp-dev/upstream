@@ -17,6 +17,7 @@ import { colors, spacing, radius } from '../src/theme';
 import { Image } from 'expo-image';
 import { useKeyboardHeight, getBottomSafeInset } from '../src/hooks/useKeyboardHeight';
 import { BASE_URL } from '../src/lib/api/media';
+import type { CommentTarget } from '../src/context/commentSheet';
 
 interface Comment {
     id: string;
@@ -33,13 +34,13 @@ interface Comment {
 }
 
 interface CommentSheetProps {
-    videoUrl: string;
+    target: CommentTarget;
     onClose: () => void;
     visible: boolean;
 }
 
-export const CommentSheet = ({ videoUrl, onClose, visible }: CommentSheetProps) => {
-    const { user, supabase, login } = useAuth();
+export const CommentSheet = ({ target, onClose, visible }: CommentSheetProps) => {
+    const { user, login } = useAuth();
     const [comments, setComments] = useState<Comment[]>([]);
     const [newComment, setNewComment] = useState('');
     const [loading, setLoading] = useState(false);
@@ -56,54 +57,26 @@ export const CommentSheet = ({ videoUrl, onClose, visible }: CommentSheetProps) 
         ? keyboardHeight - bottomSafeInset + 32 // Added extra padding for safety
         : bottomSafeInset + 16;
 
+    const targetQueryParam = target.type === 'video'
+        ? `video_url=${encodeURIComponent(target.videoUrl)}`
+        : `image_post_id=${encodeURIComponent(String(target.imagePostId))}`;
+
     const fetchComments = useCallback(async () => {
         if (!visible) return;
 
         setLoading(true);
         try {
-            // Fetch top-level comments (no parent_id) with user info
-            const { data, error } = await supabase
-                .from('comments')
-                .select(`
-                    id,
-                    content,
-                    user_id,
-                    created_at,
-                    parent_id,
-                    likes_count
-                `)
-                .eq('video_url', videoUrl)
-                .is('parent_id', null)  // Only top-level comments
-                .order('created_at', { ascending: false });
-
-            if (error) throw error;
-
-            // Fetch user details for comments
-            if (data && data.length > 0) {
-                const userIds = [...new Set(data.map(c => c.user_id))];
-                const { data: users } = await supabase
-                    .from('users')
-                    .select('auth0_id, name, avatar')
-                    .in('auth0_id', userIds);
-
-                const userMap: Record<string, { name: string; avatar: string }> = {};
-                users?.forEach(u => {
-                    userMap[u.auth0_id] = { name: u.name || 'User', avatar: u.avatar || '' };
-                });
-
-                setComments(data.map(c => ({
-                    ...c,
-                    user: userMap[c.user_id] || { name: 'User', avatar: '' }
-                })));
-            } else {
-                setComments([]);
-            }
+            const response = await fetch(`${BASE_URL}/api/comments?${targetQueryParam}`);
+            if (!response.ok) throw new Error('Failed to fetch comments');
+            const payload = await response.json();
+            const nextComments = Array.isArray(payload?.comments) ? payload.comments : [];
+            setComments(nextComments);
         } catch (err) {
             console.error('Error fetching comments:', err);
         } finally {
             setLoading(false);
         }
-    }, [videoUrl, visible, supabase]);
+    }, [targetQueryParam, visible]);
 
     useEffect(() => {
         if (visible) {
@@ -126,7 +99,9 @@ export const CommentSheet = ({ videoUrl, onClose, visible }: CommentSheetProps) 
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    video_url: videoUrl,
+                    ...(target.type === 'video'
+                        ? { video_url: target.videoUrl }
+                        : { image_post_id: target.imagePostId }),
                     user_id: user.sub,
                     content: commentText,
                     parent_id: parentId,
@@ -136,7 +111,6 @@ export const CommentSheet = ({ videoUrl, onClose, visible }: CommentSheetProps) 
             if (!response.ok) throw new Error('Failed to post comment');
             const data = await response.json();
 
-            // Add to local state optimistically
             const newCommentItem: Comment = {
                 id: data.comment?.id || Date.now().toString(),
                 content: commentText,
@@ -157,6 +131,9 @@ export const CommentSheet = ({ videoUrl, onClose, visible }: CommentSheetProps) 
             } else {
                 setComments(prev => [newCommentItem, ...prev]);
             }
+
+            // Always refresh from backend so persisted state is authoritative.
+            await fetchComments();
         } catch (err) {
             console.error('Error posting comment:', err);
             setNewComment(commentText); // Restore on error
@@ -164,6 +141,8 @@ export const CommentSheet = ({ videoUrl, onClose, visible }: CommentSheetProps) 
             setPosting(false);
         }
     };
+
+    const commentTitle = target.type === 'video' ? 'Comments' : 'Image Comments';
 
     const handleReply = (commentId: string, username: string) => {
         setReplyingTo({ id: commentId, username });
@@ -249,7 +228,7 @@ export const CommentSheet = ({ videoUrl, onClose, visible }: CommentSheetProps) 
                 {/* Header */}
                 <View style={styles.header}>
                     <Text style={styles.title}>
-                        Comments
+                        {commentTitle}
                     </Text>
                     <TouchableOpacity onPress={onClose} style={styles.closeButton}>
                         <Ionicons name="close" size={24} color="#fff" />

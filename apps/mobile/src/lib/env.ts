@@ -24,4 +24,7 @@ if (__DEV__) {
   if (MEDIA_API_BASE.includes('localhost') || SEARCH_API_BASE.includes('localhost')) {
     console.warn('[Env] localhost URLs will not work on physical iOS devices. Use your LAN IP or tunnel URL.');
   }
+  if (MEDIA_API_BASE.includes('onrender.com') || SEARCH_API_BASE.includes('onrender.com')) {
+    console.warn('[Env] Using deployed APIs in dev. If you expect local backend logs, set EXPO_PUBLIC_*_API_BASE to your LAN/tunnel URLs before building the dev client.');
+  }
 }

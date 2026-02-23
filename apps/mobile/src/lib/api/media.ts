@@ -540,14 +540,30 @@ export async function acceptTerms(auth0Id: string, version: string): Promise<voi
 }
 
 export async function reportContent(payload: ModerationReportRequest): Promise<void> {
-  const response = await fetch(`${MEDIA_API_BASE}/api/reports`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({}));
-    throw new Error(data.error || 'Failed to report content');
+  try {
+    const response = await fetch(`${MEDIA_API_BASE}/api/reports`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({} as any));
+      const rawError = data?.error;
+      const normalizedError = Array.isArray(rawError)
+        ? rawError
+          .map((entry: any) => entry?.message || JSON.stringify(entry))
+          .filter(Boolean)
+          .join('; ')
+        : (typeof rawError === 'string' ? rawError : '');
+
+      throw new Error(normalizedError || `Failed to report content (status ${response.status})`);
+    }
+  } catch (error: any) {
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Failed to report content');
   }
 }
 

@@ -48,7 +48,14 @@ reportsRouter.post('/', async (req, res) => {
     res.json({ status: 'success', report: result.rows[0] });
   } catch (error: any) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: error.errors });
+      const message = error.errors
+        .map((entry) => {
+          const path = entry.path?.length ? `${entry.path.join('.')}: ` : '';
+          return `${path}${entry.message}`;
+        })
+        .join('; ');
+      console.warn('[Reports] Validation failed:', message);
+      return res.status(400).json({ error: message });
     }
     console.error('[Reports] Failed to create report:', error?.message);
     res.status(500).json({ error: 'Failed to create report' });

@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, Image, TouchableOpacity, Platform, Share, Alert } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { View, StyleSheet, Image, TouchableOpacity, Platform, Share, Alert, ActionSheetIOS } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,7 +9,7 @@ import { colors, spacing, radius } from '../src/theme';
 import { Text } from '../src/ui';
 import { useAuth } from '../src/context/auth';
 import { useCommentSheet } from '../src/context/commentSheet';
-import { blockUser, reportContent } from '../src/lib/api/media';
+import { BASE_URL, blockUser, reportContent } from '../src/lib/api/media';
 import { blockedUsersStore } from '../src/lib/blockedUsersStore';
 
 interface MediaOverlayProps {
@@ -38,9 +38,10 @@ export function MediaOverlay({
     userLocation,
 }: MediaOverlayProps) {
     const router = useRouter();
-    const { user: authUser, supabase, login } = useAuth();
-    const { openCommentSheet } = useCommentSheet();
+    const { user: authUser, login, isLoading } = useAuth();
+    const { openCommentSheet, isOpen: commentSheetOpen } = useCommentSheet();
     const [distance, setDistance] = useState<string | null>(null);
+    const prevCommentSheetOpen = useRef(false);
 
     // DEBUG: Log what props we receive
     useEffect(() => {
@@ -100,95 +101,46 @@ export function MediaOverlay({
         })();
     }, [restaurant, userLocation]);
 
-    // Fetch social data
-    useEffect(() => {
+    const fetchSocialData = useCallback(async () => {
         if (!videoUrl && !imagePostId) return;
 
-        const fetchSocialData = async () => {
-            try {
-                // LIKE COUNT
-                let likeCount = 0;
-                if (videoUrl) {
-                    const { count } = await supabase
-                        .from('video_likes')
-                        .select('*', { count: 'exact', head: true })
-                        .eq('video_url', videoUrl);
-                    likeCount = count || 0;
-                } else if (imagePostId) {
-                    const { count } = await supabase
-                        .from('image_post_likes')
-                        .select('*', { count: 'exact', head: true })
-                        .eq('image_post_id', imagePostId);
-                    likeCount = count || 0;
-                }
-                setLikesCount(likeCount);
+        try {
+            const params = new URLSearchParams();
+            if (videoUrl) params.set('video_url', videoUrl);
+            if (imagePostId) params.set('image_post_id', String(imagePostId));
+            if (authUser?.sub) params.set('user_id', authUser.sub);
 
-                // COMMENT COUNT
-                let commentCount = 0;
-                if (videoUrl) {
-                    const { count } = await supabase
-                        .from('comments')
-                        .select('id', { count: 'exact', head: true })
-                        .eq('video_url', videoUrl);
-                    commentCount = count || 0;
-                } else if (imagePostId) {
-                    const { count } = await supabase
-                        .from('image_post_comments')
-                        .select('id', { count: 'exact', head: true })
-                        .eq('image_post_id', imagePostId);
-                    commentCount = count || 0;
-                }
-                setCommentsCount(commentCount || 0);
+            const response = await fetch(`${BASE_URL}/api/social/status?${params}`);
+            if (!response.ok) throw new Error(`Status ${response.status}`);
+            const data = await response.json();
 
-                // USER LIKE STATUS
-                if (authUser) {
-                    let isLikedData = false;
-                    if (videoUrl) {
-                        const { data } = await supabase
-                            .from('video_likes')
-                            .select('*')
-                            .eq('video_url', videoUrl)
-                            .eq('user_id', authUser.sub)
-                            .maybeSingle();
-                        isLikedData = !!data;
-                    } else if (imagePostId) {
-                        const { data } = await supabase
-                            .from('image_post_likes')
-                            .select('*')
-                            .eq('image_post_id', imagePostId)
-                            .eq('user_id', authUser.sub)
-                            .maybeSingle();
-                        isLikedData = !!data;
-                    }
-                    setIsLiked(isLikedData);
+            setLikesCount(data.likes_count ?? 0);
+            setCommentsCount(data.comments_count ?? 0);
+            setSavesCount(data.saves_count ?? 0);
+            setIsLiked(data.is_liked ?? false);
+            setIsSaved(data.is_saved ?? false);
+        } catch (err) {
+            console.error('[MediaOverlay] Failed to fetch social data:', err);
+        }
+    }, [videoUrl, imagePostId, authUser]);
 
-                    // Saves (only video supported for now in original code, skipping for image post if unknown)
-                    if (videoUrl) {
-                        const { data: saveData } = await supabase
-                            .from('saves')
-                            .select('*')
-                            .eq('video_url', videoUrl)
-                            .eq('user_id', authUser.sub)
-                            .maybeSingle();
-                        setIsSaved(!!saveData);
-                    }
-                }
-
-                // Saves Count (video only for now)
-                if (videoUrl) {
-                    const { count: saveCount } = await supabase
-                        .from('saves')
-                        .select('id', { count: 'exact', head: true })
-                        .eq('video_url', videoUrl);
-                    setSavesCount(saveCount || 0);
-                }
-            } catch (err) {
-                // Silently handle errors
-            }
-        };
-
+    // Initial fetch
+    useEffect(() => {
+        if (isLoading) return;
+        if (!authUser) {
+            setIsLiked(false);
+            setIsSaved(false);
+        }
         fetchSocialData();
-    }, [videoUrl, imagePostId, authUser, supabase]);
+    }, [fetchSocialData, isLoading, authUser]);
+
+    // Refresh counts when comment sheet closes (user may have posted)
+    useEffect(() => {
+        if (prevCommentSheetOpen.current && !commentSheetOpen) {
+            fetchSocialData();
+        }
+        prevCommentSheetOpen.current = commentSheetOpen;
+    }, [commentSheetOpen, fetchSocialData]);
 
     const handleProfilePress = () => {
         if (user?.userId) {
@@ -209,26 +161,27 @@ export function MediaOverlay({
         const previousLiked = isLiked;
         const previousCount = likesCount;
 
-        // Optimistic update
         setIsLiked(!previousLiked);
         setLikesCount(previousLiked ? previousCount - 1 : previousCount + 1);
 
         try {
-            if (previousLiked) {
-                if (videoUrl) {
-                    await supabase.from('video_likes').delete().eq('video_url', videoUrl).eq('user_id', authUser.sub);
-                } else if (imagePostId) {
-                    await supabase.from('image_post_likes').delete().eq('image_post_id', imagePostId).eq('user_id', authUser.sub);
-                }
-            } else {
-                if (videoUrl) {
-                    await supabase.from('video_likes').insert({ video_url: videoUrl, user_id: authUser.sub });
-                } else if (imagePostId) {
-                    await supabase.from('image_post_likes').insert({ image_post_id: imagePostId, user_id: authUser.sub });
-                }
+            const response = await fetch(`${BASE_URL}/api/social/like`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ...(videoUrl ? { video_url: videoUrl } : { image_post_id: imagePostId }),
+                    user_id: authUser.sub,
+                }),
+            });
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.error || `Status ${response.status}`);
             }
+            const data = await response.json();
+            setIsLiked(data.liked);
+            setLikesCount(data.likes_count ?? likesCount);
         } catch (err) {
-            // Revert on error
+            console.error('[MediaOverlay] Failed to toggle like:', err);
             setIsLiked(previousLiked);
             setLikesCount(previousCount);
         }
@@ -239,7 +192,7 @@ export function MediaOverlay({
             login();
             return;
         }
-        if (!videoUrl) return;
+        if (!videoUrl && !imagePostId) return;
 
         const previousSaved = isSaved;
         const previousCount = savesCount;
@@ -248,21 +201,23 @@ export function MediaOverlay({
         setSavesCount(previousSaved ? previousCount - 1 : previousCount + 1);
 
         try {
-            if (previousSaved) {
-                await supabase
-                    .from('saves')
-                    .delete()
-                    .eq('video_url', videoUrl)
-                    .eq('user_id', authUser.sub);
-            } else {
-                await supabase
-                    .from('saves')
-                    .insert({
-                        video_url: videoUrl,
-                        user_id: authUser.sub
-                    });
+            const response = await fetch(`${BASE_URL}/api/social/save`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ...(videoUrl ? { video_url: videoUrl } : { image_post_id: imagePostId }),
+                    user_id: authUser.sub,
+                }),
+            });
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.error || `Status ${response.status}`);
             }
+            const data = await response.json();
+            setIsSaved(data.saved);
+            setSavesCount(data.saves_count ?? savesCount);
         } catch (err) {
+            console.error('[MediaOverlay] Failed to toggle save:', err);
             setIsSaved(previousSaved);
             setSavesCount(previousCount);
         }
@@ -270,14 +225,9 @@ export function MediaOverlay({
 
     const handleComment = () => {
         if (videoUrl) {
-            openCommentSheet(videoUrl);
+            openCommentSheet({ type: 'video', videoUrl });
         } else if (imagePostId) {
-            // Pass explicitly as image post ID if comment sheet supports it, 
-            // or pass a construct that the sheet understands.
-            // Assuming openCommentSheet handles polymorphism via string ID or we need to update context.
-            // For now, let's try passing ID as string with prefix if needed, or just ID.
-            // The current context likely expects a string ID.
-            openCommentSheet(imagePostId.toString());
+            openCommentSheet({ type: 'image_post', imagePostId });
         }
     };
 
@@ -301,40 +251,106 @@ export function MediaOverlay({
         }
     };
 
-    const handleReport = async () => {
-        if (!authUser) {
-            login();
-            return;
-        }
+    const submitReport = async (reason: string, description?: string) => {
+        if (!authUser) return;
         const contentType = videoUrl ? 'video' : 'image_post';
         const contentId = videoUrl || imagePostId?.toString();
         if (!contentId) return;
 
-        Alert.alert(
-            'Report content',
-            'Report this post for objectionable or abusive content?',
-            [
-                { text: 'Cancel', style: 'cancel' },
+        try {
+            await reportContent({
+                reporterUserId: authUser.sub,
+                reportedUserId: user?.userId,
+                contentType,
+                contentId,
+                reason: reason as any,
+                description,
+            });
+            Alert.alert('Reported', 'Thanks. We review reports within 24 hours.');
+        } catch (error: any) {
+            console.error('[Report] Failed to submit report:', error);
+            const message = error?.message && typeof error.message === 'string'
+                ? error.message
+                : 'Failed to submit report.';
+            Alert.alert('Error', message);
+        }
+    };
+
+    const handleReport = () => {
+        if (!authUser) {
+            login();
+            return;
+        }
+        if (!videoUrl && !imagePostId) return;
+
+        const reasons = [
+            { key: 'spam', label: 'Spam' },
+            { key: 'harassment', label: 'Harassment' },
+            { key: 'inappropriate', label: 'Inappropriate content' },
+            { key: 'hate', label: 'Hate speech' },
+            { key: 'other', label: 'Other' },
+        ];
+
+        if (Platform.OS === 'ios') {
+            ActionSheetIOS.showActionSheetWithOptions(
                 {
-                    text: 'Report',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            await reportContent({
-                                reporterUserId: authUser.sub,
-                                reportedUserId: user?.userId,
-                                contentType,
-                                contentId,
-                                reason: 'inappropriate',
-                            });
-                            Alert.alert('Reported', 'Thanks. We review reports within 24 hours.');
-                        } catch (error) {
-                            Alert.alert('Error', 'Failed to submit report.');
-                        }
+                    title: 'Why are you reporting this?',
+                    options: ['Cancel', ...reasons.map(r => r.label)],
+                    cancelButtonIndex: 0,
+                    destructiveButtonIndex: reasons.length,
+                },
+                (buttonIndex) => {
+                    if (buttonIndex === 0) return;
+                    const selected = reasons[buttonIndex - 1];
+                    if (selected.key === 'other') {
+                        Alert.prompt(
+                            'Describe the issue',
+                            'Please provide details about why you are reporting this content.',
+                            [
+                                { text: 'Cancel', style: 'cancel' },
+                                {
+                                    text: 'Submit',
+                                    onPress: (text) => submitReport('other', text),
+                                },
+                            ],
+                            'plain-text',
+                            '',
+                            'default'
+                        );
+                    } else {
+                        submitReport(selected.key);
                     }
                 }
-            ]
-        );
+            );
+        } else {
+            Alert.alert(
+                'Why are you reporting this?',
+                'Select a reason:',
+                [
+                    ...reasons.map(r => ({
+                        text: r.label,
+                        onPress: () => {
+                            if (r.key === 'other') {
+                                Alert.alert(
+                                    'Describe the issue',
+                                    'Please provide details.',
+                                    [
+                                        { text: 'Cancel', style: 'cancel' as const },
+                                        {
+                                            text: 'Submit without details',
+                                            onPress: () => submitReport('other'),
+                                        },
+                                    ]
+                                );
+                            } else {
+                                submitReport(r.key);
+                            }
+                        },
+                    })),
+                    { text: 'Cancel', style: 'cancel' },
+                ]
+            );
+        }
     };
 
     const handleBlock = async () => {

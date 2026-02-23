@@ -2,9 +2,14 @@
 const { Pool } = require('pg');
 
 const start = async () => {
-    // Use the exact connection string from .env
+    const connectionString = process.env.DATABASE_URL;
+    if (!connectionString) {
+        console.error('DATABASE_URL is required');
+        process.exit(1);
+    }
+
     const pool = new Pool({
-        connectionString: "postgresql://postgres.gpucrivkkqqdzmaruicu:MLBLHXDXusechomp.com123!@aws-1-us-east-2.pooler.supabase.com:6543/postgres",
+        connectionString,
         ssl: { rejectUnauthorized: false },
         connectionTimeoutMillis: 5000,
     });

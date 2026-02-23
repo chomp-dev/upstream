@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { View, StyleSheet, Image, TouchableOpacity, ActivityIndicator, Platform, AppState, Text as RNText } from 'react-native';
@@ -43,6 +43,8 @@ export function VideoPlayer({
     status
 }: VideoPlayerProps) {
     const { width, height } = useContentDimensions();
+    const isDisposedRef = useRef(false);
+    const playerRef = useRef<any>(null);
 
     // Setup player with expo-video hook
     // We only create the player if we have a playbackUrl
@@ -59,8 +61,41 @@ export function VideoPlayer({
             }
         }
     });
+    playerRef.current = player;
 
     const [isPlaying, setIsPlaying] = React.useState(false);
+
+    const safePause = useCallback(() => {
+        const activePlayer = playerRef.current;
+        if (!activePlayer || isDisposedRef.current) return;
+        try {
+            activePlayer.pause();
+        } catch (error) {
+            console.warn('[VideoPlayer] pause skipped during cleanup/race:', error);
+        }
+    }, []);
+
+    const safePlay = useCallback(() => {
+        const activePlayer = playerRef.current;
+        if (!activePlayer || isDisposedRef.current) return;
+        try {
+            if (!activePlayer.playing) {
+                const result = activePlayer.play() as any;
+                if (result && typeof result.catch === 'function') {
+                    result.catch(() => { /* Ignore transient playback race errors */ });
+                }
+            }
+        } catch (error) {
+            console.warn('[VideoPlayer] play skipped during cleanup/race:', error);
+        }
+    }, []);
+
+    useEffect(() => {
+        isDisposedRef.current = false;
+        return () => {
+            isDisposedRef.current = true;
+        };
+    }, []);
 
     useEffect(() => {
         const sub = player.addListener('playingChange', ({ isPlaying: newIsPlaying }) => {
@@ -75,21 +110,16 @@ export function VideoPlayer({
         if (!player) return;
 
         const handlePlayback = () => {
+            if (isDisposedRef.current) return;
             if (isActive) {
                 // Only play if app is active
                 if (AppState.currentState === 'active') {
-                    if (!player.playing) {
-                        // Handle Web Promise rejection (AbortError)
-                        const result = player.play() as any;
-                        if (result && typeof result.catch === 'function') {
-                            result.catch(() => { });
-                        }
-                    }
+                    safePlay();
                 } else {
-                    player.pause();
+                    safePause();
                 }
             } else {
-                player.pause();
+                safePause();
             }
         };
 
@@ -97,7 +127,7 @@ export function VideoPlayer({
         handlePlayback();
 
         // Listen for AppState changes
-        const subscription = AppState.addEventListener('change', (nextAppState) => {
+        const subscription = AppState.addEventListener('change', () => {
             handlePlayback();
         });
 
@@ -106,11 +136,9 @@ export function VideoPlayer({
             // Cleanup: pause player on unmount
             // Note: Don't call player.release() - it causes crashes on iOS
             // expo-video handles cleanup automatically
-            if (player) {
-                player.pause();
-            }
+            safePause();
         };
-    }, [isActive, player]);
+    }, [isActive, player, safePause, safePlay]);
 
     // If processing or no playback URL, show placeholder
     if (status === 'processing' || !playbackUrl) {
@@ -140,11 +168,11 @@ export function VideoPlayer({
             style={[styles.container, { width, height }]}
             activeOpacity={1}
             onPress={() => {
-                if (player.playing) {
-                    player.pause();
-                } else {
-                    player.play();
+                if (player?.playing) {
+                    safePause();
+                    return;
                 }
+                safePlay();
             }}
         >
             <VideoView
@@ -152,7 +180,7 @@ export function VideoPlayer({
                 style={[styles.video, { width, height }]}
                 contentFit="cover"
                 nativeControls={false}
-                allowsFullscreen={false}
+                // Default fullscreen behavior from platform defaults.
                 // @ts-ignore: playsInline is required for iOS Web inline playback
                 playsInline
                 // @ts-ignore: muted is required for iOS Web autoplay, but we want sound elsewhere

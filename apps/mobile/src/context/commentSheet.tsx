@@ -1,8 +1,12 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { CommentSheet } from '../../components/CommentSheet';
 
+export type CommentTarget =
+    | { type: 'video'; videoUrl: string }
+    | { type: 'image_post'; imagePostId: number };
+
 interface CommentSheetContextType {
-    openCommentSheet: (videoUrl: string) => void;
+    openCommentSheet: (target: CommentTarget) => void;
     closeCommentSheet: () => void;
     isOpen: boolean;
 }
@@ -23,25 +27,25 @@ interface CommentSheetProviderProps {
 
 export function CommentSheetProvider({ children }: CommentSheetProviderProps) {
     const [isOpen, setIsOpen] = useState(false);
-    const [currentVideoUrl, setCurrentVideoUrl] = useState<string | null>(null);
+    const [currentTarget, setCurrentTarget] = useState<CommentTarget | null>(null);
 
-    const openCommentSheet = useCallback((videoUrl: string) => {
-        setCurrentVideoUrl(videoUrl);
+    const openCommentSheet = useCallback((target: CommentTarget) => {
+        setCurrentTarget(target);
         setIsOpen(true);
     }, []);
 
     const closeCommentSheet = useCallback(() => {
         setIsOpen(false);
-        setCurrentVideoUrl(null);
+        setCurrentTarget(null);
     }, []);
 
     return (
         <CommentSheetContext.Provider value={{ openCommentSheet, closeCommentSheet, isOpen }}>
             {children}
             {/* Global CommentSheet - only one instance renders */}
-            {currentVideoUrl && (
+            {currentTarget && (
                 <CommentSheet
-                    videoUrl={currentVideoUrl}
+                    target={currentTarget}
                     visible={isOpen}
                     onClose={closeCommentSheet}
                 />

@@ -29,6 +29,15 @@ const BlockUserSchema = z.object({
     reason: z.string().max(300).optional(),
 });
 
+function formatZodError(error: z.ZodError): string {
+    return error.errors
+        .map((entry) => {
+            const path = entry.path?.length ? `${entry.path.join('.')}: ` : '';
+            return `${path}${entry.message}`;
+        })
+        .join('; ');
+}
+
 function getActorAuth0Id(req: Request): string | null {
     const headerValue = req.header('x-auth0-id');
     if (!headerValue) return null;
@@ -71,7 +80,7 @@ usersRouter.post('/', async (req, res) => {
         });
     } catch (error: any) {
         if (error instanceof z.ZodError) {
-            return res.status(400).json({ error: error.errors });
+            return res.status(400).json({ error: formatZodError(error) });
         }
         console.error('Error syncing user:', {
             message: error?.message,
@@ -144,7 +153,7 @@ usersRouter.put('/:auth0Id', async (req, res) => {
         });
     } catch (error: any) {
         if (error instanceof z.ZodError) {
-            return res.status(400).json({ error: error.errors });
+            return res.status(400).json({ error: formatZodError(error) });
         }
         console.error('[Users] Error updating profile:', {
             message: error?.message,
@@ -214,7 +223,7 @@ usersRouter.post('/:auth0Id/accept-terms', async (req, res) => {
         res.json({ status: 'success', compliance: result.rows[0] });
     } catch (error: any) {
         if (error instanceof z.ZodError) {
-            return res.status(400).json({ error: error.errors });
+            return res.status(400).json({ error: formatZodError(error) });
         }
         console.error('[Users] Failed to accept terms:', error?.message);
         res.status(500).json({ error: 'Failed to accept terms' });
@@ -278,7 +287,7 @@ usersRouter.post('/:auth0Id/block', async (req, res) => {
         res.json({ status: 'success' });
     } catch (error: any) {
         if (error instanceof z.ZodError) {
-            return res.status(400).json({ error: error.errors });
+            return res.status(400).json({ error: formatZodError(error) });
         }
         console.error('[Users] Failed to block user:', error?.message);
         res.status(500).json({ error: 'Failed to block user' });

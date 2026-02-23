@@ -11,6 +11,7 @@ import { tiktokRouter } from './routes/tiktok';
 import { commentsRouter } from './routes/comments';
 import { reportsRouter } from './routes/reports';
 import { adminRouter } from './routes/admin';
+import { socialRouter } from './routes/social';
 import { initDb } from './db';
 
 dotenv.config();
@@ -65,6 +66,7 @@ app.use('/api/tiktok', tiktokRouter);
 app.use('/api/comments', commentsRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/social', socialRouter);
 
 // Root route for diagnostic testing
 app.get('/', (req, res) => {

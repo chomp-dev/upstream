@@ -51,6 +51,7 @@ export default function HomeScreen() {
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [activeItemKey, setActiveItemKey] = useState<string | null>(null);
   const [restaurantCache, setRestaurantCache] = useState<Record<string, Restaurant>>({});
   const flatListRef = useRef<FlatList>(null);
   const isFocused = useIsFocused();
@@ -82,6 +83,15 @@ export default function HomeScreen() {
   const [viewMode, setViewMode] = useState<ViewMode>('feed');
   const [searchQuery, setSearchQuery] = useState('');
   const [blockedUserIds, setBlockedUserIds] = useState<string[]>([]);
+
+  const getFeedItemKey = useCallback((item: FeedItem) => `${item.type}-${item.id}`, []);
+
+  const setActiveFromIndex = useCallback((index: number, sourceFeed?: FeedItem[]) => {
+    setCurrentIndex(index);
+    const nextFeed = sourceFeed ?? feed;
+    const nextItem = nextFeed[index];
+    setActiveItemKey(nextItem ? getFeedItemKey(nextItem) : null);
+  }, [feed, getFeedItemKey]);
 
   const applySafetyFilters = useCallback((items: FeedItem[]): FeedItem[] => {
     const blockedSet = new Set(blockedUserIds);
@@ -126,6 +136,25 @@ export default function HomeScreen() {
   useEffect(() => {
     setFeed((prev) => applySafetyFilters(prev));
   }, [applySafetyFilters]);
+
+  useEffect(() => {
+    if (feed.length === 0) {
+      if (currentIndex !== 0) setCurrentIndex(0);
+      if (activeItemKey !== null) setActiveItemKey(null);
+      return;
+    }
+
+    const safeIndex = Math.min(currentIndex, feed.length - 1);
+    const nextItem = feed[safeIndex];
+    const nextKey = nextItem ? getFeedItemKey(nextItem) : null;
+
+    if (safeIndex !== currentIndex) {
+      setCurrentIndex(safeIndex);
+    }
+    if (nextKey !== activeItemKey) {
+      setActiveItemKey(nextKey);
+    }
+  }, [feed, currentIndex, activeItemKey, getFeedItemKey]);
 
   // ============================================================================
   // Handle videoDataId param (for navigating from profile/explore to specific post)
@@ -215,7 +244,7 @@ export default function HomeScreen() {
       // Scroll to top immediately since we prepended
       setTimeout(() => {
         flatListRef.current?.scrollToIndex({ index: 0, animated: false });
-        setCurrentIndex(0);
+        setActiveFromIndex(0, [passedItem, ...feed]);
       }, 100);
     };
 
@@ -583,7 +612,7 @@ export default function HomeScreen() {
               // We need to wait for state update to reflect in FlatList
               setTimeout(() => {
                 flatListRef.current?.scrollToIndex({ index: 0, animated: false });
-                setCurrentIndex(0);
+                setActiveFromIndex(0, [injectedItem, ...feed]);
               }, 200);
               return;
             }
@@ -607,7 +636,7 @@ export default function HomeScreen() {
               index: finalIndex,
               animated: false,
             });
-            setCurrentIndex(finalIndex);
+            setActiveFromIndex(finalIndex, feed);
           }, 100);
           lastScrolledRef.current = scrollKey;
         } else if (params.videoDataId) {
@@ -657,8 +686,11 @@ export default function HomeScreen() {
 
   const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
     if (viewableItems.length > 0) {
-      const index = viewableItems[0].index || 0;
+      const firstVisible = viewableItems[0];
+      const index = firstVisible?.index || 0;
+      const item = firstVisible?.item as FeedItem | undefined;
       setCurrentIndex(index);
+      setActiveItemKey(item ? getFeedItemKey(item) : null);
       // Track viewed items for cache refetch logic
       feedStore.markViewed(index);
     }
@@ -679,7 +711,7 @@ export default function HomeScreen() {
           // Wait for view switch then scroll
           setTimeout(() => {
             flatListRef.current?.scrollToIndex({ index, animated: false });
-            setCurrentIndex(index);
+            setActiveFromIndex(index, feed);
           }, 100);
         }}
         activeOpacity={0.8}
@@ -837,7 +869,7 @@ export default function HomeScreen() {
                     videoId={item.cloudflare_video_id}
                     playbackUrl={item.playback_url}
                     thumbnailUrl={item.thumbnail_url}
-                    isActive={index === currentIndex && isFocused}
+                    isActive={activeItemKey === getFeedItemKey(item) && isFocused}
                     restaurant={restaurant}
                     user={{
                       userId: item.user_id,
@@ -880,7 +912,7 @@ export default function HomeScreen() {
                     title={item.title}
                     authorName={item.username || item.author_name}
                     tiktokUrl={item.video_url || item.tiktok_url}
-                    isActive={index === currentIndex && isFocused}
+                    isActive={activeItemKey === getFeedItemKey(item) && isFocused}
                   />
                 </View>
               );

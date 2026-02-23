@@ -131,3 +131,27 @@ Add a new entry at the **bottom** of this file during or immediately after **Pha
 **Files affected**: `apps/mobile/src/lib/feedStore.ts`
 
 **Tags**: #mobile #feed #store #cache
+
+---
+
+## [2026-02-23] — Mobile/Social — Optimistic like UI did not verify mutation success
+
+**What went wrong**: A feed action updated `isLiked` and counts optimistically but did not check Supabase mutation results for `insert/delete` errors. The UI appeared successful, but failed writes meant likes were not persisted and disappeared after restart. The same area also suppressed social-read errors, hiding root causes during debugging.
+
+**Correct approach**: Always inspect `{ error }` from Supabase writes and throw/revert optimistic state when present. Do not silently swallow errors in social bootstrap reads; log them with clear source tags so device logs reveal whether failures are auth, RLS, or connectivity-related.
+
+**Files affected**: `apps/mobile/components/MediaOverlay.tsx`
+
+**Tags**: #mobile #likes #optimistic-ui #supabase #observability
+
+---
+
+## [2026-02-23] — Mobile/Social — Supabase RLS rejects Auth0 JWTs for social writes (likes, saves)
+
+**What went wrong**: `MediaOverlay.tsx` used the Supabase JS client (with Auth0 `idToken` as Bearer header) to insert/delete rows in `video_likes`, `image_post_likes`, and `saves`. Supabase RLS policies use `auth.uid()` / `auth.jwt()` which expect Supabase-native auth claims, not Auth0's `sub` claim format (e.g. `google-oauth2|123...`). Every write was rejected with error `42501: new row violates row-level security policy`. Reads may also have been silently returning empty results. This is the same root cause that previously broke comments (which were already migrated to the Media API).
+
+**Correct approach**: Route all social writes (likes, saves, comments) through the Media API backend, which connects to the same Postgres database via `pg` pool as the `postgres` role and bypasses RLS entirely. The pattern is: mobile calls `POST /api/social/like` or `POST /api/social/save` via `fetch()`, and the backend performs the DB operation. Social reads also go through `GET /api/social/status` for the same reason. Never use the Supabase JS client for write operations on tables with RLS policies that don't recognize Auth0 JWTs.
+
+**Files affected**: `apps/mobile/components/MediaOverlay.tsx`, `services/media-api/src/routes/social.ts` (new), `services/media-api/src/db/index.ts`
+
+**Tags**: #mobile #supabase #rls #auth0 #likes #saves #architecture

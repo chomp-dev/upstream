@@ -166,6 +166,83 @@ export async function initDb() {
       )
     `);
 
+    // Ensure comments schema is aligned with comments routes.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS comments (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        video_url TEXT NOT NULL REFERENCES videos(video_url) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(auth0_id) ON DELETE CASCADE,
+        content TEXT NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )
+    `);
+
+    await pool.query(`
+      ALTER TABLE comments
+      ADD COLUMN IF NOT EXISTS image_post_id INTEGER REFERENCES image_posts(id) ON DELETE CASCADE,
+      ALTER COLUMN video_url DROP NOT NULL,
+      ADD COLUMN IF NOT EXISTS parent_id UUID REFERENCES comments(id) ON DELETE CASCADE,
+      ADD COLUMN IF NOT EXISTS likes_count INTEGER NOT NULL DEFAULT 0
+    `);
+
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1
+          FROM pg_constraint
+          WHERE conname = 'comments_exactly_one_target'
+        ) THEN
+          ALTER TABLE comments
+            ADD CONSTRAINT comments_exactly_one_target
+            CHECK (
+              (video_url IS NOT NULL AND image_post_id IS NULL)
+              OR
+              (video_url IS NULL AND image_post_id IS NOT NULL)
+            );
+        END IF;
+      END $$;
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS comment_likes (
+        comment_id UUID NOT NULL REFERENCES comments(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(auth0_id) ON DELETE CASCADE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        PRIMARY KEY (comment_id, user_id)
+      )
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS video_likes (
+        video_url TEXT NOT NULL REFERENCES videos(playback_url),
+        user_id TEXT NOT NULL REFERENCES users(auth0_id) ON DELETE CASCADE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        PRIMARY KEY (video_url, user_id)
+      )
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS image_post_likes (
+        image_post_id INTEGER NOT NULL REFERENCES image_posts(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(auth0_id) ON DELETE CASCADE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        PRIMARY KEY (image_post_id, user_id)
+      )
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS saves (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id TEXT NOT NULL REFERENCES users(auth0_id) ON DELETE CASCADE,
+        video_url TEXT REFERENCES videos(playback_url),
+        image_post_id INTEGER REFERENCES image_posts(id) ON DELETE CASCADE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        UNIQUE (user_id, video_url),
+        UNIQUE (user_id, image_post_id)
+      )
+    `);
+
     // Create indexes for google_place_id
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_videos_google_place_id ON videos (google_place_id);
@@ -181,6 +258,22 @@ export async function initDb() {
 
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_user_blocks_blocked_user_id ON user_blocks (blocked_user_id);
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_comments_video_url_created_at ON comments (video_url, created_at DESC);
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_comments_parent_id ON comments (parent_id);
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_comment_likes_comment_id ON comment_likes (comment_id);
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_comments_image_post_id_created_at ON comments (image_post_id, created_at DESC);
     `);
 
     console.log('✅ Database tables initialized with google_place_id support');
